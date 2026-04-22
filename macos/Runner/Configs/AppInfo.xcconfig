@@ -8,7 +8,7 @@
 PRODUCT_NAME = kidflix
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.example.kidflix
+PRODUCT_BUNDLE_IDENTIFIER = fr.dtfh.kidflix
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 com.example. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 fr.dtfh. All rights reserved.
