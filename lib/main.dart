@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/ui/router/app_router.dart';
+import 'package:kidflix/ui/theme/app_theme_data.dart';
 
 void main() {
   runApp(const ProviderScope(child: KidflixApp()));
@@ -13,10 +14,7 @@ class KidflixApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final bootstrap = ref.watch(bootstrapProvider);
-    final theme = ThemeData(
-      colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      useMaterial3: true,
-    );
+    final theme = AppThemeData.buildDarkTheme();
     return bootstrap.when(
       data: (_) => MaterialApp.router(
         title: 'Kidflix',
