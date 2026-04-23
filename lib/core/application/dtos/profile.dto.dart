@@ -1,12 +1,19 @@
 import 'package:kidflix/core/domain/model/profile.dart';
 
 /// UI-facing projection of a [Profile]. Never exposes the bcrypt PIN hash.
+///
+/// [isMain] is exposed so the management UI can:
+/// - display a "Principal" badge on the main profile tile
+/// - disable the delete action on the main profile
+/// - route PIN changes on the main profile to the dedicated double-entry
+///   screen instead of the standard edit form
 class ProfileDto {
   final String id;
   final String name;
   final String ageCategory;
   final bool hasPin;
   final String? avatarUrl;
+  final bool isMain;
 
   const ProfileDto({
     required this.id,
@@ -14,6 +21,7 @@ class ProfileDto {
     required this.ageCategory,
     required this.hasPin,
     this.avatarUrl,
+    required this.isMain,
   });
 
   factory ProfileDto.fromDomain(Profile profile) => ProfileDto(
@@ -22,5 +30,6 @@ class ProfileDto {
     ageCategory: profile.ageCategory.name,
     hasPin: profile.hasPin,
     avatarUrl: profile.avatarUrl,
+    isMain: profile.isMain,
   );
 }

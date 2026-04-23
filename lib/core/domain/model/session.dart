@@ -14,6 +14,12 @@ class Session {
     required this.profiles,
   });
 
+  Session copyWith({List<Profile>? profiles}) => Session(
+    jwt: jwt,
+    device: device,
+    profiles: profiles ?? this.profiles,
+  );
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;

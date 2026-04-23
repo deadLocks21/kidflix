@@ -95,6 +95,7 @@ class SharedPreferencesSessionRepository implements SessionRepository {
     'ageCategory': profile.ageCategory.name,
     'pinHash': profile.pinHash,
     'avatarUrl': profile.avatarUrl,
+    'isMain': profile.isMain,
   };
 
   Profile _profileFromJson(Map<String, dynamic> json) => Profile(
@@ -105,5 +106,8 @@ class SharedPreferencesSessionRepository implements SessionRepository {
     ),
     pinHash: json['pinHash'] as String?,
     avatarUrl: json['avatarUrl'] as String?,
+    // Backwards-compat: sessions persisted before `isMain` existed default
+    // to false. The next successful login overwrites with correct data.
+    isMain: json['isMain'] as bool? ?? false,
   );
 }

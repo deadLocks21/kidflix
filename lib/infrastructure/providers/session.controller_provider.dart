@@ -1,11 +1,23 @@
 import 'package:kidflix/core/application/session_state.dart';
+import 'package:kidflix/core/application/usecases/change_main_profile_pin.usecase.dart';
+import 'package:kidflix/core/application/usecases/change_profile_pin.usecase.dart';
+import 'package:kidflix/core/application/usecases/clear_profile_pin.usecase.dart';
+import 'package:kidflix/core/application/usecases/create_profile.usecase.dart';
+import 'package:kidflix/core/application/usecases/delete_profile.usecase.dart';
+import 'package:kidflix/core/application/usecases/enter_management_mode.usecase.dart';
 import 'package:kidflix/core/application/usecases/request_otp.usecase.dart';
 import 'package:kidflix/core/application/usecases/resend_otp.usecase.dart';
 import 'package:kidflix/core/application/usecases/restore_session.usecase.dart';
 import 'package:kidflix/core/application/usecases/select_profile.usecase.dart';
+import 'package:kidflix/core/application/usecases/update_profile_metadata.usecase.dart';
+import 'package:kidflix/core/application/usecases/verify_management_pin.usecase.dart';
 import 'package:kidflix/core/application/usecases/verify_otp.usecase.dart';
 import 'package:kidflix/core/application/usecases/verify_profile_pin.usecase.dart';
+import 'package:kidflix/core/domain/model/profile.dart';
+import 'package:kidflix/core/domain/model/session.dart';
 import 'package:kidflix/infrastructure/providers/auth.service_provider.dart';
+import 'package:kidflix/infrastructure/providers/in_memory_accounts_store.provider.dart';
+import 'package:kidflix/infrastructure/providers/profile_management.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.repository_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -151,7 +163,220 @@ class SessionController extends _$SessionController {
   Future<void> logout() async {
     final service = ref.read(authServiceProvider);
     await service.logout.execute();
+    ref.read(inMemoryAccountsStoreProvider).clearCurrentAccount();
     state = const Anonymous();
+  }
+
+  // --- Profile management ---------------------------------------------------
+
+  /// Enters management mode. On success, transitions to
+  /// `ManagementPinRequired`. Fails if no profile has `isMain`.
+  EnterManagementModeResult enterManagementMode() {
+    final current = state;
+    if (current is! Authenticated) {
+      return const EnterManagementModeInvalidState();
+    }
+    final service = ref.read(profileManagementServiceProvider);
+    final result = service.enterManagementMode.execute(
+      session: current.session,
+    );
+    if (result is EnterManagementModeSuccess) {
+      state = ManagementPinRequired(current.session);
+    }
+    return result;
+  }
+
+  Future<VerifyManagementPinResult> verifyManagementPin(String rawPin) async {
+    final current = state;
+    if (current is! ManagementPinRequired) {
+      return const VerifyManagementPinInvalid();
+    }
+    final main = _mainProfile(current.session);
+    if (main == null) return const VerifyManagementPinInvalid();
+    final service = ref.read(profileManagementServiceProvider);
+    final result = await service.verifyManagementPin.execute(
+      mainProfile: main,
+      rawPin: rawPin,
+    );
+    if (result is VerifyManagementPinSuccess) {
+      state = ManagingProfiles(current.session);
+    }
+    return result;
+  }
+
+  void cancelManagementPinEntry() {
+    final current = state;
+    if (current is ManagementPinRequired) {
+      state = Authenticated(current.session);
+    }
+  }
+
+  void exitManagementMode() {
+    final current = state;
+    if (current is ManagingProfiles) {
+      state = Authenticated(current.session);
+    }
+  }
+
+  Future<CreateProfileResult> createProfile({
+    required String name,
+    required AgeCategory ageCategory,
+    String? rawPin,
+  }) async {
+    final current = state;
+    if (current is! ManagingProfiles) {
+      return const CreateProfileInvalidState();
+    }
+    final service = ref.read(profileManagementServiceProvider);
+    final result = await service.createProfile.execute(
+      rawName: name,
+      ageCategory: ageCategory,
+      rawPin: rawPin,
+    );
+    if (result is CreateProfileSuccess) {
+      final updatedProfiles = List<Profile>.from(current.session.profiles)
+        ..add(result.profile);
+      await _persistAndReplaceSession(
+        current.session.copyWith(profiles: updatedProfiles),
+      );
+    }
+    return result;
+  }
+
+  Future<UpdateProfileMetadataResult> updateProfileMetadata({
+    required String profileId,
+    required String name,
+    required AgeCategory ageCategory,
+  }) async {
+    final current = state;
+    if (current is! ManagingProfiles) {
+      return const UpdateProfileMetadataInvalidState();
+    }
+    final service = ref.read(profileManagementServiceProvider);
+    final result = await service.updateProfileMetadata.execute(
+      session: current.session,
+      profileId: profileId,
+      rawName: name,
+      ageCategory: ageCategory,
+    );
+    if (result is UpdateProfileMetadataSuccess) {
+      await _persistAndReplaceSession(
+        current.session.copyWith(
+          profiles: _replaceProfile(current.session.profiles, result.profile),
+        ),
+      );
+    }
+    return result;
+  }
+
+  Future<ChangeProfilePinResult> changeProfilePin({
+    required String profileId,
+    required String rawPin,
+  }) async {
+    final current = state;
+    if (current is! ManagingProfiles) {
+      return const ChangeProfilePinInvalidState();
+    }
+    final service = ref.read(profileManagementServiceProvider);
+    final result = await service.changeProfilePin.execute(
+      session: current.session,
+      profileId: profileId,
+      rawPin: rawPin,
+    );
+    if (result is ChangeProfilePinSuccess) {
+      await _persistAndReplaceSession(
+        current.session.copyWith(
+          profiles: _replaceProfile(current.session.profiles, result.profile),
+        ),
+      );
+    }
+    return result;
+  }
+
+  Future<ClearProfilePinResult> clearProfilePin({
+    required String profileId,
+  }) async {
+    final current = state;
+    if (current is! ManagingProfiles) {
+      return const ClearProfilePinInvalidState();
+    }
+    final service = ref.read(profileManagementServiceProvider);
+    final result = await service.clearProfilePin.execute(
+      session: current.session,
+      profileId: profileId,
+    );
+    if (result is ClearProfilePinSuccess) {
+      await _persistAndReplaceSession(
+        current.session.copyWith(
+          profiles: _replaceProfile(current.session.profiles, result.profile),
+        ),
+      );
+    }
+    return result;
+  }
+
+  Future<ChangeMainProfilePinResult> changeMainProfilePin({
+    required String newPin,
+    required String confirmPin,
+  }) async {
+    final current = state;
+    if (current is! ManagingProfiles) {
+      return const ChangeMainProfilePinInvalidState();
+    }
+    final service = ref.read(profileManagementServiceProvider);
+    final result = await service.changeMainProfilePin.execute(
+      session: current.session,
+      newPin: newPin,
+      confirmPin: confirmPin,
+    );
+    if (result is ChangeMainProfilePinSuccess) {
+      await _persistAndReplaceSession(
+        current.session.copyWith(
+          profiles: _replaceProfile(current.session.profiles, result.profile),
+        ),
+      );
+    }
+    return result;
+  }
+
+  Future<DeleteProfileResult> deleteProfile({required String profileId}) async {
+    final current = state;
+    if (current is! ManagingProfiles) {
+      return const DeleteProfileInvalidState();
+    }
+    final service = ref.read(profileManagementServiceProvider);
+    final result = await service.deleteProfile.execute(
+      session: current.session,
+      profileId: profileId,
+    );
+    if (result is DeleteProfileSuccess) {
+      final updated = current.session.profiles
+          .where((p) => p.id != profileId)
+          .toList(growable: false);
+      await _persistAndReplaceSession(
+        current.session.copyWith(profiles: updated),
+      );
+    }
+    return result;
+  }
+
+  Profile? _mainProfile(Session session) {
+    for (final p in session.profiles) {
+      if (p.isMain) return p;
+    }
+    return null;
+  }
+
+  List<Profile> _replaceProfile(List<Profile> profiles, Profile replacement) {
+    return [
+      for (final p in profiles)
+        if (p.id == replacement.id) replacement else p,
+    ];
+  }
+
+  Future<void> _persistAndReplaceSession(Session next) async {
+    await ref.read(sessionRepositoryProvider).write(next);
+    state = ManagingProfiles(next);
   }
 }
 

@@ -5,6 +5,10 @@ import 'package:kidflix/infrastructure/providers/session.controller_provider.dar
 import 'package:kidflix/ui/pages/home/home.page.dart';
 import 'package:kidflix/ui/pages/otp_verify/otp_verify.page.dart';
 import 'package:kidflix/ui/pages/phone_entry/phone_entry.page.dart';
+import 'package:kidflix/ui/pages/profile_management/change_main_pin.page.dart';
+import 'package:kidflix/ui/pages/profile_management/management_list.page.dart';
+import 'package:kidflix/ui/pages/profile_management/management_pin.page.dart';
+import 'package:kidflix/ui/pages/profile_management/profile_form.page.dart';
 import 'package:kidflix/ui/pages/profile_pin/profile_pin.page.dart';
 import 'package:kidflix/ui/pages/profile_selection/profile_selection.page.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -17,6 +21,11 @@ abstract final class AppRoutes {
   static const profiles = '/profiles';
   static const profilePin = '/profiles/pin';
   static const home = '/home';
+  static const managementPin = '/profiles/manage/pin';
+  static const manage = '/profiles/manage';
+  static const manageNew = '/profiles/manage/new';
+  static const manageEdit = '/profiles/manage/:id/edit';
+  static const manageMainPin = '/profiles/manage/main/pin';
 }
 
 String _targetRouteFor(SessionState state) => switch (state) {
@@ -25,7 +34,15 @@ String _targetRouteFor(SessionState state) => switch (state) {
   Authenticated() => AppRoutes.profiles,
   PinRequired() => AppRoutes.profilePin,
   ProfileSelected() => AppRoutes.home,
+  ManagementPinRequired() => AppRoutes.managementPin,
+  ManagingProfiles() => AppRoutes.manage,
 };
+
+bool _isManageSubRoute(String path) =>
+    path == AppRoutes.manage ||
+    path == AppRoutes.manageNew ||
+    path == AppRoutes.manageMainPin ||
+    (path.startsWith('/profiles/manage/') && path.endsWith('/edit'));
 
 @Riverpod(keepAlive: true)
 GoRouter appRouter(Ref ref) {
@@ -38,8 +55,13 @@ GoRouter appRouter(Ref ref) {
     initialLocation: AppRoutes.phone,
     refreshListenable: refresh,
     redirect: (context, routerState) {
-      final target = _targetRouteFor(ref.read(sessionControllerProvider));
-      return routerState.matchedLocation == target ? null : target;
+      final sessionState = ref.read(sessionControllerProvider);
+      final target = _targetRouteFor(sessionState);
+      final current = routerState.matchedLocation;
+      if (sessionState is ManagingProfiles && _isManageSubRoute(current)) {
+        return null;
+      }
+      return current == target ? null : target;
     },
     routes: [
       GoRoute(path: AppRoutes.phone, builder: (_, _) => const PhoneEntryPage()),
@@ -53,6 +75,26 @@ GoRouter appRouter(Ref ref) {
         builder: (_, _) => const ProfilePinPage(),
       ),
       GoRoute(path: AppRoutes.home, builder: (_, _) => const HomePage()),
+      GoRoute(
+        path: AppRoutes.managementPin,
+        builder: (_, _) => const ManagementPinPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.manage,
+        builder: (_, _) => const ManagementListPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.manageNew,
+        builder: (_, _) => const ProfileFormPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.manageEdit,
+        builder: (_, s) => ProfileFormPage(profileId: s.pathParameters['id']),
+      ),
+      GoRoute(
+        path: AppRoutes.manageMainPin,
+        builder: (_, _) => const ChangeMainPinPage(),
+      ),
     ],
   );
 }

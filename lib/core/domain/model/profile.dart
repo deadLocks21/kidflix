@@ -9,12 +9,17 @@ enum AgeCategory { bebe, enfant, ado, jeuneAdulte, adulte }
 /// The hash is a bcrypt string (`$2b$...`) verified locally by a
 /// `ProfilePinService` — the raw PIN never travels beyond the verification
 /// call.
+///
+/// [isMain] marks the account's main profile. The flag is set by the source
+/// of truth (backend / in-memory fake data) and is immutable from the app's
+/// perspective — no Domain or Application operation mutates it.
 class Profile {
   final String id;
   final String name;
   final AgeCategory ageCategory;
   final String? pinHash;
   final String? avatarUrl;
+  final bool isMain;
 
   const Profile({
     required this.id,
@@ -22,6 +27,7 @@ class Profile {
     required this.ageCategory,
     this.pinHash,
     this.avatarUrl,
+    this.isMain = false,
   });
 
   /// `true` when the profile requires PIN verification.
