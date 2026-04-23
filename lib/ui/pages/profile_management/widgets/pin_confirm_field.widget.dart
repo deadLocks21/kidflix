@@ -107,6 +107,8 @@ class PinConfirmFieldState extends State<PinConfirmField> {
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             decoration: const InputDecoration(
               border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
               counterText: '',
             ),
             style: const TextStyle(color: Colors.transparent, height: 0.01),

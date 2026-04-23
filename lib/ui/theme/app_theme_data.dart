@@ -37,6 +37,16 @@ abstract final class AppThemeData {
       iconButtonTheme: IconButtonThemeData(
         style: KidflixIconButtonStyles.mediaFlat,
       ),
+      inputDecorationTheme: const InputDecorationTheme(
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: KidflixPalette.white, width: 2),
+        ),
+        floatingLabelStyle: TextStyle(color: KidflixPalette.white),
+      ),
+      textSelectionTheme: const TextSelectionThemeData(
+        cursorColor: KidflixPalette.white,
+        selectionHandleColor: KidflixPalette.white,
+      ),
     );
   }
 }

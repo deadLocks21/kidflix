@@ -147,6 +147,8 @@ class _ManagementPinPageState extends ConsumerState<ManagementPinPage>
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     decoration: const InputDecoration(
                       border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
                       counterText: '',
                     ),
                     style: const TextStyle(

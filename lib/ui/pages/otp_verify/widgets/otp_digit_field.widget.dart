@@ -36,6 +36,8 @@ class OtpDigitField extends StatelessWidget {
         decoration: const InputDecoration(
           counterText: '',
           border: OutlineInputBorder(),
+          isDense: true,
+          contentPadding: EdgeInsets.symmetric(vertical: 14, horizontal: 8),
         ),
         onChanged: (value) {
           if (value.isEmpty) {
