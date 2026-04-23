@@ -65,18 +65,10 @@ class ProfileSelectionPage extends ConsumerWidget {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 480),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.manage_accounts),
-                      label: const Text('Gérer les profils'),
-                      onPressed: () => _enterManagement(context, ref),
-                    ),
-                  ),
-                ),
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.manage_accounts),
+                label: const Text('Gérer les profils'),
+                onPressed: () => _enterManagement(context, ref),
               ),
             ),
           ],

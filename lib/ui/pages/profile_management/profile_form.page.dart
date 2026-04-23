@@ -249,7 +249,10 @@ class _ProfileFormPageState extends ConsumerState<ProfileFormPage> {
                     ? const SizedBox(
                         height: 16,
                         width: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : const Text('Valider'),
               ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kidflix/ui/theme/app_colors.dart';
+import 'package:kidflix/ui/theme/button_styles.dart';
 import 'package:kidflix/ui/theme/kidflix_palette.dart';
 
 abstract final class AppThemeData {
@@ -27,6 +28,15 @@ abstract final class AppThemeData {
       brightness: Brightness.dark,
       colorScheme: colorScheme,
       extensions: const <ThemeExtension<dynamic>>[AppColors.dark()],
+      filledButtonTheme: FilledButtonThemeData(
+        style: KidflixButtonStyles.primaryLarge,
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: KidflixButtonStyles.outlinedLarge,
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: KidflixIconButtonStyles.mediaFlat,
+      ),
     );
   }
 }
