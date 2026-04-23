@@ -1,30 +1,29 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:kidflix/main.dart';
+import 'package:kidflix/core/domain/exceptions/invalid_phone_number.exception.dart';
+import 'package:kidflix/core/domain/model/phone_number.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('PhoneNumber', () {
+    test('accepts a well-formatted mobile number', () {
+      expect(PhoneNumber.parse('0612345678').e164, '+33612345678');
+    });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    test('strips whitespace, dots and hyphens before validation', () {
+      expect(PhoneNumber.parse('06 12.34-56 78').e164, '+33612345678');
+    });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    test('rejects numbers not starting with 06 or 07', () {
+      expect(
+        () => PhoneNumber.parse('0112345678'),
+        throwsA(isA<InvalidPhoneNumberException>()),
+      );
+    });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    test('rejects numbers with wrong length', () {
+      expect(
+        () => PhoneNumber.parse('061234567'),
+        throwsA(isA<InvalidPhoneNumberException>()),
+      );
+    });
   });
 }

@@ -1,17 +1,43 @@
 # kidflix
 
-A new Flutter project.
+Application familiale Flutter pour la médiathèque kDrive.
 
-## Getting Started
+## Lancer l'application
 
-This project is a starting point for a Flutter application.
+```bash
+flutter pub get
+dart run build_runner build --delete-conflicting-outputs
+flutter run -d macos   # ou -d chrome, -d <deviceId>
+```
 
-A few resources to get you started if this is your first Flutter project:
+## Architecture
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+Architecture hexagonale, layers avec dépendances unidirectionnelles :
+`UI → Application → Domain ← Infrastructure`.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+- `lib/core/domain/` : modèles, interfaces, exceptions (pur Dart)
+- `lib/core/application/` : usecases, DTOs, services applicatifs
+- `lib/infrastructure/` : implémentations + providers Riverpod
+- `lib/ui/` : pages Flutter + router
+
+Détails dans `/Users/timh/Projects/songbook-app/ARCHITECTURE.md` (mêmes conventions).
+
+## Données de test (mode InMemory)
+
+Le backend n'est pas encore développé. L'app utilise `InMemoryAuthRepository`
+avec les numéros suivants :
+
+| Téléphone       | Profils                                          |
+| --------------- | ------------------------------------------------ |
+| `0612345678`    | Papa (PIN `1234`), Ar (sans PIN), Ro (PIN `9999`) |
+| `0787654321`    | Alice (PIN `0000`), Li (sans PIN)                 |
+
+Code OTP accepté pour tous les numéros autorisés : **`123456`**.
+Tout autre numéro renvoie "numéro inconnu". Tout autre code renvoie
+"code invalide".
+
+## Tests
+
+```bash
+flutter test
+```
