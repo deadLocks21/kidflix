@@ -49,13 +49,13 @@ void main() {
       expect(find.widgetWithText(FilledButton, 'Lire'), findsOneWidget);
     });
 
-    testWidgets('Play button is disabled', (tester) async {
+    testWidgets('Play button is enabled', (tester) async {
       await tester.pumpWidget(
         _harness(MovieDetailContent(movie: _detailWith())),
       );
       final button =
           tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Lire'));
-      expect(button.onPressed, isNull);
+      expect(button.onPressed, isNotNull);
     });
 
     testWidgets('meta line contains year, duration and primary genre', (

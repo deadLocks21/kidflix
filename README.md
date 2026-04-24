@@ -78,6 +78,52 @@ Matching : insensible à la casse et aux accents, substring sur `title` et
 `originalTitle`. Normalisation dans `lib/shared/text_normalization.dart`.
 Seuil minimum de 2 caractères, debounce 250 ms, tri alphabétique.
 
+## Lecture vidéo
+
+Le bouton `"Lire"` de la modale de détails ouvre la `PlayerPage`
+(`/player/:movieId`), qui orchestre :
+
+1. **Download** — `InMemoryDownloadRepository` télécharge via `dio` depuis
+   une URL unique en dur (Big Buck Bunny sur archive.org, ~62 MB,
+   720p ~10 min, MP4 H.264) vers
+   `${applicationDocumentsDirectory}/downloads/${movieId}.mp4.partial`.
+   Dès que 2 Mo sont reçus (seuil `readyToPlay`), la lecture démarre sur
+   le fichier partiel — le download continue en fond et le `.partial`
+   est renommé en `.mp4` à la fin.
+2. **Reprise** — si une `WatchProgress` existe pour la paire
+   `(profile, movie)` avec `positionSeconds >= 10` et `completed == false`,
+   un dialogue bloquant `"Reprendre la lecture ?"` propose `"Reprendre à
+   Xh YY"` ou `"Recommencer"`.
+3. **Sauvegarde** — la progression est sauvegardée toutes les 10s
+   pendant la lecture, à la fermeture de la page, et au franchissement
+   du seuil de complétion (> 90% regardé).
+4. **Lecture** — `media_kit` joue le fichier local avec ses contrôles
+   natifs (`MaterialVideoControls` sur mobile, `MaterialDesktopVideoControls`
+   sur desktop), configurés via `MaterialVideoControlsTheme` :
+   - **Top bar custom** : bouton Close + titre du film
+   - **Bottom bar standard** : play/pause, position, fullscreen
+     (+ volume sur desktop)
+   - `speedUpOnLongPress` et `seekOnDoubleTap` désactivés (gestes
+     "pro" qui surprendraient un enfant)
+   - Auto-hide après 3s sans interaction, géré par media_kit
+   Les raccourcis clavier (espace, flèches) sont câblés gratuitement
+   par la lib. Le seek au-delà du buffered est toléré — mpv stalle
+   brièvement le temps que le download rattrape.
+5. **Mobile** — orientation landscape forcée, `SystemUiMode.immersiveSticky`,
+   wakelock actif pendant la lecture.
+
+Le `WatchProgressRepository` est un `InMemoryWatchProgressRepository`
+(Map en RAM) — les progressions sont perdues au redémarrage de l'app.
+Le contrat domain est identique à ce que sera l'implémentation HTTP
+(`GET/POST /progress/:movieId`) : aucune modification de l'API client
+attendue lors du branchement sur le backend.
+
+**Hors scope** (changements ultérieurs) : kid lock natif
+(Android `startLockTask` / iOS Accès Guidé), download en arrière-plan,
+file d'attente multi-films, contrôles avancés (vitesse, sous-titres,
+skip ±10s), alimentation réelle de la row `continueWatching` de la
+home.
+
 ## Tests
 
 ```bash

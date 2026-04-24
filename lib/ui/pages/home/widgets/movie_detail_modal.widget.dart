@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/shared/duration_format.dart';
 
@@ -94,7 +95,7 @@ class MovieDetailContent extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(_metaLine(movie), style: theme.textTheme.bodyMedium),
                 const SizedBox(height: 16),
-                _PlayButton(),
+                _PlayButton(movieId: movie.id),
                 const SizedBox(height: 24),
                 Text(movie.synopsis, style: theme.textTheme.bodyMedium),
                 if (movie.genres.isNotEmpty) ...[
@@ -184,15 +185,19 @@ class _Backdrop extends StatelessWidget {
 }
 
 class _PlayButton extends StatelessWidget {
+  final String movieId;
+
+  const _PlayButton({required this.movieId});
+
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: 'Lecture bientôt disponible',
-      child: FilledButton.icon(
-        icon: const Icon(Icons.play_arrow),
-        label: const Text('Lire'),
-        onPressed: null,
-      ),
+    return FilledButton.icon(
+      icon: const Icon(Icons.play_arrow),
+      label: const Text('Lire'),
+      onPressed: () {
+        Navigator.of(context).pop();
+        context.go('/player/$movieId');
+      },
     );
   }
 }

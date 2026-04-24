@@ -464,26 +464,6 @@ The modal SHALL be dismissible by:
 
 ---
 
-### Requirement: Play button is visible but disabled in MVP
-
-The detail modal SHALL display a "Lire" (Play) primary button. For this
-change, the button SHALL be rendered in the Material disabled state
-(`onPressed: null`) because the video player has not yet been implemented.
-
-A tooltip or ancillary hint `"Lecture bientôt disponible"` MAY be attached
-to the button.
-
-The button SHALL NOT be hidden, removed, or replaced by a placeholder.
-
-#### Scenario: Play button is disabled
-
-- **GIVEN** the detail modal is open for a movie
-- **WHEN** the user taps the Play button
-- **THEN** nothing happens (button is disabled)
-- **AND** no navigation or state change occurs
-
----
-
 ### Requirement: Posters are cached on disk for offline availability
 
 The UI SHALL load poster and backdrop images through `cached_network_image`

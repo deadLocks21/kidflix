@@ -9,6 +9,7 @@ import 'package:kidflix/ui/pages/profile_management/change_main_pin.page.dart';
 import 'package:kidflix/ui/pages/profile_management/management_list.page.dart';
 import 'package:kidflix/ui/pages/profile_management/management_pin.page.dart';
 import 'package:kidflix/ui/pages/profile_management/profile_form.page.dart';
+import 'package:kidflix/ui/pages/player/player.page.dart';
 import 'package:kidflix/ui/pages/profile_pin/profile_pin.page.dart';
 import 'package:kidflix/ui/pages/profile_selection/profile_selection.page.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -26,6 +27,7 @@ abstract final class AppRoutes {
   static const manageNew = '/profiles/manage/new';
   static const manageEdit = '/profiles/manage/:id/edit';
   static const manageMainPin = '/profiles/manage/main/pin';
+  static const player = '/player/:movieId';
 }
 
 String _targetRouteFor(SessionState state) => switch (state) {
@@ -44,6 +46,8 @@ bool _isManageSubRoute(String path) =>
     path == AppRoutes.manageMainPin ||
     (path.startsWith('/profiles/manage/') && path.endsWith('/edit'));
 
+bool _isPlayerRoute(String path) => path.startsWith('/player/');
+
 @Riverpod(keepAlive: true)
 GoRouter appRouter(Ref ref) {
   final refresh = ValueNotifier<int>(0);
@@ -59,6 +63,9 @@ GoRouter appRouter(Ref ref) {
       final target = _targetRouteFor(sessionState);
       final current = routerState.matchedLocation;
       if (sessionState is ManagingProfiles && _isManageSubRoute(current)) {
+        return null;
+      }
+      if (sessionState is ProfileSelected && _isPlayerRoute(current)) {
         return null;
       }
       return current == target ? null : target;
@@ -94,6 +101,10 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: AppRoutes.manageMainPin,
         builder: (_, _) => const ChangeMainPinPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.player,
+        builder: (_, s) => PlayerPage(movieId: s.pathParameters['movieId']!),
       ),
     ],
   );
