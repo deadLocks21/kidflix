@@ -1,0 +1,121 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+import 'package:kidflix/core/application/dtos/movie.dto.dart';
+import 'package:kidflix/shared/duration_format.dart';
+
+/// Single-line result row rendered inside the search results list.
+class SearchResultTile extends StatelessWidget {
+  static const double _posterWidth = 60;
+  static const double _posterHeight = 90;
+
+  final MovieDto movie;
+  final VoidCallback onTap;
+
+  const SearchResultTile({
+    super.key,
+    required this.movie,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: SizedBox(
+                width: _posterWidth,
+                height: _posterHeight,
+                child: _Poster(posterUrl: movie.posterUrl),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    movie.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _caption(movie),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _caption(MovieDto movie) {
+    final duration = formatDurationHuman(movie.duration);
+    if (movie.year == null) return duration;
+    return '${movie.year} · $duration';
+  }
+}
+
+class _Poster extends StatelessWidget {
+  final String? posterUrl;
+
+  const _Poster({required this.posterUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    final fallback = _PosterFallback();
+    final url = posterUrl;
+    if (url == null || url.isEmpty) return fallback;
+    return CachedNetworkImage(
+      imageUrl: url,
+      fit: BoxFit.cover,
+      placeholder: (_, _) => const _PosterPlaceholder(),
+      errorWidget: (_, _, _) => fallback,
+    );
+  }
+}
+
+class _PosterPlaceholder extends StatelessWidget {
+  const _PosterPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(color: Theme.of(context).colorScheme.surfaceContainerHigh);
+  }
+}
+
+class _PosterFallback extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      color: theme.colorScheme.surfaceContainerHigh,
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.movie_outlined,
+        size: 24,
+        color: theme.colorScheme.onSurfaceVariant,
+      ),
+    );
+  }
+}

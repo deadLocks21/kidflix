@@ -85,5 +85,53 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byIcon(Icons.switch_account), findsOneWidget);
     });
+
+    testWidgets('shows search icon in normal mode', (tester) async {
+      await tester.pumpWidget(
+        _app([
+          homeCatalogRowsProvider.overrideWith((ref) async => const [_row]),
+        ]),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.search), findsOneWidget);
+    });
+
+    testWidgets('tapping search icon swaps AppBar into search mode', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _app([
+          homeCatalogRowsProvider.overrideWith((ref) async => const [_row]),
+        ]),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.search));
+      await tester.pumpAndSettle();
+      expect(find.byType(TextField), findsOneWidget);
+      expect(find.byIcon(Icons.close), findsOneWidget);
+      expect(find.byIcon(Icons.switch_account), findsNothing);
+      expect(
+        find.text('Tape au moins 2 lettres pour chercher.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('closing search returns to normal mode with rows visible', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _app([
+          homeCatalogRowsProvider.overrideWith((ref) async => const [_row]),
+        ]),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.search));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.switch_account), findsOneWidget);
+      expect(find.byIcon(Icons.search), findsOneWidget);
+      expect(find.byType(CatalogRowWidget), findsOneWidget);
+    });
   });
 }

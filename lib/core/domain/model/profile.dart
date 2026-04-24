@@ -3,6 +3,17 @@
 /// The ordering follows the hierarchy: `bebe < enfant < ado < jeuneAdulte < adulte`.
 enum AgeCategory { bebe, enfant, ado, jeuneAdulte, adulte }
 
+/// Materializes the documented ordering of [AgeCategory] as a lookup used
+/// by the `search` capability to grant a profile access to its own
+/// category and all strictly lower ones.
+extension AgeCategoryHierarchy on AgeCategory {
+  /// All categories with `index <= this.index`, in enum order. Includes
+  /// this category itself.
+  List<AgeCategory> get lowerOrEqual => AgeCategory.values
+      .where((c) => c.index <= index)
+      .toList(growable: false);
+}
+
 /// A viewer profile attached to an authenticated user account.
 ///
 /// Profiles with a non-null [pinHash] require PIN verification before use.

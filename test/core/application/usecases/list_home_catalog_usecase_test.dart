@@ -23,6 +23,12 @@ class _FakeRepo implements CatalogRepository {
       ),
     ];
   }
+
+  @override
+  Future<List<Movie>> searchMovies({
+    required String query,
+    required AgeCategory upToAgeCategory,
+  }) async => const [];
 }
 
 void main() {

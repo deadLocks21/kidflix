@@ -57,8 +57,26 @@ remplacés par les vrais repositories (`WatchProgressRepository`,
 correspondantes arriveront dans leurs propres changes.
 
 Le filtre d'âge est **strict sur la homepage** (`profile.ageCategory ==
-movie.ageCategory`). La permission hiérarchique (`bebe < enfant < ...`)
-sera utilisée par la future recherche.
+movie.ageCategory`). La permission hiérarchique (`bebe < enfant < ado <
+jeuneAdulte < adulte`) est matérialisée par l'extension
+`AgeCategoryHierarchy.lowerOrEqual` et utilisée par la recherche
+ci-dessous.
+
+## Recherche de films
+
+Une barre de recherche est accessible via l'icône loupe dans l'AppBar de
+la homepage. Elle s'ouvre inline (sans navigation vers une autre page),
+bascule l'AppBar en champ de saisie, et remplace les rows par la liste
+des résultats. La fermeture restaure la home à sa position de scroll
+précédente (via `IndexedStack`).
+
+Portée : un profil voit tous les films dont `ageCategory` est inférieure
+ou égale à la sienne (un profil `ado` accède aux films `bebe` + `enfant`
++ `ado`, un profil `bebe` ne voit que `bebe`).
+
+Matching : insensible à la casse et aux accents, substring sur `title` et
+`originalTitle`. Normalisation dans `lib/shared/text_normalization.dart`.
+Seuil minimum de 2 caractères, debounce 250 ms, tri alphabétique.
 
 ## Tests
 

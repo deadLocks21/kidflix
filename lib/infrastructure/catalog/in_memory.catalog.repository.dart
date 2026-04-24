@@ -1,6 +1,7 @@
 import 'package:kidflix/core/domain/model/movie.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/services/catalog.repository.dart';
+import 'package:kidflix/shared/text_normalization.dart';
 
 /// In-memory fake [CatalogRepository] used until the HTTP backend is ready.
 ///
@@ -27,6 +28,24 @@ class InMemoryCatalogRepository implements CatalogRepository {
   @override
   Future<List<Movie>> listMoviesFor(AgeCategory ageCategory) async {
     return _movies.where((m) => m.ageCategory == ageCategory).toList();
+  }
+
+  @override
+  Future<List<Movie>> searchMovies({
+    required String query,
+    required AgeCategory upToAgeCategory,
+  }) async {
+    final allowed = upToAgeCategory.lowerOrEqual.toSet();
+    final needle = normalizeForSearch(query);
+    return _movies.where((m) {
+      if (!allowed.contains(m.ageCategory)) return false;
+      if (normalizeForSearch(m.title).contains(needle)) return true;
+      final original = m.originalTitle;
+      if (original != null && normalizeForSearch(original).contains(needle)) {
+        return true;
+      }
+      return false;
+    }).toList(growable: false);
   }
 
   static List<Movie> _seed() {

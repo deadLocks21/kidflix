@@ -5,43 +5,62 @@ import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/core/application/session_state.dart';
 import 'package:kidflix/infrastructure/providers/catalog.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/catalog.usecases_provider.dart';
+import 'package:kidflix/infrastructure/providers/search.controller_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/ui/pages/home/widgets/catalog_row.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/catalog_skeleton.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/movie_detail_modal.widget.dart';
+import 'package:kidflix/ui/pages/home/widgets/search_app_bar.widget.dart';
+import 'package:kidflix/ui/pages/home/widgets/search_results.widget.dart';
 
 /// Homepage catalog: vertical scroll of horizontal rows built for the
 /// active profile. Rows are filtered strictly by the profile's age
 /// category; empty rows are hidden server-side (application service).
+///
+/// Hosts the inline search mode — a search icon in the AppBar swaps the
+/// header for a search bar and the body for the search results (via
+/// [IndexedStack] to preserve scroll position and results between
+/// toggles).
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final rows = ref.watch(homeCatalogRowsProvider);
+    final isSearching = ref.watch(
+      searchUiControllerProvider.select((s) => s.active),
+    );
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Kidflix'),
-        actions: [
-          IconButton(
-            tooltip: 'Changer de profil',
-            icon: const Icon(Icons.switch_account),
-            onPressed: () =>
-                ref.read(sessionControllerProvider.notifier).deselectProfile(),
+      appBar: isSearching
+          ? const SearchAppBar()
+          : AppBar(
+              title: const Text('Kidflix'),
+              actions: [
+                IconButton(
+                  tooltip: 'Chercher un film',
+                  icon: const Icon(Icons.search),
+                  onPressed: () => ref
+                      .read(searchUiControllerProvider.notifier)
+                      .activate(),
+                ),
+                IconButton(
+                  tooltip: 'Changer de profil',
+                  icon: const Icon(Icons.switch_account),
+                  onPressed: () => ref
+                      .read(sessionControllerProvider.notifier)
+                      .deselectProfile(),
+                ),
+              ],
+            ),
+      body: IndexedStack(
+        index: isSearching ? 1 : 0,
+        children: [
+          _HomeBody(
+            rows: rows,
+            onMovieTap: (movie) => _openDetail(context, ref, movie),
           ),
+          const SearchResults(),
         ],
-      ),
-      body: rows.when(
-        loading: () => const CatalogSkeleton(),
-        error: (_, _) => _ErrorState(
-          onRetry: () => ref.invalidate(homeCatalogRowsProvider),
-        ),
-        data: (list) => list.isEmpty
-            ? const _EmptyState()
-            : _CatalogList(
-                rows: list,
-                onMovieTap: (movie) => _openDetail(context, ref, movie),
-              ),
       ),
     );
   }
@@ -58,6 +77,24 @@ class HomePage extends ConsumerWidget {
     final domain = pool.firstWhere((m) => m.id == movie.id);
     if (!context.mounted) return;
     await showMovieDetailModal(context, MovieDetailDto.fromDomain(domain));
+  }
+}
+
+class _HomeBody extends StatelessWidget {
+  final AsyncValue<List<CatalogRowDto>> rows;
+  final void Function(MovieDto movie) onMovieTap;
+
+  const _HomeBody({required this.rows, required this.onMovieTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return rows.when(
+      loading: () => const CatalogSkeleton(),
+      error: (_, _) => const _ErrorState(),
+      data: (list) => list.isEmpty
+          ? const _EmptyState()
+          : _CatalogList(rows: list, onMovieTap: onMovieTap),
+    );
   }
 }
 
@@ -103,13 +140,11 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-class _ErrorState extends StatelessWidget {
-  final VoidCallback onRetry;
-
-  const _ErrorState({required this.onRetry});
+class _ErrorState extends ConsumerWidget {
+  const _ErrorState();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Padding(
       padding: const EdgeInsets.all(32),
       child: Center(
@@ -122,7 +157,10 @@ class _ErrorState extends StatelessWidget {
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: 16),
-            OutlinedButton(onPressed: onRetry, child: const Text('Réessayer')),
+            OutlinedButton(
+              onPressed: () => ref.invalidate(homeCatalogRowsProvider),
+              child: const Text('Réessayer'),
+            ),
           ],
         ),
       ),

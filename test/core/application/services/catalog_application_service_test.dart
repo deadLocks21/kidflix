@@ -14,6 +14,12 @@ class _FakeRepo implements CatalogRepository {
   Future<List<Movie>> listMoviesFor(AgeCategory ageCategory) async {
     return _pool.where((m) => m.ageCategory == ageCategory).toList();
   }
+
+  @override
+  Future<List<Movie>> searchMovies({
+    required String query,
+    required AgeCategory upToAgeCategory,
+  }) async => const [];
 }
 
 Movie _m({
