@@ -8,15 +8,23 @@ import 'package:go_router/go_router.dart';
 import 'package:kidflix/core/application/dtos/movie_download.dto.dart';
 import 'package:kidflix/core/application/session_state.dart';
 import 'package:kidflix/core/application/usecases/save_watch_progress.usecase.dart';
+import 'package:kidflix/core/domain/model/profile.dart';
+import 'package:kidflix/core/domain/services/kids_lock.service.dart';
+import 'package:kidflix/core/domain/services/profile_pin.service.dart';
 import 'package:kidflix/infrastructure/providers/catalog.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/download.usecases_provider.dart';
+import 'package:kidflix/infrastructure/providers/kids_lock.service_provider.dart';
+import 'package:kidflix/infrastructure/providers/profile_pin.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/infrastructure/providers/watch_progress.usecases_provider.dart';
 import 'package:kidflix/ui/pages/player/media_kit_player_engine.dart';
 import 'package:kidflix/ui/pages/player/player_engine.dart';
+import 'package:kidflix/ui/pages/player/widgets/lock_button.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/player_download_gate.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/player_error_state.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/resume_dialog.widget.dart';
+import 'package:kidflix/ui/pages/player/widgets/unlock_button.widget.dart';
+import 'package:kidflix/ui/pages/player/widgets/unlock_pin_dialog.widget.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -64,11 +72,19 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   SaveWatchProgressUseCase? _saveUseCase;
   String? _profileId;
 
+  late final KidsLockService _kidsLock;
+  late final ProfilePinService _pinService;
+  Profile? _mainProfile;
+
+  bool _isLocked = false;
+
   Timer? _periodicSaveTimer;
 
   @override
   void initState() {
     super.initState();
+    _kidsLock = ref.read(kidsLockServiceProvider);
+    _pinService = ref.read(profilePinServiceProvider);
     _applyMobileSystemUi();
     _bootstrap();
   }
@@ -83,6 +99,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     _playingSub?.cancel();
     unawaited(_saveProgressNow());
     unawaited(_engine?.dispose());
+    unawaited(_kidsLock.stopLock());
     WakelockPlus.disable();
     _restoreMobileSystemUi();
     super.dispose();
@@ -113,6 +130,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     final session = ref.read(sessionControllerProvider);
     if (session is ProfileSelected) {
       _profileId = session.profile.id;
+      _mainProfile = session.session.profiles
+          .where((p) => p.isMain)
+          .firstOrNull;
     }
 
     await _resolveMovieTitle();
@@ -279,6 +299,26 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     context.go('/home');
   }
 
+  Future<void> _onLockTap() async {
+    await _kidsLock.startLock();
+    if (_disposed || !mounted) return;
+    setState(() => _isLocked = true);
+  }
+
+  Future<void> _onUnlockTap() async {
+    final main = _mainProfile;
+    if (main == null) return;
+    final ok = await showUnlockPinDialog(
+      context,
+      mainProfile: main,
+      pinService: _pinService,
+    );
+    if (!ok) return;
+    await _kidsLock.stopLock();
+    if (_disposed || !mounted) return;
+    setState(() => _isLocked = false);
+  }
+
   void _onCancelDownload() {
     final cancel = ref.read(cancelMovieDownloadUseCaseProvider);
     unawaited(cancel.execute(widget.movieId));
@@ -301,15 +341,17 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       onPressed: _onClose,
     ),
     const SizedBox(width: 8),
-    Expanded(
-      child: Text(
-        _movieTitle ?? '',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(color: Colors.white, fontSize: 16),
-      ),
-    ),
+    Expanded(child: _titleText()),
   ];
+
+  List<Widget> _lockedTopButtonBar() => [Expanded(child: _titleText())];
+
+  Widget _titleText() => Text(
+    _movieTitle ?? '',
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
+    style: const TextStyle(color: Colors.white, fontSize: 16),
+  );
 
   /// Screen insets the controls must avoid.
   ///
@@ -332,6 +374,34 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
 
   MaterialVideoControlsThemeData _buildMobileTheme(BuildContext context) {
     final insets = _safeInsets(context);
+    if (_isLocked) {
+      return MaterialVideoControlsThemeData(
+        visibleOnMount: true,
+        speedUpOnLongPress: false,
+        seekOnDoubleTap: false,
+        displaySeekBar: false,
+        seekGesture: false,
+        topButtonBarMargin: EdgeInsets.only(
+          left: 16 + insets.left,
+          right: 16 + insets.right,
+          top: 8,
+        ),
+        topButtonBar: _lockedTopButtonBar(),
+        primaryButtonBar: const [],
+        bottomButtonBarMargin: EdgeInsets.only(
+          left: 16 + insets.left,
+          right: 16 + insets.right,
+          bottom: 8 + insets.bottom,
+        ),
+        bottomButtonBar: [
+          const MaterialPlayOrPauseButton(),
+          const MaterialPositionIndicator(),
+          const Spacer(),
+          const MaterialFullscreenButton(),
+          UnlockButton(onTap: _onUnlockTap),
+        ],
+      );
+    }
     return MaterialVideoControlsThemeData(
       visibleOnMount: true,
       speedUpOnLongPress: false,
@@ -352,11 +422,12 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         right: 16 + insets.right,
         bottom: 8 + insets.bottom,
       ),
-      bottomButtonBar: const [
-        MaterialPlayOrPauseButton(),
-        MaterialPositionIndicator(),
-        Spacer(),
-        MaterialFullscreenButton(),
+      bottomButtonBar: [
+        const MaterialPlayOrPauseButton(),
+        const MaterialPositionIndicator(),
+        const Spacer(),
+        const MaterialFullscreenButton(),
+        LockButton(onTap: _onLockTap),
       ],
     );
   }
@@ -365,6 +436,33 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     BuildContext context,
   ) {
     final insets = _safeInsets(context);
+    if (_isLocked) {
+      return MaterialDesktopVideoControlsThemeData(
+        visibleOnMount: true,
+        toggleFullscreenOnDoublePress: false,
+        displaySeekBar: false,
+        topButtonBarMargin: EdgeInsets.only(
+          left: 16 + insets.left,
+          right: 16 + insets.right,
+          top: 8,
+        ),
+        topButtonBar: _lockedTopButtonBar(),
+        primaryButtonBar: const [],
+        bottomButtonBarMargin: EdgeInsets.only(
+          left: 16 + insets.left,
+          right: 16 + insets.right,
+          bottom: 8 + insets.bottom,
+        ),
+        bottomButtonBar: [
+          const MaterialDesktopPlayOrPauseButton(),
+          const MaterialDesktopVolumeButton(),
+          const MaterialDesktopPositionIndicator(),
+          const Spacer(),
+          const MaterialDesktopFullscreenButton(),
+          UnlockButton(onTap: _onUnlockTap),
+        ],
+      );
+    }
     return MaterialDesktopVideoControlsThemeData(
       visibleOnMount: true,
       toggleFullscreenOnDoublePress: false,
@@ -384,12 +482,13 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         right: 16 + insets.right,
         bottom: 8 + insets.bottom,
       ),
-      bottomButtonBar: const [
-        MaterialDesktopPlayOrPauseButton(),
-        MaterialDesktopVolumeButton(),
-        MaterialDesktopPositionIndicator(),
-        Spacer(),
-        MaterialDesktopFullscreenButton(),
+      bottomButtonBar: [
+        const MaterialDesktopPlayOrPauseButton(),
+        const MaterialDesktopVolumeButton(),
+        const MaterialDesktopPositionIndicator(),
+        const Spacer(),
+        const MaterialDesktopFullscreenButton(),
+        LockButton(onTap: _onLockTap),
       ],
     );
   }
@@ -407,7 +506,14 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     if (engine != null) {
       final mobileTheme = _buildMobileTheme(context);
       final desktopTheme = _buildDesktopTheme(context);
+      // The `MaterialVideoControlsTheme` from media_kit_video 1.3.1 has an
+      // inverted `updateShouldNotify` (returns `false` on real change),
+      // so its `MaterialVideoControls` descendants never react to theme
+      // swaps. We force a subtree remount via a key tied to `_isLocked`.
+      // Playback survives because the `Player` and `VideoController` are
+      // owned by the engine, not by the disposed Video element.
       return MaterialVideoControlsTheme(
+        key: ValueKey(_isLocked),
         normal: mobileTheme,
         fullscreen: mobileTheme,
         child: MaterialDesktopVideoControlsTheme(
