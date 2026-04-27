@@ -1,4 +1,5 @@
 import 'package:kidflix/core/domain/exceptions/invalid_profile_name.exception.dart';
+import 'package:kidflix/core/domain/exceptions/unknown_profile.exception.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/model/session.dart';
 import 'package:kidflix/core/domain/services/profile_management.repository.dart';
@@ -58,11 +59,15 @@ class UpdateProfileMetadataUseCase {
       );
     }
 
-    final updated = await _repo.updateMetadata(
-      id: profileId,
-      name: trimmed,
-      ageCategory: ageCategory,
-    );
-    return UpdateProfileMetadataSuccess(updated);
+    try {
+      final updated = await _repo.updateMetadata(
+        id: profileId,
+        name: trimmed,
+        ageCategory: ageCategory,
+      );
+      return UpdateProfileMetadataSuccess(updated);
+    } on UnknownProfileException {
+      return const UpdateProfileMetadataUnknownProfile();
+    }
   }
 }

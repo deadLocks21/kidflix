@@ -52,6 +52,7 @@ class _ChangeMainPinPageState extends ConsumerState<ChangeMainPinPage> {
       case ChangeMainProfilePinInvalidPin():
         setState(() => _error = 'Le code doit faire 4 chiffres');
       case ChangeMainProfilePinNoMainProfile():
+      case ChangeMainProfilePinUnknownProfile():
       case ChangeMainProfilePinInvalidState():
         setState(() => _error = 'Action impossible');
     }

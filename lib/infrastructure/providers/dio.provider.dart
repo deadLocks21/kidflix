@@ -1,4 +1,6 @@
 import 'package:dio/dio.dart';
+import 'package:kidflix/infrastructure/http/auth.interceptor.dart';
+import 'package:kidflix/infrastructure/providers/current_session.provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'dio.provider.g.dart';
@@ -17,15 +19,20 @@ part 'dio.provider.g.dart';
 /// flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080   # Android emulator
 /// ```
 ///
-/// **No auth interceptors are registered here.** The `/auth/*` endpoints are
-/// public per `API.md`, so an `Authorization: Bearer <jwt>` /
-/// `X-Device-Id: <uuid>` interceptor would be dead code at this stage. They
-/// must be added when the first protected capability (catalog,
-/// profile-management, …) is ported to HTTP.
+/// An [AuthInterceptor] is wired in to add `Authorization: Bearer <jwt>` and
+/// `X-Device-Id: <uuid>` headers on every protected request, sourcing the
+/// current session from [currentSessionProvider]. The interceptor itself
+/// skips the public `/auth/*` endpoints — they expect no auth headers per
+/// `API.md` § Conventions.
+///
+/// The session is read via `ref.read` (not `ref.watch`) inside the
+/// interceptor's callback so login/logout transitions do NOT rebuild this
+/// `Dio` (which would lose the connection pool). The interceptor reads the
+/// latest session lazily at every request.
 @Riverpod(keepAlive: true)
 Dio dio(Ref ref) {
   const baseUrl = String.fromEnvironment('API_BASE_URL');
-  return Dio(
+  final dio = Dio(
     BaseOptions(
       baseUrl: baseUrl,
       connectTimeout: const Duration(seconds: 10),
@@ -34,4 +41,8 @@ Dio dio(Ref ref) {
       responseType: ResponseType.json,
     ),
   );
+  dio.interceptors.add(
+    AuthInterceptor(() => ref.read(currentSessionProvider)),
+  );
+  return dio;
 }

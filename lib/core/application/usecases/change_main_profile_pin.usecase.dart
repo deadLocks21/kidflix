@@ -1,3 +1,4 @@
+import 'package:kidflix/core/domain/exceptions/unknown_profile.exception.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/model/session.dart';
 import 'package:kidflix/core/domain/services/profile_management.repository.dart';
@@ -23,6 +24,10 @@ class ChangeMainProfilePinInvalidPin extends ChangeMainProfilePinResult {
 
 class ChangeMainProfilePinNoMainProfile extends ChangeMainProfilePinResult {
   const ChangeMainProfilePinNoMainProfile();
+}
+
+class ChangeMainProfilePinUnknownProfile extends ChangeMainProfilePinResult {
+  const ChangeMainProfilePinUnknownProfile();
 }
 
 class ChangeMainProfilePinInvalidState extends ChangeMainProfilePinResult {
@@ -58,7 +63,11 @@ class ChangeMainProfilePinUseCase {
       }
     }
     if (main == null) return const ChangeMainProfilePinNoMainProfile();
-    final updated = await _repo.setPin(id: main.id, rawPin: newPin);
-    return ChangeMainProfilePinSuccess(updated);
+    try {
+      final updated = await _repo.setPin(id: main.id, rawPin: newPin);
+      return ChangeMainProfilePinSuccess(updated);
+    } on UnknownProfileException {
+      return const ChangeMainProfilePinUnknownProfile();
+    }
   }
 }

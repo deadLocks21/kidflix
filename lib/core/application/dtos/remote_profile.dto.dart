@@ -41,7 +41,7 @@ class RemoteProfileDto {
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
-    'age_category': _ageCategoryToWire(ageCategory),
+    'age_category': ageCategoryToWire(ageCategory),
     'pin_hash': pinHash,
     'avatar_url': avatarUrl,
     'is_main': isMain,
@@ -66,7 +66,11 @@ AgeCategory _ageCategoryFromWire(String value) => switch (value) {
   _ => throw FormatException('Unknown age_category: $value'),
 };
 
-String _ageCategoryToWire(AgeCategory value) => switch (value) {
+/// Maps an [AgeCategory] to its `snake_case` wire representation.
+///
+/// Public so that `dio.<feature>.repository.dart` files can serialize
+/// outbound payloads consistently with `RemoteProfileDto.toJson`.
+String ageCategoryToWire(AgeCategory value) => switch (value) {
   AgeCategory.bebe => 'bebe',
   AgeCategory.enfant => 'enfant',
   AgeCategory.ado => 'ado',

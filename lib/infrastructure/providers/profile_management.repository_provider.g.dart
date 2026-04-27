@@ -10,8 +10,17 @@ part of 'profile_management.repository_provider.dart';
 // ignore_for_file: type=lint, type=warning
 /// Profile-management repository provider.
 ///
-/// Currently always returns [InMemoryProfileManagementRepository]. Will
-/// gain an HTTP variant when the backend is available.
+/// Selects between two implementations based on the compile-time constant
+/// `String.fromEnvironment('API_BASE_URL')`:
+///
+/// - **empty (default)** → [InMemoryProfileManagementRepository] — used by
+///   tests, by `flutter run` without flag, and by anyone running offline.
+/// - **non-empty** → [DioProfileManagementRepository] consuming [dioProvider]
+///   — used to talk to the real backend, e.g.
+///   `flutter run --dart-define=API_BASE_URL=http://localhost:8080`.
+///
+/// Switching modes requires a full rebuild. The selection MUST stay
+/// consistent with `authRepositoryProvider` — they read the same flag.
 
 @ProviderFor(profileManagementRepository)
 final profileManagementRepositoryProvider =
@@ -19,8 +28,17 @@ final profileManagementRepositoryProvider =
 
 /// Profile-management repository provider.
 ///
-/// Currently always returns [InMemoryProfileManagementRepository]. Will
-/// gain an HTTP variant when the backend is available.
+/// Selects between two implementations based on the compile-time constant
+/// `String.fromEnvironment('API_BASE_URL')`:
+///
+/// - **empty (default)** → [InMemoryProfileManagementRepository] — used by
+///   tests, by `flutter run` without flag, and by anyone running offline.
+/// - **non-empty** → [DioProfileManagementRepository] consuming [dioProvider]
+///   — used to talk to the real backend, e.g.
+///   `flutter run --dart-define=API_BASE_URL=http://localhost:8080`.
+///
+/// Switching modes requires a full rebuild. The selection MUST stay
+/// consistent with `authRepositoryProvider` — they read the same flag.
 
 final class ProfileManagementRepositoryProvider
     extends
@@ -32,8 +50,17 @@ final class ProfileManagementRepositoryProvider
     with $Provider<ProfileManagementRepository> {
   /// Profile-management repository provider.
   ///
-  /// Currently always returns [InMemoryProfileManagementRepository]. Will
-  /// gain an HTTP variant when the backend is available.
+  /// Selects between two implementations based on the compile-time constant
+  /// `String.fromEnvironment('API_BASE_URL')`:
+  ///
+  /// - **empty (default)** → [InMemoryProfileManagementRepository] — used by
+  ///   tests, by `flutter run` without flag, and by anyone running offline.
+  /// - **non-empty** → [DioProfileManagementRepository] consuming [dioProvider]
+  ///   — used to talk to the real backend, e.g.
+  ///   `flutter run --dart-define=API_BASE_URL=http://localhost:8080`.
+  ///
+  /// Switching modes requires a full rebuild. The selection MUST stay
+  /// consistent with `authRepositoryProvider` — they read the same flag.
   ProfileManagementRepositoryProvider._()
     : super(
         from: null,
@@ -69,4 +96,4 @@ final class ProfileManagementRepositoryProvider
 }
 
 String _$profileManagementRepositoryHash() =>
-    r'7d3b8d8c775d4132380868f8220deab05a50fe04';
+    r'eb7447d71f33ad9e3671a736986ccb61f9c6afe0';

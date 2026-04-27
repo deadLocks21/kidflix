@@ -1,4 +1,5 @@
 import 'package:kidflix/core/domain/exceptions/cannot_clear_main_profile_pin.exception.dart';
+import 'package:kidflix/core/domain/exceptions/unknown_profile.exception.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/model/session.dart';
 import 'package:kidflix/core/domain/services/profile_management.repository.dart';
@@ -45,6 +46,8 @@ class ClearProfilePinUseCase {
       return ClearProfilePinSuccess(updated);
     } on CannotClearMainProfilePinException {
       return const ClearProfilePinCannotClearMain();
+    } on UnknownProfileException {
+      return const ClearProfilePinUnknownProfile();
     }
   }
 }

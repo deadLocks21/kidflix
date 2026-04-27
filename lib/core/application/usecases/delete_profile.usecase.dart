@@ -1,4 +1,5 @@
 import 'package:kidflix/core/domain/exceptions/cannot_delete_main_profile.exception.dart';
+import 'package:kidflix/core/domain/exceptions/unknown_profile.exception.dart';
 import 'package:kidflix/core/domain/model/session.dart';
 import 'package:kidflix/core/domain/services/profile_management.repository.dart';
 
@@ -42,6 +43,8 @@ class DeleteProfileUseCase {
       return const DeleteProfileSuccess();
     } on CannotDeleteMainProfileException {
       return const DeleteProfileCannotDeleteMain();
+    } on UnknownProfileException {
+      return const DeleteProfileUnknownProfile();
     }
   }
 }

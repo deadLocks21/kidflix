@@ -284,7 +284,9 @@ The `Dio` instance SHALL be configured with:
 - `contentType` = `'application/json'`.
 - `responseType` = `ResponseType.json`.
 
-The provider SHALL NOT register any interceptor in this change — the two `/auth/*` endpoints are public and require no `Authorization` or `X-Device-Id` header. The provider SHALL document, via doc-comment, that authentication interceptors are expected to be added when the first protected capability is ported (catalog or profile-management).
+The provider SHALL register an `AuthInterceptor` on `dio.interceptors`, constructed with a callback `() => ref.read(currentSessionProvider)`. The callback uses `ref.read` (not `ref.watch`) so that login/logout transitions do NOT rebuild Dio — the interceptor reads the latest session lazily at every request.
+
+The provider SHALL NOT register additional interceptors in this change (logging, retry, refresh). Future portages may extend the registration — the contract for `AuthInterceptor` is documented under its own requirement.
 
 The provider SHALL be importable from any `lib/infrastructure/<feature>/` implementation that needs to make HTTP calls. Repositories SHALL NOT instantiate their own `Dio`.
 
@@ -296,10 +298,10 @@ The provider SHALL be importable from any `lib/infrastructure/<feature>/` implem
 - **AND** `dio.options.receiveTimeout` is `Duration(seconds: 30)`
 - **AND** `dio.options.contentType` is `'application/json'`
 
-#### Scenario: Provider has no auth interceptors in this change
+#### Scenario: Provider has an AuthInterceptor registered
 
 - **WHEN** a consumer reads `dioProvider`
-- **THEN** `dio.interceptors` does NOT contain any interceptor that reads or sets the `Authorization` or `X-Device-Id` headers
+- **THEN** `dio.interceptors.whereType<AuthInterceptor>().length` is `1`
 
 #### Scenario: Empty API_BASE_URL produces an empty baseUrl
 
@@ -331,7 +333,7 @@ The class SHALL accept a `Dio` instance via its constructor and SHALL NOT instan
 5. On `DioException` whose response has `statusCode == 404` and `body.error.code == "unknown_phone_number"`, throw `UnknownPhoneNumberException(phoneNumber)`.
 6. On any other `DioException`, rethrow.
 
-The implementation SHALL read the `error.code` from the response body defensively (`response?.data?['error']?['code'] as String?`) — never crash when the body is absent, malformed, or non-JSON.
+The implementation SHALL read the `error.code` from the response body via the shared top-level function `readErrorCode(Response?)` from `lib/infrastructure/http/error_code.dart` — never via a private duplicate.
 
 The implementation SHALL NOT log raw response bodies or PII (phone numbers, OTP codes, JWT) at any log level.
 
@@ -401,8 +403,6 @@ The implementation SHALL NOT retry failed requests — retry policy is out of sc
 - **WHEN** `verifyOtp` is called
 - **THEN** the future throws `DioException` (since `error.code` cannot be read, the implementation rethrows rather than guessing)
 - **AND** does NOT throw `_TypeError` or `_CastError` from the parsing
-
----
 
 ### Requirement: RemoteProfileDto wire-format mapping
 
@@ -617,4 +617,156 @@ Switching between in-memory and HTTP modes SHALL require a full app rebuild (`fl
 - **GIVEN** a test that overrides `authRepositoryProvider` with a fake implementation via `ProviderContainer.test`
 - **WHEN** the consumer reads `authRepositoryProvider` in the test
 - **THEN** the fake is returned regardless of the `API_BASE_URL` value the test was compiled with
+
+### Requirement: Derived `currentSession` provider
+
+The system SHALL expose a Riverpod provider `currentSessionProvider` in `lib/infrastructure/providers/current_session.provider.dart` that derives `Session?` from the current `SessionState` exposed by `sessionControllerProvider`.
+
+The provider SHALL be annotated `@Riverpod(keepAlive: true)` and SHALL `ref.watch(sessionControllerProvider)` so it re-emits whenever the session state changes.
+
+The provider SHALL return `Session?` per the following exhaustive mapping over the seven `SessionState` variants:
+
+| `SessionState` variant | Returned value |
+|---|---|
+| `Anonymous` | `null` |
+| `OtpRequested(...)` | `null` |
+| `Authenticated(session)` | `session` |
+| `PinRequired(profile, session)` | `session` |
+| `ProfileSelected(profile, session)` | `session` |
+| `ManagementPinRequired(session)` | `session` |
+| `ManagingProfiles(session)` | `session` |
+
+The provider SHALL be implemented with an exhaustive `switch` over the sealed `SessionState` so that adding a new variant in the future surfaces as a compile-time error.
+
+The provider's primary consumer is the `AuthInterceptor` registered on `dioProvider`, but it SHALL be reusable by any other component that needs the active session without knowing the state machine (logging interceptor, debug overlay, future refresh interceptor).
+
+#### Scenario: Returns null in Anonymous state
+
+- **GIVEN** the session controller's state is `Anonymous`
+- **WHEN** a consumer reads `currentSessionProvider`
+- **THEN** the returned value is `null`
+
+#### Scenario: Returns null in OtpRequested state
+
+- **GIVEN** the session controller's state is `OtpRequested(phone, expiresAt)`
+- **WHEN** a consumer reads `currentSessionProvider`
+- **THEN** the returned value is `null`
+
+#### Scenario: Returns the session in Authenticated state
+
+- **GIVEN** the session controller's state is `Authenticated(session)`
+- **WHEN** a consumer reads `currentSessionProvider`
+- **THEN** the returned value is the same `Session` instance
+
+#### Scenario: Returns the session in any state that carries one
+
+- **GIVEN** the session controller's state is `PinRequired`, `ProfileSelected`, `ManagementPinRequired`, or `ManagingProfiles`
+- **WHEN** a consumer reads `currentSessionProvider`
+- **THEN** the returned value is the embedded `Session` instance
+
+---
+
+### Requirement: AuthInterceptor adds bearer + device headers
+
+The system SHALL provide a Dio `Interceptor` named `AuthInterceptor` in `lib/infrastructure/http/auth.interceptor.dart` that automatically injects authentication headers on outbound HTTP requests.
+
+The interceptor SHALL accept a `Session? Function()` callback at construction time and SHALL NOT depend on Riverpod or any framework. The callback SHALL be invoked at every request to read the current session lazily.
+
+On `onRequest`:
+
+1. If `options.path.startsWith('/auth/')`, the interceptor SHALL call `handler.next(options)` immediately without modifying headers — the `/auth/*` endpoints are public per `API.md` § Conventions.
+2. Otherwise, the interceptor SHALL invoke the callback. If the returned `Session?` is non-null:
+   - `options.headers['Authorization']` SHALL be set to `'Bearer <session.jwt>'`.
+   - `options.headers['X-Device-Id']` SHALL be set to `session.device.id`.
+3. If the callback returns `null`, the interceptor SHALL call `handler.next(options)` without adding any header. The backend SHALL be the source of truth for auth status — the interceptor SHALL NOT short-circuit with `handler.reject(...)`.
+
+The interceptor SHALL NOT override `onResponse` or `onError` in this change — header refresh, 401 handling, and retry are out of scope.
+
+The same interceptor instance SHALL handle login/logout cycles without recreating Dio: the callback closes over a Riverpod `ref` and reads the latest session via `ref.read(currentSessionProvider)`, so consecutive requests after a state change pick up the new session without rebuilding the connection pool.
+
+#### Scenario: Skips /auth/request-otp without adding headers
+
+- **GIVEN** an `AuthInterceptor` constructed with a callback that returns a non-null `Session(jwt: "X", device: Device(id: "Y", ...), ...)`
+- **WHEN** a request to `/auth/request-otp` is intercepted
+- **THEN** the request reaches the next handler with NO `Authorization` header
+- **AND** with NO `X-Device-Id` header
+
+#### Scenario: Skips /auth/verify-otp without adding headers
+
+- **GIVEN** an `AuthInterceptor` with a non-null session callback
+- **WHEN** a request to `/auth/verify-otp` is intercepted
+- **THEN** the request reaches the next handler with no auth headers added
+
+#### Scenario: Adds bearer and device headers when session is present
+
+- **GIVEN** an `AuthInterceptor` constructed with `() => Session(jwt: "eyJabc", device: Device(id: "uuid-1", name: null), profiles: [])`
+- **WHEN** a request to `/profiles/123` is intercepted
+- **THEN** the forwarded request has `Authorization: Bearer eyJabc`
+- **AND** `X-Device-Id: uuid-1`
+
+#### Scenario: Lets request through without headers when session is null
+
+- **GIVEN** an `AuthInterceptor` constructed with `() => null`
+- **WHEN** a request to `/profiles/123` is intercepted
+- **THEN** the request reaches the next handler with NO `Authorization` header
+- **AND** with NO `X-Device-Id` header
+- **AND** the interceptor does NOT call `handler.reject(...)`
+
+#### Scenario: Reflects session changes between requests
+
+- **GIVEN** an `AuthInterceptor` constructed with `() => mutableSessionRef`
+- **AND** `mutableSessionRef == null` initially
+- **WHEN** a 1st request is sent → the request has no auth headers
+- **AND** `mutableSessionRef` is set to `Session(jwt: "A", device: Device(id: "D1", ...), ...)`
+- **AND** a 2nd request is sent → the request has `Authorization: Bearer A` and `X-Device-Id: D1`
+- **AND** `mutableSessionRef` is set back to `null`
+- **AND** a 3rd request is sent → the request has no auth headers
+
+---
+
+### Requirement: Shared `readErrorCode` helper
+
+The system SHALL expose a top-level function `readErrorCode(Response<dynamic>? response) → String?` in `lib/infrastructure/http/error_code.dart`, shared by every `dio.<feature>.repository.dart` that needs to read the machine-readable `error.code` from a JSON error body.
+
+The function SHALL be defensive: it SHALL return `null` for any deviation from the documented `{ "error": { "code": String, ... } }` envelope, including:
+
+- `response == null`.
+- `response.data` is not a `Map` (e.g. plain string, byte stream, `null`).
+- `response.data['error']` is not a `Map`.
+- `response.data['error']['code']` is not a `String`.
+
+In all other cases, the function SHALL return the `String` value of `error.code`.
+
+The function SHALL NEVER throw — callers can use it without try/catch.
+
+`DioAuthRepository` SHALL be updated to consume this helper instead of its prior private `_readErrorCode` method. `DioProfileManagementRepository` SHALL consume it from introduction.
+
+#### Scenario: Reads error.code from a well-formed body
+
+- **GIVEN** a `Response` with `data == { "error": { "code": "invalid_otp" } }`
+- **WHEN** `readErrorCode(response)` is called
+- **THEN** the returned value is `"invalid_otp"`
+
+#### Scenario: Returns null when error.code is absent
+
+- **GIVEN** a `Response` with `data == { "error": { "message": "..." } }`
+- **WHEN** `readErrorCode(response)` is called
+- **THEN** the returned value is `null`
+
+#### Scenario: Returns null when body is a plain string
+
+- **GIVEN** a `Response` with `data == "plain text not json"`
+- **WHEN** `readErrorCode(response)` is called
+- **THEN** the returned value is `null`
+
+#### Scenario: Returns null when response itself is null
+
+- **WHEN** `readErrorCode(null)` is called
+- **THEN** the returned value is `null`
+
+#### Scenario: Returns null when error.code is non-string
+
+- **GIVEN** a `Response` with `data == { "error": { "code": 42 } }`
+- **WHEN** `readErrorCode(response)` is called
+- **THEN** the returned value is `null`
 

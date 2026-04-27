@@ -8,6 +8,7 @@ import 'package:kidflix/core/domain/model/otp_code.dart';
 import 'package:kidflix/core/domain/model/phone_number.dart';
 import 'package:kidflix/core/domain/model/session.dart';
 import 'package:kidflix/core/domain/services/auth.repository.dart';
+import 'package:kidflix/infrastructure/http/error_code.dart';
 
 /// HTTP implementation of [AuthRepository] backed by Dio.
 ///
@@ -38,7 +39,7 @@ class DioAuthRepository implements AuthRepository {
       return DateTime.parse(expiresAtRaw);
     } on DioException catch (e) {
       if (e.response?.statusCode == 404 &&
-          _readErrorCode(e.response) == 'unknown_phone_number') {
+          readErrorCode(e.response) == 'unknown_phone_number') {
         throw UnknownPhoneNumberException(phoneNumber);
       }
       rethrow;
@@ -64,7 +65,7 @@ class DioAuthRepository implements AuthRepository {
       return RemoteSessionDto.fromJson(response.data!).toDomain();
     } on DioException catch (e) {
       final status = e.response?.statusCode;
-      final code = _readErrorCode(e.response);
+      final code = readErrorCode(e.response);
       if (status == 401 && code == 'invalid_otp') {
         throw const InvalidOtpException();
       }
@@ -76,14 +77,5 @@ class DioAuthRepository implements AuthRepository {
       }
       rethrow;
     }
-  }
-
-  String? _readErrorCode(Response? response) {
-    final data = response?.data;
-    if (data is! Map) return null;
-    final error = data['error'];
-    if (error is! Map) return null;
-    final code = error['code'];
-    return code is String ? code : null;
   }
 }
