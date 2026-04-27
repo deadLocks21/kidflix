@@ -10,24 +10,51 @@ part of 'auth.repository_provider.dart';
 // ignore_for_file: type=lint, type=warning
 /// Auth repository provider.
 ///
-/// Currently always returns [InMemoryAuthRepository]. Will gain an HTTP
-/// variant when the backend is available.
+/// Selects between two implementations based on the compile-time constant
+/// `String.fromEnvironment('API_BASE_URL')`:
+///
+/// - **empty (default)** → [InMemoryAuthRepository] — used by tests, by
+///   `flutter run` without flag, and by anyone running offline.
+/// - **non-empty** → [DioAuthRepository] consuming [dioProvider] — used to
+///   talk to the real backend, e.g.
+///   `flutter run --dart-define=API_BASE_URL=http://localhost:8080`.
+///
+/// Switching modes requires a full rebuild — `String.fromEnvironment` is
+/// evaluated at compile time, not at runtime.
 
 @ProviderFor(authRepository)
 final authRepositoryProvider = AuthRepositoryProvider._();
 
 /// Auth repository provider.
 ///
-/// Currently always returns [InMemoryAuthRepository]. Will gain an HTTP
-/// variant when the backend is available.
+/// Selects between two implementations based on the compile-time constant
+/// `String.fromEnvironment('API_BASE_URL')`:
+///
+/// - **empty (default)** → [InMemoryAuthRepository] — used by tests, by
+///   `flutter run` without flag, and by anyone running offline.
+/// - **non-empty** → [DioAuthRepository] consuming [dioProvider] — used to
+///   talk to the real backend, e.g.
+///   `flutter run --dart-define=API_BASE_URL=http://localhost:8080`.
+///
+/// Switching modes requires a full rebuild — `String.fromEnvironment` is
+/// evaluated at compile time, not at runtime.
 
 final class AuthRepositoryProvider
     extends $FunctionalProvider<AuthRepository, AuthRepository, AuthRepository>
     with $Provider<AuthRepository> {
   /// Auth repository provider.
   ///
-  /// Currently always returns [InMemoryAuthRepository]. Will gain an HTTP
-  /// variant when the backend is available.
+  /// Selects between two implementations based on the compile-time constant
+  /// `String.fromEnvironment('API_BASE_URL')`:
+  ///
+  /// - **empty (default)** → [InMemoryAuthRepository] — used by tests, by
+  ///   `flutter run` without flag, and by anyone running offline.
+  /// - **non-empty** → [DioAuthRepository] consuming [dioProvider] — used to
+  ///   talk to the real backend, e.g.
+  ///   `flutter run --dart-define=API_BASE_URL=http://localhost:8080`.
+  ///
+  /// Switching modes requires a full rebuild — `String.fromEnvironment` is
+  /// evaluated at compile time, not at runtime.
   AuthRepositoryProvider._()
     : super(
         from: null,
@@ -61,4 +88,4 @@ final class AuthRepositoryProvider
   }
 }
 
-String _$authRepositoryHash() => r'04118685f59b1e55230798bb425abc6430485c22';
+String _$authRepositoryHash() => r'cf6a67225de92fab7f12eeff3bf730eaffbbf787';
