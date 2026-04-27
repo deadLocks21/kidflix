@@ -20,6 +20,7 @@ const _movie = MovieDto(
   title: 'Astérix',
   year: 2023,
   duration: Duration(minutes: 112),
+  ageCategory: 'enfant',
 );
 
 const _row = CatalogRowDto(

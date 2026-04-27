@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:kidflix/core/application/dtos/age_category_wire.dart';
 import 'package:kidflix/core/application/dtos/remote_profile.dto.dart';
 import 'package:kidflix/core/domain/exceptions/cannot_clear_main_profile_pin.exception.dart';
 import 'package:kidflix/core/domain/exceptions/cannot_delete_main_profile.exception.dart';

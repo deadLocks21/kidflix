@@ -14,7 +14,7 @@ et leurs implémentations actuelles dans `lib/infrastructure/*/in_memory.*`.
 | Repository client | Méthodes | Endpoints HTTP |
 |---|---|---|
 | `AuthRepository` | `requestOtp`, `verifyOtp` | `POST /auth/request-otp`, `POST /auth/verify-otp` |
-| `CatalogRepository` | `listMoviesFor`, `searchMovies` | `GET /movies?age_category=…`, `GET /movies?search=…&up_to_age_category=…` |
+| `CatalogRepository` | `listMoviesFor`, `searchMovies` | `GET /movies?age_category=…`, `GET /movies/search?q=…&up_to_age_category=…` |
 | `DownloadRepository` | `download` (stream HTTP) | `GET /movies/{movie_id}/download` (Range supporté) |
 | `ProfileManagementRepository` | `create`, `updateMetadata`, `setPin`, `clearPin`, `delete` | `POST /profiles`, `PATCH /profiles/{id}`, `PUT /profiles/{id}/pin`, `DELETE /profiles/{id}/pin`, `DELETE /profiles/{id}` |
 | `WatchProgressRepository` | `findFor`, `save`, `listForProfile` | `GET /profiles/{profile_id}/progress/{movie_id}`, `PUT /profiles/{profile_id}/progress/{movie_id}`, `GET /profiles/{profile_id}/progress` |
@@ -59,15 +59,24 @@ remonté tel quel mais sera traité comme erreur générique côté UI.
 
 ### Mapping des énumérations
 
-L'enum Dart `AgeCategory` a la valeur `jeuneAdulte`. Le client la sérialise
-via `.name`, donc en pratique il enverra et attendra **`jeuneAdulte`** sur
-le wire tant que la sérialisation actuelle n'est pas modifiée.
+L'enum Dart `AgeCategory` a la valeur `jeuneAdulte`. Le client convertit
+explicitement vers `snake_case` via `ageCategoryToWire` (cf.
+`lib/core/application/dtos/age_category_wire.dart`). Le wire utilise donc
+**`jeune_adulte`** (snake_case) sur le paramètre URL et dans le champ
+`age_category` des réponses.
 
-**Décision attendue côté backend** : accepter `jeuneAdulte` (camelCase)
-pour ne pas avoir à toucher l'app, OU exposer `jeune_adulte` et adapter
-les DTO côté Flutter. Cette doc liste les deux endroits où la valeur
-apparaît : `GET /movies` (paramètre + champ de réponse), et tous les
-endpoints `/profiles/*` (champ `age_category`).
+Mapping :
+
+| `AgeCategory` (Dart) | Wire (`snake_case`) |
+|---|---|
+| `bebe` | `bebe` |
+| `enfant` | `enfant` |
+| `ado` | `ado` |
+| `jeuneAdulte` | `jeune_adulte` |
+| `adulte` | `adulte` |
+
+Cette valeur apparaît : `GET /movies?age_category=…`, `GET /movies/search?up_to_age_category=…`,
+et tous les endpoints `/profiles/*` (champ `age_category`).
 
 ---
 
@@ -298,13 +307,21 @@ et `cast[].photo_url`.
 
 ---
 
-### `GET /movies?search={q}&up_to_age_category={cat}`
+### `GET /movies/search?q={q}&up_to_age_category={cat}`
 
 Mappe `CatalogRepository.searchMovies(query, upToAgeCategory)`. Doit
 retourner les films **dont la catégorie est ≤ `up_to_age_category`** dans
 la hiérarchie `bebe < enfant < ado < jeuneAdulte < adulte`, et dont le
-`title` OU le `original_title` contient `search` après normalisation
-**case- et accent-insensible** (`shared/text_normalization.dart`).
+`title` OU le `original_title` contient `q` après normalisation
+**case- et accent-insensible** (`shared/text_normalization.dart`). La
+normalisation s'applique des deux côtés (la requête `q` ET le titre
+indexé) — le client envoie la chaîne brute, le backend normalise.
+
+**Query**
+- `q` (requis) : la chaîne de recherche, transmise telle quelle (sans
+  trim, sans lowercase, sans accent-strip côté client).
+- `up_to_age_category` (requis) : valeur de l'enum `AgeCategory` en
+  `snake_case` (cf. [Mapping des énumérations](#mapping-des-énumérations)).
 
 Le client n'impose ni longueur minimale (responsabilité UI) ni tri
 (le service applicatif trie alphabétiquement sur le titre).

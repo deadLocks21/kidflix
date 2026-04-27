@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/core/application/session_state.dart';
+import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/infrastructure/providers/catalog.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/search.controller_provider.dart';
 import 'package:kidflix/infrastructure/providers/search.usecase_provider.dart';
@@ -55,12 +56,10 @@ class SearchResults extends ConsumerWidget {
     final repository = ref.read(catalogRepositoryProvider);
     final session = ref.read(sessionControllerProvider);
     if (session is! ProfileSelected) return;
-    // Empty query matches every movie in the hierarchy — used here to
-    // locate the full Domain entity so the modal can render its details.
-    final pool = await repository.searchMovies(
-      query: '',
-      upToAgeCategory: session.profile.ageCategory,
+    final category = AgeCategory.values.firstWhere(
+      (c) => c.name == movie.ageCategory,
     );
+    final pool = await repository.listMoviesFor(category);
     final domain = pool.firstWhere((m) => m.id == movie.id);
     if (!context.mounted) return;
     await showMovieDetailModal(context, MovieDetailDto.fromDomain(domain));

@@ -16,6 +16,7 @@ void main() {
         year: 2023,
         duration: Duration(minutes: 112),
         posterUrl: null,
+        ageCategory: 'enfant',
       );
       await tester.pumpWidget(
         _harness(MovieCard(movie: dto, onTap: () {})),
@@ -29,6 +30,7 @@ void main() {
         id: 'm',
         title: 'Inconnu',
         duration: Duration(minutes: 92),
+        ageCategory: 'enfant',
       );
       await tester.pumpWidget(
         _harness(MovieCard(movie: dto, onTap: () {})),
@@ -43,6 +45,7 @@ void main() {
         id: 'm',
         title: 'T',
         duration: Duration(minutes: 80),
+        ageCategory: 'enfant',
       );
       await tester.pumpWidget(
         _harness(MovieCard(movie: dto, onTap: () => taps++)),
@@ -56,6 +59,7 @@ void main() {
         id: 'm',
         title: 'T',
         duration: Duration(minutes: 80),
+        ageCategory: 'enfant',
       );
       await tester.pumpWidget(
         _harness(MovieCard(movie: dto, onTap: () {})),

@@ -1,3 +1,4 @@
+import 'package:kidflix/core/application/dtos/age_category_wire.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 
 /// Wire-format DTO for a [Profile] — direction of flow: `JSON ↔ Domain`.
@@ -9,8 +10,9 @@ import 'package:kidflix/core/domain/model/profile.dart';
 ///
 /// JSON keys are `snake_case` per the contract in `API.md`. The
 /// `age_category` enum is exchanged in `snake_case` form
-/// (`jeune_adulte` ↔ `AgeCategory.jeuneAdulte`) — see `_ageCategoryFromWire`
-/// / `_ageCategoryToWire` for the explicit mapping.
+/// (`jeune_adulte` ↔ `AgeCategory.jeuneAdulte`) — see
+/// `age_category_wire.dart` for the shared helpers used here and by every
+/// other `Remote*Dto`.
 class RemoteProfileDto {
   final String id;
   final String name;
@@ -32,7 +34,7 @@ class RemoteProfileDto {
       RemoteProfileDto(
         id: json['id'] as String,
         name: json['name'] as String,
-        ageCategory: _ageCategoryFromWire(json['age_category'] as String),
+        ageCategory: ageCategoryFromWire(json['age_category'] as String),
         pinHash: json['pin_hash'] as String?,
         avatarUrl: json['avatar_url'] as String?,
         isMain: json['is_main'] as bool,
@@ -56,24 +58,3 @@ class RemoteProfileDto {
     isMain: isMain,
   );
 }
-
-AgeCategory _ageCategoryFromWire(String value) => switch (value) {
-  'bebe' => AgeCategory.bebe,
-  'enfant' => AgeCategory.enfant,
-  'ado' => AgeCategory.ado,
-  'jeune_adulte' => AgeCategory.jeuneAdulte,
-  'adulte' => AgeCategory.adulte,
-  _ => throw FormatException('Unknown age_category: $value'),
-};
-
-/// Maps an [AgeCategory] to its `snake_case` wire representation.
-///
-/// Public so that `dio.<feature>.repository.dart` files can serialize
-/// outbound payloads consistently with `RemoteProfileDto.toJson`.
-String ageCategoryToWire(AgeCategory value) => switch (value) {
-  AgeCategory.bebe => 'bebe',
-  AgeCategory.enfant => 'enfant',
-  AgeCategory.ado => 'ado',
-  AgeCategory.jeuneAdulte => 'jeune_adulte',
-  AgeCategory.adulte => 'adulte',
-};

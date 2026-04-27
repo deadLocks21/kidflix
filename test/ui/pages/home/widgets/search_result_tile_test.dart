@@ -15,6 +15,7 @@ void main() {
         title: 'Totoro',
         year: 1988,
         duration: Duration(minutes: 86),
+        ageCategory: 'enfant',
       );
       await tester.pumpWidget(
         _hostOf(SearchResultTile(movie: movie, onTap: () {})),
@@ -28,6 +29,7 @@ void main() {
         id: 'x',
         title: 'Sans année',
         duration: Duration(minutes: 42),
+        ageCategory: 'enfant',
       );
       await tester.pumpWidget(
         _hostOf(SearchResultTile(movie: movie, onTap: () {})),
@@ -42,6 +44,7 @@ void main() {
         title: 'X',
         year: 2020,
         duration: Duration(minutes: 90),
+        ageCategory: 'enfant',
       );
       await tester.pumpWidget(
         _hostOf(SearchResultTile(movie: movie, onTap: () => taps += 1)),
@@ -56,6 +59,7 @@ void main() {
         id: 'x',
         title: 'X',
         duration: Duration(minutes: 90),
+        ageCategory: 'enfant',
       );
       await tester.pumpWidget(
         _hostOf(SearchResultTile(movie: movie, onTap: () {})),

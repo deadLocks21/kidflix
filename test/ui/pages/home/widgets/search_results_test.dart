@@ -19,6 +19,7 @@ const _movieA = MovieDto(
   title: 'Astérix',
   year: 2023,
   duration: Duration(minutes: 112),
+  ageCategory: 'enfant',
 );
 
 const _movieB = MovieDto(
@@ -26,6 +27,7 @@ const _movieB = MovieDto(
   title: 'Totoro',
   year: 1988,
   duration: Duration(minutes: 86),
+  ageCategory: 'enfant',
 );
 
 /// Pumps long enough for the controller's 250 ms debounce to flush.

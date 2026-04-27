@@ -742,24 +742,6 @@ The selection SHALL be consistent with `authRepositoryProvider`: a build either 
 
 ---
 
-### Requirement: Public `ageCategoryToWire` helper
-
-The system SHALL expose a public top-level function `String ageCategoryToWire(AgeCategory category)` in `lib/core/application/dtos/remote_profile.dto.dart`, promoted from the previously-private `_ageCategoryToWire` introduced by `2026-04-27-add-http-auth-repository`.
-
-The function SHALL implement the exact mapping documented under "HTTP implementation of ProfileManagementRepository" and reused by `RemoteProfileDto.toJson`.
-
-The complementary `_ageCategoryFromWire` SHALL remain private — it is only consumed by `RemoteProfileDto.fromJson` internally.
-
-The promotion SHALL NOT change the existing `RemoteProfileDto.toJson` semantics: it continues to call this mapping internally, just under the public name.
-
-#### Scenario: Maps each enum variant to its snake_case wire string
-
-- **GIVEN** the five `AgeCategory` variants: `bebe`, `enfant`, `ado`, `jeuneAdulte`, `adulte`
-- **WHEN** `ageCategoryToWire` is called on each
-- **THEN** the returned values are `"bebe"`, `"enfant"`, `"ado"`, `"jeune_adulte"`, `"adulte"` respectively
-
----
-
 ### Requirement: Usecases catch UnknownProfileException as defense in depth
 
 The five mutation usecases that target a profile by id SHALL catch `UnknownProfileException` thrown by the repository layer and map it to their existing `unknownProfile` failure result, in addition to keeping the existing `session.profiles.any(...)` pre-check.

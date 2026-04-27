@@ -1,17 +1,25 @@
 import 'package:kidflix/core/domain/model/movie.dart';
 
 /// Compact UI-facing projection of a [Movie], suitable for card rendering.
+///
+/// [ageCategory] is the `.name` of the Domain enum (`"enfant"`, `"jeuneAdulte"`,
+/// …). It does not appear in card visuals; it is carried so consumers can
+/// re-target the catalog repository at the right category when they need the
+/// full details (e.g. opening the modal from a search result whose category
+/// may differ from the active profile's).
 class MovieDto {
   final String id;
   final String title;
   final int? year;
   final Duration duration;
   final String? posterUrl;
+  final String ageCategory;
 
   const MovieDto({
     required this.id,
     required this.title,
     required this.duration,
+    required this.ageCategory,
     this.year,
     this.posterUrl,
   });
@@ -22,6 +30,7 @@ class MovieDto {
     year: movie.year,
     duration: movie.duration,
     posterUrl: movie.posterUrl,
+    ageCategory: movie.ageCategory.name,
   );
 }
 
