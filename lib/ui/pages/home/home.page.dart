@@ -73,7 +73,7 @@ class HomePage extends ConsumerWidget {
     final repository = ref.read(catalogRepositoryProvider);
     final state = ref.read(sessionControllerProvider);
     if (state is! ProfileSelected) return;
-    final pool = await repository.listMoviesFor(state.profile.ageCategory);
+    final pool = await repository.listMoviesFor();
     final domain = pool.firstWhere((m) => m.id == movie.id);
     if (!context.mounted) return;
     await showMovieDetailModal(context, MovieDetailDto.fromDomain(domain));

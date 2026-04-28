@@ -154,7 +154,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     final state = ref.read(sessionControllerProvider);
     if (state is! ProfileSelected) return;
     final repo = ref.read(catalogRepositoryProvider);
-    final pool = await repo.listMoviesFor(state.profile.ageCategory);
+    final pool = await repo.listMoviesFor();
     final movie = pool.where((m) => m.id == widget.movieId).firstOrNull;
     if (_disposed) return;
     setState(() => _movieTitle = movie?.title ?? '');

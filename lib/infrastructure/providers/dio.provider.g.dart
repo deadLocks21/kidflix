@@ -22,16 +22,18 @@ part of 'dio.provider.dart';
 /// flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080   # Android emulator
 /// ```
 ///
-/// An [AuthInterceptor] is wired in to add `Authorization: Bearer <jwt>` and
-/// `X-Device-Id: <uuid>` headers on every protected request, sourcing the
-/// current session from [currentSessionProvider]. The interceptor itself
-/// skips the public `/auth/*` endpoints — they expect no auth headers per
-/// `API.md` § Conventions.
+/// An [AuthInterceptor] is wired in to add `Authorization: Bearer <jwt>`,
+/// `X-Device-Id: <uuid>` and `X-Profile-Id: <profile_id>` headers on every
+/// protected request, sourcing the current session from
+/// [currentSessionProvider] and the active profile id from
+/// [currentProfileIdProvider]. The interceptor itself skips the public
+/// `/auth/*` endpoints (no header at all) and exempts `GET /profiles` from
+/// `X-Profile-Id` injection (bootstrap route).
 ///
-/// The session is read via `ref.read` (not `ref.watch`) inside the
-/// interceptor's callback so login/logout transitions do NOT rebuild this
-/// `Dio` (which would lose the connection pool). The interceptor reads the
-/// latest session lazily at every request.
+/// Both callbacks are read via `ref.read` (not `ref.watch`) so login/logout
+/// transitions AND profile-selection transitions do NOT rebuild this `Dio`
+/// (which would lose the connection pool). The interceptor reads the
+/// latest values lazily at every request.
 
 @ProviderFor(dio)
 final dioProvider = DioProvider._();
@@ -50,16 +52,18 @@ final dioProvider = DioProvider._();
 /// flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080   # Android emulator
 /// ```
 ///
-/// An [AuthInterceptor] is wired in to add `Authorization: Bearer <jwt>` and
-/// `X-Device-Id: <uuid>` headers on every protected request, sourcing the
-/// current session from [currentSessionProvider]. The interceptor itself
-/// skips the public `/auth/*` endpoints — they expect no auth headers per
-/// `API.md` § Conventions.
+/// An [AuthInterceptor] is wired in to add `Authorization: Bearer <jwt>`,
+/// `X-Device-Id: <uuid>` and `X-Profile-Id: <profile_id>` headers on every
+/// protected request, sourcing the current session from
+/// [currentSessionProvider] and the active profile id from
+/// [currentProfileIdProvider]. The interceptor itself skips the public
+/// `/auth/*` endpoints (no header at all) and exempts `GET /profiles` from
+/// `X-Profile-Id` injection (bootstrap route).
 ///
-/// The session is read via `ref.read` (not `ref.watch`) inside the
-/// interceptor's callback so login/logout transitions do NOT rebuild this
-/// `Dio` (which would lose the connection pool). The interceptor reads the
-/// latest session lazily at every request.
+/// Both callbacks are read via `ref.read` (not `ref.watch`) so login/logout
+/// transitions AND profile-selection transitions do NOT rebuild this `Dio`
+/// (which would lose the connection pool). The interceptor reads the
+/// latest values lazily at every request.
 
 final class DioProvider extends $FunctionalProvider<Dio, Dio, Dio>
     with $Provider<Dio> {
@@ -77,16 +81,18 @@ final class DioProvider extends $FunctionalProvider<Dio, Dio, Dio>
   /// flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080   # Android emulator
   /// ```
   ///
-  /// An [AuthInterceptor] is wired in to add `Authorization: Bearer <jwt>` and
-  /// `X-Device-Id: <uuid>` headers on every protected request, sourcing the
-  /// current session from [currentSessionProvider]. The interceptor itself
-  /// skips the public `/auth/*` endpoints — they expect no auth headers per
-  /// `API.md` § Conventions.
+  /// An [AuthInterceptor] is wired in to add `Authorization: Bearer <jwt>`,
+  /// `X-Device-Id: <uuid>` and `X-Profile-Id: <profile_id>` headers on every
+  /// protected request, sourcing the current session from
+  /// [currentSessionProvider] and the active profile id from
+  /// [currentProfileIdProvider]. The interceptor itself skips the public
+  /// `/auth/*` endpoints (no header at all) and exempts `GET /profiles` from
+  /// `X-Profile-Id` injection (bootstrap route).
   ///
-  /// The session is read via `ref.read` (not `ref.watch`) inside the
-  /// interceptor's callback so login/logout transitions do NOT rebuild this
-  /// `Dio` (which would lose the connection pool). The interceptor reads the
-  /// latest session lazily at every request.
+  /// Both callbacks are read via `ref.read` (not `ref.watch`) so login/logout
+  /// transitions AND profile-selection transitions do NOT rebuild this `Dio`
+  /// (which would lose the connection pool). The interceptor reads the
+  /// latest values lazily at every request.
   DioProvider._()
     : super(
         from: null,
@@ -120,4 +126,4 @@ final class DioProvider extends $FunctionalProvider<Dio, Dio, Dio>
   }
 }
 
-String _$dioHash() => r'6f85eb1344ebf179d0dac01dbf489bcac4033ed6';
+String _$dioHash() => r'b7c91a0ccb9913dbafefe9dcda6f87baefc0b28b';

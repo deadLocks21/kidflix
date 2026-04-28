@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/core/application/session_state.dart';
-import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/infrastructure/providers/catalog.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/search.controller_provider.dart';
 import 'package:kidflix/infrastructure/providers/search.usecase_provider.dart';
@@ -56,10 +55,12 @@ class SearchResults extends ConsumerWidget {
     final repository = ref.read(catalogRepositoryProvider);
     final session = ref.read(sessionControllerProvider);
     if (session is! ProfileSelected) return;
-    final category = AgeCategory.values.firstWhere(
-      (c) => c.name == movie.ageCategory,
-    );
-    final pool = await repository.listMoviesFor(category);
+    // Search results may include movies from categories other than the
+    // active profile's (the search scope is hierarchical), so we cannot
+    // resolve the movie via `listMoviesFor()` (which is strictly the
+    // active category). Re-issuing the search with the movie's title
+    // gives us the full Movie back from whichever category it lives in.
+    final pool = await repository.searchMovies(query: movie.title);
     final domain = pool.firstWhere((m) => m.id == movie.id);
     if (!context.mounted) return;
     await showMovieDetailModal(context, MovieDetailDto.fromDomain(domain));

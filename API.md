@@ -44,6 +44,15 @@ locaux** (filesystem) côté client : ils n'impliquent pas le backend.
 - **Identifiant device** : header `X-Device-Id: <uuid>` sur toutes les
   routes authentifiées (le client génère et persiste cet UUID au premier
   lancement, comme aujourd'hui via `SessionRepository.readOrCreateDevice`).
+- **Profil actif** : header `X-Profile-Id: <profile_id>` sur toutes les
+  routes authentifiées **sauf** `GET /profiles` (bootstrap exempt). Le
+  serveur valide que le profil appartient au user JWT et applique le
+  filtre âge en dur depuis `profile.age_category`. Le client dérive cet
+  id du profil sélectionné dans la session courante (`PinRequired`,
+  `ProfileSelected`) ; en mode gestion (`ManagementPinRequired`,
+  `ManagingProfiles`), c'est le profil **principal** (`is_main = true`)
+  qui sert d'id. Header absent → `400 missing_profile_id`. Profil
+  n'appartient pas au user JWT → `403 forbidden_profile`.
 
 ### Format d'erreur
 
@@ -169,7 +178,53 @@ encore en attente pour le même numéro.
 ## Profils
 
 Toutes les routes ci-dessous requièrent `Authorization` + `X-Device-Id`.
-Le profil cible doit appartenir au compte du JWT, sinon `404`.
+À l'exception de `GET /profiles` (bootstrap), elles exigent aussi
+`X-Profile-Id` ; les routes de gestion (`POST`, `PATCH`, `DELETE`,
+`PUT/DELETE pin`) imposent en plus que le profil actif ait
+`is_main = true`, sinon `403 main_profile_required`. Le profil cible
+doit appartenir au compte du JWT, sinon `404`.
+
+### `GET /profiles`
+
+Mappe `AuthRepository.fetchProfiles`. Bootstrap après login : retourne
+la liste des profils du user **sans** exiger un profil actif (route
+exempte de `X-Profile-Id`). Utilisé pour resynchroniser la liste après
+des mutations externes (nouveau profil sur un autre device, PIN modifié,
+profil supprimé).
+
+**Headers requête**
+- `Authorization: Bearer <jwt>` (requis)
+- `X-Device-Id: <uuid>` (requis)
+- **Pas** de `X-Profile-Id` (route bootstrap, le client n'en envoie pas)
+
+**Response 200** — même schéma `profiles[]` que dans `verify-otp` :
+
+```json
+{
+  "profiles": [
+    {
+      "id": "papa",
+      "name": "Papa",
+      "age_category": "adulte",
+      "is_main": true,
+      "pin_hash": "$2b$12$…",
+      "avatar_url": null
+    },
+    {
+      "id": "ar",
+      "name": "Ar",
+      "age_category": "enfant",
+      "is_main": false,
+      "pin_hash": null,
+      "avatar_url": null
+    }
+  ]
+}
+```
+
+Pas de mapping métier d'erreur ; toute non-2xx remonte génériquement.
+
+---
 
 ### `POST /profiles`
 
@@ -253,14 +308,17 @@ Mappe `delete`. Supprime un profil non principal.
 
 Auth requise sur tous les endpoints.
 
-### `GET /movies?age_category={cat}`
+### `GET /movies`
 
-Mappe `CatalogRepository.listMoviesFor(ageCategory)`. Renvoie **uniquement**
-les films de la catégorie demandée — pas d'expansion hiérarchique à ce
-niveau (l'expansion `lowerOrEqual` est utilisée seulement par la recherche).
+Mappe `CatalogRepository.listMoviesFor()`. Le filtre âge est appliqué
+**serveur-side** à partir du `X-Profile-Id` actif : le serveur résout le
+profil et renvoie **uniquement** les films dont
+`ageCategory == profile.ageCategory`. Pas d'expansion hiérarchique sur
+cette route (l'expansion `lowerOrEqual` est utilisée seulement par la
+recherche).
 
-**Query**
-- `age_category` (requis) : valeur de l'enum `AgeCategory`.
+**Query** : aucune. Le query param `?age_category=` n'existe plus —
+le serveur ignore tout query param.
 
 **Response 200**
 ```json
@@ -307,21 +365,23 @@ et `cast[].photo_url`.
 
 ---
 
-### `GET /movies/search?q={q}&up_to_age_category={cat}`
+### `GET /movies/search?q={q}`
 
-Mappe `CatalogRepository.searchMovies(query, upToAgeCategory)`. Doit
-retourner les films **dont la catégorie est ≤ `up_to_age_category`** dans
-la hiérarchie `bebe < enfant < ado < jeuneAdulte < adulte`, et dont le
-`title` OU le `original_title` contient `q` après normalisation
-**case- et accent-insensible** (`shared/text_normalization.dart`). La
-normalisation s'applique des deux côtés (la requête `q` ET le titre
-indexé) — le client envoie la chaîne brute, le backend normalise.
+Mappe `CatalogRepository.searchMovies({query})`. Le filtre hiérarchique
+est appliqué **serveur-side** à partir du `X-Profile-Id` actif : le
+serveur retourne les films dont la catégorie est **≤** celle du profil
+actif dans la hiérarchie `bebe < enfant < ado < jeuneAdulte < adulte`,
+et dont le `title` OU le `original_title` contient `q` après
+normalisation **case- et accent-insensible** (la normalisation
+s'applique des deux côtés — la requête `q` ET le titre indexé — le
+client envoie la chaîne brute, le backend normalise).
 
 **Query**
 - `q` (requis) : la chaîne de recherche, transmise telle quelle (sans
   trim, sans lowercase, sans accent-strip côté client).
-- `up_to_age_category` (requis) : valeur de l'enum `AgeCategory` en
-  `snake_case` (cf. [Mapping des énumérations](#mapping-des-énumérations)).
+
+Le query param `?up_to_age_category=` n'existe plus — le serveur ignore
+tout query param autre que `q`.
 
 Le client n'impose ni longueur minimale (responsabilité UI) ni tri
 (le service applicatif trie alphabétiquement sur le titre).
@@ -356,10 +416,12 @@ support des **range requests**.
   (le client parse le total depuis ce header — regex `/(\d+)\s*$`
   dans `_resolveTotalSize`).
 - `404` si le `movie_id` est inconnu.
-- `403` si le user n'a aucun profil dont la catégorie d'âge donne accès
-  à ce film (vérification de permission **non négociable** : voir
-  GLOBALVIEW §"Logique de permissions critiques"). Le client n'a pas de
-  gestion fine de ce cas — un 403 sera remonté comme `DownloadStatus.failed`.
+- `403 movie_above_age_category` si le profil actif (`X-Profile-Id`) a
+  une `age_category` strictement inférieure à celle du film cible. Le
+  client n'a pas de gestion fine de ce cas — un 403 sera remonté comme
+  `DownloadStatus.failed`. En pratique cette erreur est curl-only : la
+  homepage filtre déjà serveur-side, donc le client n'expose jamais de
+  film au-dessus de la catégorie du profil actif.
 
 **Body** : binaire `video/mp4`, H.264 + AAC, web-optimized (moov atom au
 début pour permettre la lecture progressive).
@@ -371,8 +433,12 @@ agissent uniquement sur le filesystem local (le `.partial` et le `.mp4`).
 
 ## Progression de lecture (watch progress)
 
-Auth requise. Le `profile_id` du path doit appartenir au user du JWT.
-Les positions sont des **secondes entières** (`positionSeconds: int`).
+Auth requise + `X-Profile-Id`. Le `profile_id` du path doit être **égal**
+au `X-Profile-Id` du header (sinon `403 forbidden_profile`) — pas de
+lecture cross-profil. En pratique cette contrainte est satisfaite par
+construction côté client (le `:pid` du path et le header sont alimentés
+par la même source : le profil actif). Les positions sont des
+**secondes entières** (`positionSeconds: int`).
 
 ### `GET /profiles/{profile_id}/progress/{movie_id}`
 
@@ -469,7 +535,10 @@ Tout autre code est traité comme erreur générique.
 | 422 | `cannot_clear_main_profile_pin` | `CannotClearMainProfilePinException` |
 | 422 | `cannot_delete_main_profile` | `CannotDeleteMainProfileException` |
 | 401 | `invalid_token` | JWT manquant / invalide / expiré |
-| 403 | `forbidden_age_category` | Tentative d'accès à un film hors permission |
+| 400 | `missing_profile_id` | Header `X-Profile-Id` absent sur une route protégée non-bootstrap |
+| 403 | `forbidden_profile` | `X-Profile-Id` ne correspond à aucun profil du user JWT, ou `:pid` du path != `X-Profile-Id` (watch-progress) |
+| 403 | `main_profile_required` | Route de gestion (`POST/PATCH/DELETE /profiles*`, `PUT/DELETE /profiles/:id/pin`) appelée alors que le profil actif n'est pas `is_main = true` |
+| 403 | `movie_above_age_category` | Tentative d'accès à un film dont la `age_category` excède celle du profil actif |
 | 404 | `not_found` | Profil ou film inexistant |
 
 Le client n'a **pas** de gestion centralisée du `401 invalid_token` à ce

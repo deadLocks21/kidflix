@@ -4,6 +4,7 @@ import 'package:kidflix/core/domain/exceptions/unknown_phone_number.exception.da
 import 'package:kidflix/core/domain/model/device.dart';
 import 'package:kidflix/core/domain/model/otp_code.dart';
 import 'package:kidflix/core/domain/model/phone_number.dart';
+import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/model/session.dart';
 import 'package:kidflix/core/domain/services/auth.repository.dart';
 import 'package:kidflix/core/domain/services/profile_pin.service.dart';
@@ -63,5 +64,17 @@ class InMemoryAuthRepository implements AuthRepository {
       device: device,
       profiles: List.unmodifiable(account.profiles),
     );
+  }
+
+  @override
+  Future<List<Profile>> fetchProfiles() async {
+    await _store.ensureSeeded(_pin);
+    final account = _store.currentAccount;
+    if (account == null) {
+      throw StateError(
+        'fetchProfiles called before any successful verifyOtp',
+      );
+    }
+    return List.unmodifiable(account.profiles);
   }
 }

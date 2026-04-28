@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:kidflix/core/application/dtos/remote_profile.dto.dart';
 import 'package:kidflix/core/application/dtos/remote_session.dto.dart';
 import 'package:kidflix/core/domain/exceptions/invalid_otp.exception.dart';
 import 'package:kidflix/core/domain/exceptions/otp_expired.exception.dart';
@@ -6,6 +7,7 @@ import 'package:kidflix/core/domain/exceptions/unknown_phone_number.exception.da
 import 'package:kidflix/core/domain/model/device.dart';
 import 'package:kidflix/core/domain/model/otp_code.dart';
 import 'package:kidflix/core/domain/model/phone_number.dart';
+import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/model/session.dart';
 import 'package:kidflix/core/domain/services/auth.repository.dart';
 import 'package:kidflix/infrastructure/http/error_code.dart';
@@ -77,5 +79,14 @@ class DioAuthRepository implements AuthRepository {
       }
       rethrow;
     }
+  }
+
+  @override
+  Future<List<Profile>> fetchProfiles() async {
+    final response = await _dio.get<Map<String, dynamic>>('/profiles');
+    final raw = response.data!['profiles'] as List<dynamic>;
+    return raw
+        .map((e) => RemoteProfileDto.fromJson(e as Map<String, dynamic>).toDomain())
+        .toList(growable: false);
   }
 }

@@ -9,78 +9,180 @@ import 'package:kidflix/infrastructure/http/auth.interceptor.dart';
 void main() {
   group('AuthInterceptor', () {
     test(
-      'skips /auth/request-otp without adding Authorization or X-Device-Id',
+      'skips /auth/request-otp without adding any auth header',
       () async {
         final adapter = _FakeAdapter();
         final dio = _dio(adapter);
-        dio.interceptors.add(AuthInterceptor(() => _session));
+        dio.interceptors.add(
+          AuthInterceptor(session: () => _session, profileId: () => 'ar'),
+        );
 
         await dio.post<dynamic>('/auth/request-otp');
 
         expect(adapter.last.headers, isNot(contains('Authorization')));
         expect(adapter.last.headers, isNot(contains('X-Device-Id')));
+        expect(adapter.last.headers, isNot(contains('X-Profile-Id')));
       },
     );
 
     test(
-      'skips /auth/verify-otp without adding Authorization or X-Device-Id',
+      'skips /auth/verify-otp without adding any auth header',
       () async {
         final adapter = _FakeAdapter();
         final dio = _dio(adapter);
-        dio.interceptors.add(AuthInterceptor(() => _session));
+        dio.interceptors.add(
+          AuthInterceptor(session: () => _session, profileId: () => 'ar'),
+        );
 
         await dio.post<dynamic>('/auth/verify-otp');
 
         expect(adapter.last.headers, isNot(contains('Authorization')));
         expect(adapter.last.headers, isNot(contains('X-Device-Id')));
+        expect(adapter.last.headers, isNot(contains('X-Profile-Id')));
       },
     );
 
     test(
-      'adds Bearer JWT and X-Device-Id headers when session is present',
+      'GET /profiles bootstrap receives JWT + device but NOT X-Profile-Id',
       () async {
         final adapter = _FakeAdapter();
         final dio = _dio(adapter);
-        dio.interceptors.add(AuthInterceptor(() => _session));
+        dio.interceptors.add(
+          AuthInterceptor(session: () => _session, profileId: () => 'ar'),
+        );
 
-        await dio.get<dynamic>('/profiles/123');
+        await dio.get<dynamic>('/profiles');
 
         expect(adapter.last.headers['Authorization'], 'Bearer eyJabc');
         expect(adapter.last.headers['X-Device-Id'], 'uuid-1');
+        expect(adapter.last.headers, isNot(contains('X-Profile-Id')));
       },
     );
 
     test(
-      'lets the request through without auth headers when session is null',
+      'POST /profiles receives all three headers',
       () async {
         final adapter = _FakeAdapter();
         final dio = _dio(adapter);
-        dio.interceptors.add(AuthInterceptor(() => null));
+        dio.interceptors.add(
+          AuthInterceptor(session: () => _session, profileId: () => 'papa'),
+        );
 
-        await dio.get<dynamic>('/profiles/123');
+        await dio.post<dynamic>('/profiles');
+
+        expect(adapter.last.headers['Authorization'], 'Bearer eyJabc');
+        expect(adapter.last.headers['X-Device-Id'], 'uuid-1');
+        expect(adapter.last.headers['X-Profile-Id'], 'papa');
+      },
+    );
+
+    test(
+      'PATCH /profiles/:id receives all three headers (path is not the bootstrap exemption)',
+      () async {
+        final adapter = _FakeAdapter();
+        final dio = _dio(adapter);
+        dio.interceptors.add(
+          AuthInterceptor(session: () => _session, profileId: () => 'papa'),
+        );
+
+        await dio.patch<dynamic>('/profiles/ar');
+
+        expect(adapter.last.headers['Authorization'], 'Bearer eyJabc');
+        expect(adapter.last.headers['X-Device-Id'], 'uuid-1');
+        expect(adapter.last.headers['X-Profile-Id'], 'papa');
+      },
+    );
+
+    test(
+      'GET /movies (protected route) receives all three headers',
+      () async {
+        final adapter = _FakeAdapter();
+        final dio = _dio(adapter);
+        dio.interceptors.add(
+          AuthInterceptor(session: () => _session, profileId: () => 'ar'),
+        );
+
+        await dio.get<dynamic>('/movies');
+
+        expect(adapter.last.headers['Authorization'], 'Bearer eyJabc');
+        expect(adapter.last.headers['X-Device-Id'], 'uuid-1');
+        expect(adapter.last.headers['X-Profile-Id'], 'ar');
+      },
+    );
+
+    test(
+      'lets the request through without any auth header when session is null',
+      () async {
+        final adapter = _FakeAdapter();
+        final dio = _dio(adapter);
+        dio.interceptors.add(
+          AuthInterceptor(session: () => null, profileId: () => null),
+        );
+
+        await dio.get<dynamic>('/movies');
 
         expect(adapter.last.headers, isNot(contains('Authorization')));
         expect(adapter.last.headers, isNot(contains('X-Device-Id')));
+        expect(adapter.last.headers, isNot(contains('X-Profile-Id')));
       },
     );
+
+    test(
+      'profile-id null but session present injects only JWT + device on protected routes',
+      () async {
+        final adapter = _FakeAdapter();
+        final dio = _dio(adapter);
+        dio.interceptors.add(
+          AuthInterceptor(session: () => _session, profileId: () => null),
+        );
+
+        await dio.get<dynamic>('/movies');
+
+        expect(adapter.last.headers['Authorization'], 'Bearer eyJabc');
+        expect(adapter.last.headers['X-Device-Id'], 'uuid-1');
+        expect(adapter.last.headers, isNot(contains('X-Profile-Id')));
+      },
+    );
+
+    test('reflects profile-id changes between consecutive requests', () async {
+      final adapter = _FakeAdapter();
+      final dio = _dio(adapter);
+      String? currentProfileId = 'ar';
+      dio.interceptors.add(
+        AuthInterceptor(
+          session: () => _session,
+          profileId: () => currentProfileId,
+        ),
+      );
+
+      await dio.get<dynamic>('/movies');
+      expect(adapter.requests[0].headers['X-Profile-Id'], 'ar');
+
+      currentProfileId = 'ro';
+      await dio.get<dynamic>('/movies');
+      expect(adapter.requests[1].headers['X-Profile-Id'], 'ro');
+
+      currentProfileId = null;
+      await dio.get<dynamic>('/movies');
+      expect(adapter.requests[2].headers, isNot(contains('X-Profile-Id')));
+    });
 
     test('reflects session changes between consecutive requests', () async {
       final adapter = _FakeAdapter();
       final dio = _dio(adapter);
       Session? current;
-      dio.interceptors.add(AuthInterceptor(() => current));
+      dio.interceptors.add(
+        AuthInterceptor(session: () => current, profileId: () => null),
+      );
 
-      // 1st request — no session
       await dio.get<dynamic>('/profiles');
       expect(adapter.requests[0].headers, isNot(contains('Authorization')));
 
-      // Login
       current = _session;
       await dio.get<dynamic>('/profiles');
       expect(adapter.requests[1].headers['Authorization'], 'Bearer eyJabc');
       expect(adapter.requests[1].headers['X-Device-Id'], 'uuid-1');
 
-      // Logout
       current = null;
       await dio.get<dynamic>('/profiles');
       expect(adapter.requests[2].headers, isNot(contains('Authorization')));

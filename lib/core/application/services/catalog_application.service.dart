@@ -3,11 +3,17 @@ import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/core/application/dtos/profile.dto.dart';
 import 'package:kidflix/core/domain/model/catalog_row.dart';
 import 'package:kidflix/core/domain/model/movie.dart';
-import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/services/catalog.repository.dart';
 
 /// Assembles the homepage's ordered list of [CatalogRow] instances for the
-/// active profile, filtering strictly by age category.
+/// active profile.
+///
+/// Age-category filtering is **not** done here: it lives outside the
+/// service in `DioCatalogRepository` (server-side via `X-Profile-Id` in
+/// HTTP mode) or is intentionally absent in `InMemoryCatalogRepository`
+/// (the seed is returned in full in dev mode). The [ProfileDto] parameter
+/// is preserved on `buildHomeRowsFor` for future row-composition decisions
+/// that may consume profile metadata other than the age category.
 ///
 /// Rows with an empty movie list are removed before projection. The row
 /// display order is controlled by [_rowOrder], and dynamic row families
@@ -32,10 +38,7 @@ class CatalogApplicationService {
   ];
 
   Future<List<CatalogRowDto>> buildHomeRowsFor(ProfileDto profile) async {
-    final category = AgeCategory.values.firstWhere(
-      (c) => c.name == profile.ageCategory,
-    );
-    final movies = await _repository.listMoviesFor(category);
+    final movies = await _repository.listMoviesFor();
 
     final rows = <CatalogRow>[];
     for (final type in _rowOrder) {

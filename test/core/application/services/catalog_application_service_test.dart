@@ -11,15 +11,10 @@ class _FakeRepo implements CatalogRepository {
   _FakeRepo(this._pool);
 
   @override
-  Future<List<Movie>> listMoviesFor(AgeCategory ageCategory) async {
-    return _pool.where((m) => m.ageCategory == ageCategory).toList();
-  }
+  Future<List<Movie>> listMoviesFor() async => List.unmodifiable(_pool);
 
   @override
-  Future<List<Movie>> searchMovies({
-    required String query,
-    required AgeCategory upToAgeCategory,
-  }) async => const [];
+  Future<List<Movie>> searchMovies({required String query}) async => const [];
 }
 
 Movie _m({
@@ -58,18 +53,25 @@ ProfileDto _profile(AgeCategory category) => ProfileDto(
 
 void main() {
   group('CatalogApplicationService.buildHomeRowsFor', () {
-    test('filters strictly by ageCategory', () async {
-      final service = CatalogApplicationService(
-        _FakeRepo([
-          _m(id: 'b1', ageCategory: AgeCategory.bebe, genres: ['Animation']),
-          _m(id: 'e1', ageCategory: AgeCategory.enfant, genres: ['Aventure']),
-        ]),
-      );
-      final rows = await service.buildHomeRowsFor(_profile(AgeCategory.enfant));
-      final allMovieIds = rows.expand((r) => r.movies.map((m) => m.id)).toSet();
-      expect(allMovieIds, contains('e1'));
-      expect(allMovieIds, isNot(contains('b1')));
-    });
+    test(
+      'consumes the repository result without re-filtering by age category',
+      () async {
+        final service = CatalogApplicationService(
+          _FakeRepo([
+            _m(id: 'b1', ageCategory: AgeCategory.bebe, genres: ['Animation']),
+            _m(id: 'e1', ageCategory: AgeCategory.enfant, genres: ['Aventure']),
+          ]),
+        );
+        final rows = await service.buildHomeRowsFor(
+          _profile(AgeCategory.enfant),
+        );
+        final allMovieIds =
+            rows.expand((r) => r.movies.map((m) => m.id)).toSet();
+        // Both movies appear: the service forwards the repository's output
+        // verbatim. Filtering is server-side (HTTP) or absent (in-memory).
+        expect(allMovieIds, containsAll(['b1', 'e1']));
+      },
+    );
 
     test('saga row needs at least 2 movies with same sagaId', () async {
       final service = CatalogApplicationService(

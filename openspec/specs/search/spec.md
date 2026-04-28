@@ -227,15 +227,22 @@ Future<List<MovieDto>> searchFor({
 
 The service SHALL:
 
-1. Derive the hierarchical scope from `profile.ageCategory` using the
-   `AgeCategory` hierarchy helper.
-2. Call `CatalogRepository.searchMovies(query: query, upToAgeCategory: profile.ageCategory)`.
-3. Sort the resulting `List<Movie>` alphabetically by `title`.
-4. Convert each `Movie` to a `MovieDto`.
-5. Return the resulting list.
+1. Call `CatalogRepository.searchMovies(query: query)` (no longer
+   passes the active profile's age category — the hierarchical scope
+   is enforced server-side via `X-Profile-Id` in HTTP mode, and is
+   not enforced at all in in-memory mode).
+2. Sort the resulting `List<Movie>` alphabetically by `title`.
+3. Convert each `Movie` to a `MovieDto`.
+4. Return the resulting list.
 
-A usecase `SearchMoviesUseCase` SHALL wrap the service call, accepting a
-`String query` and a `ProfileDto profile`, returning
+The service SHALL NOT pass `profile.ageCategory` (or any age value)
+to the repository. The `ProfileDto` parameter is preserved on the
+method signature because future ranking/highlighting decisions may
+consume profile metadata other than the age category, but the
+parameter is no longer used as an age filter.
+
+A usecase `SearchMoviesUseCase` SHALL wrap the service call, accepting
+a `String query` and a `ProfileDto profile`, returning
 `Future<List<MovieDto>>`. The homepage consumes the usecase via its
 Riverpod provider.
 
@@ -247,11 +254,12 @@ The service SHALL NOT expose `Movie` Domain entities to the UI.
 - **THEN** each element of the returned list is a `MovieDto`
 - **AND** no `Movie` Domain entity is exposed to the caller
 
-#### Scenario: Service applies hierarchical scope via profile
+#### Scenario: Service does not pass ageCategory to the repository
 
 - **GIVEN** a profile with `ageCategory == AgeCategory.enfant`
 - **WHEN** `searchFor("o", profile)` is called
-- **THEN** `CatalogRepository.searchMovies` is called with `upToAgeCategory: AgeCategory.enfant`
+- **THEN** `CatalogRepository.searchMovies` is called with `query: "o"` only (no `upToAgeCategory` parameter)
+- **AND** the service does not inspect or forward `profile.ageCategory` to the repository
 
 ---
 
@@ -332,26 +340,37 @@ the following states based on the controller's state:
 
 The `InMemoryCatalogRepository` SHALL implement `searchMovies` by:
 
-1. Expanding `upToAgeCategory` to the list of allowed categories using
-   the `AgeCategory` hierarchy helper (all categories with
-   `index <= upToAgeCategory.index`).
-2. Iterating over the in-memory movie list, keeping a movie if:
-   - its `ageCategory` is in the expanded list, AND
+1. Iterating over the in-memory movie list (the full seed, all age
+   categories) and keeping a movie if:
    - `normalizeForSearch(title).contains(normalizeForSearch(query))` OR
-     (`originalTitle != null` AND
-      `normalizeForSearch(originalTitle!).contains(normalizeForSearch(query))`).
-3. Returning the resulting list in its natural iteration order
+   - (`originalTitle != null` AND
+     `normalizeForSearch(originalTitle!).contains(normalizeForSearch(query))`).
+2. Returning the resulting list in its natural iteration order
    (sorting happens in the application service).
 
-#### Scenario: InMemory search respects hierarchy
+The implementation SHALL NOT apply any age-category filter. The
+hierarchical scope rule documented by the `Search scope is hierarchical
+ascending` requirement is enforced server-side in HTTP mode (via
+`X-Profile-Id`) and is intentionally NOT enforced in in-memory mode —
+in-memory tests are aware of this and adjust their fixtures or
+assertions accordingly.
 
-- **GIVEN** an `InMemoryCatalogRepository` with a `bebe` "Shaun le mouton" and an `enfant` "Totoro"
-- **WHEN** `searchMovies(query: "o", upToAgeCategory: AgeCategory.bebe)` is called
-- **THEN** the returned list contains only "Shaun le mouton"
+#### Scenario: InMemory search returns matches across all age categories
+
+- **GIVEN** an `InMemoryCatalogRepository` with a `bebe` "Shaun le mouton", an `enfant` "Totoro", and a `jeuneAdulte` "Inception"
+- **WHEN** `searchMovies(query: "o")` is called
+- **THEN** the returned list contains all three movies
+- **AND** no movie is filtered out based on age category at the in-memory repository layer
 
 #### Scenario: InMemory search normalizes both sides
 
 - **GIVEN** an `InMemoryCatalogRepository` with a movie `title = "Astérix & Obélix : L'Empire du Milieu"`
-- **WHEN** `searchMovies(query: "empire", upToAgeCategory: AgeCategory.enfant)` is called
+- **WHEN** `searchMovies(query: "empire")` is called
+- **THEN** the returned list contains that movie
+
+#### Scenario: InMemory search matches on originalTitle when title does not
+
+- **GIVEN** an `InMemoryCatalogRepository` with a movie `title = "Le Monde de Nemo"` and `originalTitle = "Finding Nemo"`
+- **WHEN** `searchMovies(query: "finding")` is called
 - **THEN** the returned list contains that movie
 

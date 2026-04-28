@@ -564,7 +564,7 @@ The function SHALL be called by every `DownloadRepository.findByMovieId(movieId)
 
 The system SHALL provide an HTTP implementation `DioDownloadRepository implements DownloadRepository` in `lib/infrastructure/downloads/dio.download.repository.dart` that calls the backend `GET /movies/{movie_id}/download` endpoint documented in `API.md` § Téléchargement de fichier vidéo.
 
-The class SHALL accept a `Dio` instance via its constructor and SHALL NOT instantiate its own — the `Dio` is provided by `dioProvider`, which has the `AuthInterceptor` registered. The repository itself SHALL NOT add `Authorization` or `X-Device-Id` headers explicitly — these are injected transparently by the interceptor since `/movies/{movie_id}/download` does not start with `/auth/`.
+The class SHALL accept a `Dio` instance via its constructor and SHALL NOT instantiate its own — the `Dio` is provided by `dioProvider`, which has the `AuthInterceptor` registered. The repository itself SHALL NOT add `Authorization`, `X-Device-Id`, or `X-Profile-Id` headers explicitly — these are injected transparently by the interceptor since `/movies/{movie_id}/download` does not start with `/auth/` and is not the `GET /profiles` bootstrap exemption.
 
 ```dart
 DioDownloadRepository({required Dio dio, Directory? downloadsDirectory});
@@ -591,11 +591,11 @@ The optional `downloadsDirectory` SHALL be used only for tests; in production it
 
 `delete(String movieId)` SHALL behave identically to the in-memory implementation: cancel any active download, then remove both `${movieId}.mp4` and `${movieId}.mp4.partial` if they exist. No HTTP DELETE call to the backend.
 
-The implementation SHALL NOT log raw response bodies, the `Authorization` header, or the JWT at any log level.
+The implementation SHALL NOT log raw response bodies, the `Authorization` header, the JWT, or the `X-Profile-Id` value at any log level.
 
 The implementation SHALL NOT retry failed requests — retry policy is out of scope for this change.
 
-The implementation SHALL NOT map HTTP error codes (401 / 403 / 404 / 5xx) to specific Domain exception types or specific `errorMessage` discriminators. Any non-2xx outcome is propagated by `streamHttpDownload` as `DownloadStatus.failed` with the dio-supplied error message verbatim. A future change MAY introduce typed sub-statuses (`unauthorized`, `forbidden`, `notFound`) if UI rendering requirements emerge.
+The implementation SHALL NOT map HTTP error codes (401 / 403 / 404 / 5xx) to specific Domain exception types or specific `errorMessage` discriminators. Any non-2xx outcome is propagated by `streamHttpDownload` as `DownloadStatus.failed` with the dio-supplied error message verbatim. This includes the new `403 movie_above_age_category` code (introduced server-side by the `add-profile-permissions` backend change to enforce the age gate when a `:movie_id` exceeds the active profile's age category) — it is curl-only in practice (the homepage and search results never expose movies the profile cannot watch in HTTP mode), so the absence of a typed Domain exception is intentional. A future change MAY introduce typed sub-statuses (`unauthorized`, `forbidden`, `notFound`, `aboveAge`) if UI rendering requirements emerge.
 
 #### Scenario: download() targets the relative path /movies/{id}/download
 
@@ -605,11 +605,11 @@ The implementation SHALL NOT map HTTP error codes (401 / 403 / 404 / 5xx) to spe
 - **THEN** the outbound HTTP request method is `GET` on path `/movies/abc/download` against `dio.options.baseUrl`
 - **AND** the stream eventually emits `complete` with `localPath` ending in `abc.mp4`
 
-#### Scenario: AuthInterceptor injects headers transparently
+#### Scenario: AuthInterceptor injects all three headers transparently
 
-- **GIVEN** a session is established and `dioProvider` has the `AuthInterceptor` registered
+- **GIVEN** a session is established, a profile is selected, and `dioProvider` has the `AuthInterceptor` registered
 - **WHEN** `download("abc")` is consumed
-- **THEN** the outbound request to `/movies/abc/download` carries `Authorization: Bearer <jwt>` and `X-Device-Id: <device.id>` headers
+- **THEN** the outbound request to `/movies/abc/download` carries `Authorization: Bearer <jwt>`, `X-Device-Id: <device.id>`, and `X-Profile-Id: <profile.id>` headers
 - **AND** the repository code does not reference these headers explicitly
 
 #### Scenario: Concurrent download() calls for the same movieId share the stream
@@ -629,10 +629,11 @@ The implementation SHALL NOT map HTTP error codes (401 / 403 / 404 / 5xx) to spe
 
 #### Scenario: 4xx is surfaced as DownloadStatus.failed
 
-- **GIVEN** the backend responds 403 with body `{"error": {"code": "forbidden_age_category"}}` on `GET /movies/abc/download`
+- **GIVEN** the backend responds 403 with body `{"error": {"code": "movie_above_age_category"}}` on `GET /movies/abc/download`
 - **WHEN** `download("abc")` is consumed
 - **THEN** the stream emits a final event with `status == DownloadStatus.failed` and `errorMessage` non-null
 - **AND** the stream closes
+- **AND** no specific Domain exception is thrown
 
 #### Scenario: cancel() preserves the .partial without backend call
 
@@ -650,8 +651,6 @@ The implementation SHALL NOT map HTTP error codes (401 / 403 / 404 / 5xx) to spe
 - **THEN** no HTTP DELETE is issued to the backend
 - **AND** the file is removed from disk
 - **AND** a subsequent `findByMovieId("abc")` returns `null`
-
----
 
 ### Requirement: DownloadRepository implementation selection via API_BASE_URL
 

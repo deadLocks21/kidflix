@@ -374,4 +374,99 @@ void main() {
       },
     );
   });
+
+  group('DioAuthRepository.fetchProfiles', () {
+    Map<String, dynamic> profileJson({
+      required String id,
+      required String name,
+      required String ageCategory,
+      String? pinHash,
+      String? avatarUrl,
+      required bool isMain,
+    }) => {
+      'id': id,
+      'name': name,
+      'age_category': ageCategory,
+      'pin_hash': pinHash,
+      'avatar_url': avatarUrl,
+      'is_main': isMain,
+    };
+
+    test('targets GET /profiles with no body and no query parameter',
+        () async {
+      final adapter = _FakeAdapter(
+        (_, _) => _jsonResponse(200, {'profiles': <Map<String, dynamic>>[]}),
+      );
+      final repo = DioAuthRepository(_makeDio(adapter));
+
+      await repo.fetchProfiles();
+
+      expect(adapter.requests, hasLength(1));
+      expect(adapter.requests.single.method, 'GET');
+      expect(adapter.requests.single.path, '/profiles');
+      expect(
+        adapter.requests.single.bodyBytes,
+        isEmpty,
+        reason: 'GET /profiles must have no body',
+      );
+    });
+
+    test('parses the profiles envelope and preserves order', () async {
+      final adapter = _FakeAdapter(
+        (_, _) => _jsonResponse(200, {
+          'profiles': [
+            profileJson(
+              id: 'papa',
+              name: 'Papa',
+              ageCategory: 'adulte',
+              pinHash: r'$2b$12$abc',
+              isMain: true,
+            ),
+            profileJson(
+              id: 'ar',
+              name: 'Ar',
+              ageCategory: 'enfant',
+              isMain: false,
+            ),
+          ],
+        }),
+      );
+      final repo = DioAuthRepository(_makeDio(adapter));
+
+      final profiles = await repo.fetchProfiles();
+
+      expect(profiles, hasLength(2));
+      expect(profiles[0].id, 'papa');
+      expect(profiles[0].isMain, isTrue);
+      expect(profiles[0].pinHash, r'$2b$12$abc');
+      expect(profiles[1].id, 'ar');
+      expect(profiles[1].isMain, isFalse);
+      expect(profiles[1].pinHash, isNull);
+    });
+
+    test('returns an empty list when the backend has none', () async {
+      final adapter = _FakeAdapter(
+        (_, _) => _jsonResponse(200, {'profiles': <Map<String, dynamic>>[]}),
+      );
+      final repo = DioAuthRepository(_makeDio(adapter));
+
+      expect(await repo.fetchProfiles(), isEmpty);
+    });
+
+    test('rethrows DioException on 5xx', () async {
+      final adapter = _FakeAdapter((_, _) => _emptyResponse(500));
+      final repo = DioAuthRepository(_makeDio(adapter));
+
+      await expectLater(
+        repo.fetchProfiles(),
+        throwsA(
+          isA<DioException>().having(
+            (e) => e.response?.statusCode,
+            'response.statusCode',
+            500,
+          ),
+        ),
+      );
+    });
+  });
 }

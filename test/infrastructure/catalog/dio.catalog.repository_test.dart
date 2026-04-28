@@ -3,7 +3,6 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/infrastructure/catalog/dio.catalog.repository.dart';
 
 class _FakeAdapter implements HttpClientAdapter {
@@ -80,7 +79,7 @@ Map<String, dynamic> _movieJson({
 
 void main() {
   group('DioCatalogRepository.listMoviesFor', () {
-    test('issues GET /movies with age_category param and parses envelope',
+    test('issues GET /movies with no query parameter and parses envelope',
         () async {
       final adapter = _FakeAdapter(
         (_) => _jsonResponse(200, {
@@ -92,7 +91,7 @@ void main() {
       );
       final repo = DioCatalogRepository(_makeDio(adapter));
 
-      final movies = await repo.listMoviesFor(AgeCategory.enfant);
+      final movies = await repo.listMoviesFor();
 
       expect(movies, hasLength(2));
       expect(movies[0].id, 'm1');
@@ -102,7 +101,8 @@ void main() {
       expect(adapter.requests.single.method, 'GET');
       expect(
         adapter.requests.single.queryParameters,
-        {'age_category': 'enfant'},
+        isEmpty,
+        reason: 'no age_category param — server filters via X-Profile-Id',
       );
     });
 
@@ -118,7 +118,7 @@ void main() {
       );
       final repo = DioCatalogRepository(_makeDio(adapter));
 
-      final movies = await repo.listMoviesFor(AgeCategory.enfant);
+      final movies = await repo.listMoviesFor();
 
       expect(movies.map((m) => m.id).toList(), ['z', 'a', 'm']);
     });
@@ -129,23 +129,9 @@ void main() {
       );
       final repo = DioCatalogRepository(_makeDio(adapter));
 
-      final movies = await repo.listMoviesFor(AgeCategory.bebe);
+      final movies = await repo.listMoviesFor();
 
       expect(movies, isEmpty);
-    });
-
-    test('serializes jeune_adulte in snake_case on the wire', () async {
-      final adapter = _FakeAdapter(
-        (_) => _jsonResponse(200, {'movies': <Map<String, dynamic>>[]}),
-      );
-      final repo = DioCatalogRepository(_makeDio(adapter));
-
-      await repo.listMoviesFor(AgeCategory.jeuneAdulte);
-
-      expect(
-        adapter.requests.single.queryParameters,
-        {'age_category': 'jeune_adulte'},
-      );
     });
 
     test('rethrows DioException on 401', () async {
@@ -157,7 +143,7 @@ void main() {
       final repo = DioCatalogRepository(_makeDio(adapter));
 
       await expectLater(
-        repo.listMoviesFor(AgeCategory.enfant),
+        repo.listMoviesFor(),
         throwsA(
           isA<DioException>().having(
             (e) => e.response?.statusCode,
@@ -168,12 +154,32 @@ void main() {
       );
     });
 
+    test('rethrows DioException on 400 missing_profile_id', () async {
+      final adapter = _FakeAdapter(
+        (_) => _jsonResponse(400, {
+          'error': {'code': 'missing_profile_id'},
+        }),
+      );
+      final repo = DioCatalogRepository(_makeDio(adapter));
+
+      await expectLater(
+        repo.listMoviesFor(),
+        throwsA(
+          isA<DioException>().having(
+            (e) => e.response?.statusCode,
+            'statusCode',
+            400,
+          ),
+        ),
+      );
+    });
+
     test('rethrows DioException on 500', () async {
       final adapter = _FakeAdapter((_) => _emptyResponse(500));
       final repo = DioCatalogRepository(_makeDio(adapter));
 
       await expectLater(
-        repo.listMoviesFor(AgeCategory.enfant),
+        repo.listMoviesFor(),
         throwsA(
           isA<DioException>().having(
             (e) => e.response?.statusCode,
@@ -186,7 +192,7 @@ void main() {
   });
 
   group('DioCatalogRepository.searchMovies', () {
-    test('issues GET /movies/search with q and up_to_age_category params',
+    test('issues GET /movies/search with only the q query parameter',
         () async {
       final adapter = _FakeAdapter(
         (_) => _jsonResponse(200, {
@@ -195,19 +201,17 @@ void main() {
       );
       final repo = DioCatalogRepository(_makeDio(adapter));
 
-      final movies = await repo.searchMovies(
-        query: 'astérix',
-        upToAgeCategory: AgeCategory.enfant,
-      );
+      final movies = await repo.searchMovies(query: 'astérix');
 
       expect(movies, hasLength(1));
       expect(movies.single.id, 'asterix');
       expect(adapter.requests.single.path, '/movies/search');
       expect(adapter.requests.single.method, 'GET');
-      expect(adapter.requests.single.queryParameters, {
-        'q': 'astérix',
-        'up_to_age_category': 'enfant',
-      });
+      expect(adapter.requests.single.queryParameters, {'q': 'astérix'});
+      expect(
+        adapter.requests.single.queryParameters,
+        isNot(contains('up_to_age_category')),
+      );
     });
 
     test('passes the query verbatim — no trim, no lowercase, no accent strip',
@@ -217,10 +221,7 @@ void main() {
       );
       final repo = DioCatalogRepository(_makeDio(adapter));
 
-      await repo.searchMovies(
-        query: '  ASTÉRIX  ',
-        upToAgeCategory: AgeCategory.enfant,
-      );
+      await repo.searchMovies(query: '  ASTÉRIX  ');
 
       expect(
         adapter.requests.single.queryParameters['q'],
@@ -234,31 +235,11 @@ void main() {
       );
       final repo = DioCatalogRepository(_makeDio(adapter));
 
-      final result = await repo.searchMovies(
-        query: '',
-        upToAgeCategory: AgeCategory.enfant,
-      );
+      final result = await repo.searchMovies(query: '');
 
       expect(result, isEmpty);
       expect(adapter.requests, hasLength(1));
       expect(adapter.requests.single.queryParameters['q'], '');
-    });
-
-    test('serializes jeune_adulte in snake_case on the wire', () async {
-      final adapter = _FakeAdapter(
-        (_) => _jsonResponse(200, {'movies': <Map<String, dynamic>>[]}),
-      );
-      final repo = DioCatalogRepository(_makeDio(adapter));
-
-      await repo.searchMovies(
-        query: 'inception',
-        upToAgeCategory: AgeCategory.jeuneAdulte,
-      );
-
-      expect(
-        adapter.requests.single.queryParameters['up_to_age_category'],
-        'jeune_adulte',
-      );
     });
 
     test('rethrows DioException on 401', () async {
@@ -270,10 +251,7 @@ void main() {
       final repo = DioCatalogRepository(_makeDio(adapter));
 
       await expectLater(
-        repo.searchMovies(
-          query: 'x',
-          upToAgeCategory: AgeCategory.enfant,
-        ),
+        repo.searchMovies(query: 'x'),
         throwsA(isA<DioException>()),
       );
     });

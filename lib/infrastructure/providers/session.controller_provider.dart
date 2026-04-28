@@ -18,6 +18,7 @@ import 'package:kidflix/core/domain/model/session.dart';
 import 'package:kidflix/infrastructure/providers/auth.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/in_memory_accounts_store.provider.dart';
 import 'package:kidflix/infrastructure/providers/profile_management.service_provider.dart';
+import 'package:kidflix/infrastructure/providers/refresh_profiles.usecase_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.repository_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -358,6 +359,61 @@ class SessionController extends _$SessionController {
       );
     }
     return result;
+  }
+
+  /// Re-fetches the profile list from the backend (or the in-memory seed)
+  /// and replaces `session.profiles` with the result. Used to resync after
+  /// external mutations (new profile on another device, PIN updated,
+  /// profile deleted). No automatic trigger is wired — UI callsites pick
+  /// the right moment.
+  ///
+  /// Throws [StateError] when called from `Anonymous` or `OtpRequested`
+  /// (no session to refresh) — the throw is delegated to
+  /// [replaceProfiles].
+  Future<void> refreshProfiles() async {
+    final usecase = ref.read(refreshProfilesUseCaseProvider);
+    final profiles = await usecase.execute();
+    await replaceProfiles(profiles);
+  }
+
+  /// Replaces the profile list in the current session with [profiles] and
+  /// persists the updated session via [sessionRepositoryProvider]. The
+  /// `SessionState` variant is preserved (e.g. `ProfileSelected` stays
+  /// `ProfileSelected`, with the same `profile` field even if that
+  /// profile is no longer in the new list — recovery is deferred to a
+  /// future change).
+  ///
+  /// Throws [StateError] if called from `Anonymous` or `OtpRequested`,
+  /// where there is no session to refresh. Used by
+  /// `RefreshProfilesUseCase` after `AuthRepository.fetchProfiles()`.
+  Future<void> replaceProfiles(List<Profile> profiles) async {
+    final current = state;
+    final session = switch (current) {
+      Authenticated(:final session) => session,
+      PinRequired(:final session) => session,
+      ProfileSelected(:final session) => session,
+      ManagementPinRequired(:final session) => session,
+      ManagingProfiles(:final session) => session,
+      Anonymous() || OtpRequested() => null,
+    };
+    if (session == null || current is Anonymous || current is OtpRequested) {
+      throw StateError(
+        'replaceProfiles called from a state that carries no session: '
+        '${current.runtimeType}',
+      );
+    }
+    final next = session.copyWith(profiles: List.unmodifiable(profiles));
+    await ref.read(sessionRepositoryProvider).write(next);
+    state = switch (current) {
+      Authenticated() => Authenticated(next),
+      PinRequired(:final profile) =>
+        PinRequired(profile: profile, session: next),
+      ProfileSelected(:final profile) =>
+        ProfileSelected(profile: profile, session: next),
+      ManagementPinRequired() => ManagementPinRequired(next),
+      ManagingProfiles() => ManagingProfiles(next),
+      Anonymous() || OtpRequested() => current,
+    };
   }
 
   Profile? _mainProfile(Session session) {

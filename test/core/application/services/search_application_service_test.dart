@@ -9,22 +9,16 @@ class _RecordingRepo implements CatalogRepository {
   final List<Movie> results;
 
   String? lastQuery;
-  AgeCategory? lastUpTo;
   int callCount = 0;
 
   _RecordingRepo(this.results);
 
   @override
-  Future<List<Movie>> listMoviesFor(AgeCategory ageCategory) async =>
-      throw UnimplementedError();
+  Future<List<Movie>> listMoviesFor() async => throw UnimplementedError();
 
   @override
-  Future<List<Movie>> searchMovies({
-    required String query,
-    required AgeCategory upToAgeCategory,
-  }) async {
+  Future<List<Movie>> searchMovies({required String query}) async {
     lastQuery = query;
-    lastUpTo = upToAgeCategory;
     callCount += 1;
     return results;
   }
@@ -54,12 +48,12 @@ const _profile = ProfileDto(
 
 void main() {
   group('SearchApplicationService.searchFor', () {
-    test('calls the repository with the profile age as upToAgeCategory', () async {
+    test('forwards the query to the repository (no age parameter)', () async {
       final repo = _RecordingRepo([_m('x', 'X')]);
       final service = SearchApplicationService(repo);
       await service.searchFor(query: 'whatever', profile: _profile);
       expect(repo.lastQuery, 'whatever');
-      expect(repo.lastUpTo, AgeCategory.ado);
+      expect(repo.callCount, 1);
     });
 
     test('sorts results alphabetically by title', () async {

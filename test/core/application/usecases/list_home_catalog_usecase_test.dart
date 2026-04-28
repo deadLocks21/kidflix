@@ -8,14 +8,14 @@ import 'package:kidflix/core/domain/services/catalog.repository.dart';
 
 class _FakeRepo implements CatalogRepository {
   @override
-  Future<List<Movie>> listMoviesFor(AgeCategory ageCategory) async {
+  Future<List<Movie>> listMoviesFor() async {
     return [
       Movie(
         id: 'm1',
         title: 'M1',
         duration: const Duration(minutes: 90),
         synopsis: '',
-        ageCategory: ageCategory,
+        ageCategory: AgeCategory.enfant,
         genres: const ['Animation'],
         director: const [],
         cast: const [],
@@ -25,10 +25,7 @@ class _FakeRepo implements CatalogRepository {
   }
 
   @override
-  Future<List<Movie>> searchMovies({
-    required String query,
-    required AgeCategory upToAgeCategory,
-  }) async => const [];
+  Future<List<Movie>> searchMovies({required String query}) async => const [];
 }
 
 void main() {

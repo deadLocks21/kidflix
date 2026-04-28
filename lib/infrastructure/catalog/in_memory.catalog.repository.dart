@@ -26,19 +26,14 @@ class InMemoryCatalogRepository implements CatalogRepository {
   static final List<Movie> _movies = _seed();
 
   @override
-  Future<List<Movie>> listMoviesFor(AgeCategory ageCategory) async {
-    return _movies.where((m) => m.ageCategory == ageCategory).toList();
+  Future<List<Movie>> listMoviesFor() async {
+    return List.unmodifiable(_movies);
   }
 
   @override
-  Future<List<Movie>> searchMovies({
-    required String query,
-    required AgeCategory upToAgeCategory,
-  }) async {
-    final allowed = upToAgeCategory.lowerOrEqual.toSet();
+  Future<List<Movie>> searchMovies({required String query}) async {
     final needle = normalizeForSearch(query);
     return _movies.where((m) {
-      if (!allowed.contains(m.ageCategory)) return false;
       if (normalizeForSearch(m.title).contains(needle)) return true;
       final original = m.originalTitle;
       if (original != null && normalizeForSearch(original).contains(needle)) {
