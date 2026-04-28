@@ -29,6 +29,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 const Duration _progressSaveInterval = Duration(seconds: 10);
+const Duration _seekDetectionThreshold = Duration(seconds: 2);
 const int _resumeMinSeconds = 10;
 const double _completionThreshold = 0.9;
 
@@ -60,6 +61,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   MovieDownloadDto? _lastDownload;
   String? _movieTitle;
   Duration _position = Duration.zero;
+  Duration? _lastObservedPosition;
   Duration? _duration;
   bool _readyEmitted = false;
   bool _completedSaved = false;
@@ -196,7 +198,15 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
 
     _positionSub = engine.positionStream.listen((p) {
       if (_disposed) return;
+      final previous = _lastObservedPosition;
       setState(() => _position = p);
+      _lastObservedPosition = p;
+      if (previous != null &&
+          (p - previous).abs() > _seekDetectionThreshold) {
+        // Seek detected (user scrub) — flush position out-of-band so
+        // multi-device clients see it without waiting up to 10s.
+        unawaited(_saveProgressNow());
+      }
       _checkCompletion();
     });
     _durationSub = engine.durationStream.listen((d) {

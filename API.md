@@ -407,17 +407,23 @@ remplace verbatim toute entrée existante pour la même paire
 ```json
 {
   "position_seconds": 1900,
-  "completed": false,
-  "updated_at": "2026-04-22T10:30:10Z"
+  "completed": false
 }
 ```
 
-`updated_at` est calculé côté client (`SaveWatchProgressUseCase` pose
-`DateTime.now()`). Le serveur peut soit le respecter, soit le réécrire à
-sa propre `now()` — au choix tant que la valeur est renvoyée à la lecture
-suivante. Le client ne s'en sert pas pour résoudre des conflits.
+`updated_at` n'est **pas** envoyé par le client. Le serveur le calcule
+lui-même à chaque écriture (sa propre `now()`) et le renvoie dans la
+réponse 200 ainsi que dans les `GET` suivants. Le client ne s'en sert
+pas pour résoudre des conflits ; c'est purement un horodatage
+serveur-authoritative pour la couche persistance et le tri éventuel
+côté UI.
 
-**Response 200** — entrée stockée (mêmes champs que `GET`).
+Le backend SHALL rejeter avec `400 invalid_request` toute requête dont
+le body contient des clés inattendues (notamment `updated_at`,
+`profile_id`, `movie_id`).
+
+**Response 200** — entrée stockée (mêmes champs que `GET`, dont
+`updated_at` calculé serveur).
 
 **Note multi-device** : le serveur écrase la ligne (clé primaire
 `(profile_id, movie_id)`), comme prévu dans GLOBALVIEW §"Règle de reprise

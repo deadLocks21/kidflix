@@ -10,16 +10,42 @@ part of 'watch_progress.repository_provider.dart';
 // ignore_for_file: type=lint, type=warning
 /// Watch-progress repository provider.
 ///
-/// Currently always returns [InMemoryWatchProgressRepository]. Will be
-/// replaced by an HTTP variant when the backend is available.
+/// Selects between two implementations based on the compile-time constant
+/// `String.fromEnvironment('API_BASE_URL')`:
+///
+/// - **empty (default)** → [InMemoryWatchProgressRepository] — used by
+///   tests, by `flutter run` without flag, and by anyone running
+///   offline. Stores progress in a `Map` reset at every app restart.
+/// - **non-empty** → [DioWatchProgressRepository] consuming [dioProvider]
+///   — hits the three watch-progress endpoints documented in `API.md`
+///   § Progression de lecture, with `Authorization: Bearer <jwt>` and
+///   `X-Device-Id` headers injected transparently by the
+///   `AuthInterceptor`. Used by
+///   `flutter run --dart-define=API_BASE_URL=http://localhost:8080`.
+///
+/// Switching modes requires a full rebuild — `String.fromEnvironment` is
+/// evaluated at compile time, not at runtime.
 
 @ProviderFor(watchProgressRepository)
 final watchProgressRepositoryProvider = WatchProgressRepositoryProvider._();
 
 /// Watch-progress repository provider.
 ///
-/// Currently always returns [InMemoryWatchProgressRepository]. Will be
-/// replaced by an HTTP variant when the backend is available.
+/// Selects between two implementations based on the compile-time constant
+/// `String.fromEnvironment('API_BASE_URL')`:
+///
+/// - **empty (default)** → [InMemoryWatchProgressRepository] — used by
+///   tests, by `flutter run` without flag, and by anyone running
+///   offline. Stores progress in a `Map` reset at every app restart.
+/// - **non-empty** → [DioWatchProgressRepository] consuming [dioProvider]
+///   — hits the three watch-progress endpoints documented in `API.md`
+///   § Progression de lecture, with `Authorization: Bearer <jwt>` and
+///   `X-Device-Id` headers injected transparently by the
+///   `AuthInterceptor`. Used by
+///   `flutter run --dart-define=API_BASE_URL=http://localhost:8080`.
+///
+/// Switching modes requires a full rebuild — `String.fromEnvironment` is
+/// evaluated at compile time, not at runtime.
 
 final class WatchProgressRepositoryProvider
     extends
@@ -31,8 +57,21 @@ final class WatchProgressRepositoryProvider
     with $Provider<WatchProgressRepository> {
   /// Watch-progress repository provider.
   ///
-  /// Currently always returns [InMemoryWatchProgressRepository]. Will be
-  /// replaced by an HTTP variant when the backend is available.
+  /// Selects between two implementations based on the compile-time constant
+  /// `String.fromEnvironment('API_BASE_URL')`:
+  ///
+  /// - **empty (default)** → [InMemoryWatchProgressRepository] — used by
+  ///   tests, by `flutter run` without flag, and by anyone running
+  ///   offline. Stores progress in a `Map` reset at every app restart.
+  /// - **non-empty** → [DioWatchProgressRepository] consuming [dioProvider]
+  ///   — hits the three watch-progress endpoints documented in `API.md`
+  ///   § Progression de lecture, with `Authorization: Bearer <jwt>` and
+  ///   `X-Device-Id` headers injected transparently by the
+  ///   `AuthInterceptor`. Used by
+  ///   `flutter run --dart-define=API_BASE_URL=http://localhost:8080`.
+  ///
+  /// Switching modes requires a full rebuild — `String.fromEnvironment` is
+  /// evaluated at compile time, not at runtime.
   WatchProgressRepositoryProvider._()
     : super(
         from: null,
@@ -68,4 +107,4 @@ final class WatchProgressRepositoryProvider
 }
 
 String _$watchProgressRepositoryHash() =>
-    r'341eaf49d62d5adbbcd4bd700ea7c7dd9ac768be';
+    r'a85c228a4e2502d510d46c48f02604cc700f58ce';

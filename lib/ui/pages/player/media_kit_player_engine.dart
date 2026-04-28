@@ -28,10 +28,17 @@ class MediaKitPlayerEngine implements PlayerEngine {
     String filePath, {
     Duration initialPosition = Duration.zero,
   }) async {
-    await _player.open(Media('file://$filePath'), play: false);
-    if (initialPosition > Duration.zero) {
-      await _player.seek(initialPosition);
-    }
+    // Pass the resume position via `Media.start` rather than calling
+    // `_player.seek(...)` after `open()`. mpv applies `--start=N` as
+    // part of the open lifecycle; a post-open seek can be silently
+    // dropped on iOS if the demuxer hasn't finished initialising.
+    await _player.open(
+      Media(
+        'file://$filePath',
+        start: initialPosition > Duration.zero ? initialPosition : null,
+      ),
+      play: false,
+    );
   }
 
   @override
