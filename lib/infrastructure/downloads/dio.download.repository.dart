@@ -7,43 +7,28 @@ import 'package:kidflix/core/domain/services/download.repository.dart';
 import 'package:kidflix/infrastructure/downloads/http_download_stream.dart';
 import 'package:path_provider/path_provider.dart';
 
-/// In-memory [DownloadRepository] for offline / dev mode (no
-/// `--dart-define=API_BASE_URL`).
+/// HTTP implementation of [DownloadRepository] backed by Dio.
 ///
-/// Delegates the HTTP streaming loop to [streamHttpDownload] and the
-/// on-disk inspection to [inspectDownloadOnDisk]. The private [Dio]
-/// instance has no `AuthInterceptor` registered — this is a structural
-/// guarantee that no `Authorization: Bearer <jwt>` is ever sent to the
-/// third-party `archive.org` URL.
+/// Hits `GET /movies/{movie_id}/download` per `API.md` § Téléchargement
+/// de fichier vidéo, with `Range` support for resume and the same on-disk
+/// layout (`${documents}/downloads/{movieId}.mp4`) as
+/// [InMemoryDownloadRepository]. The required `Authorization: Bearer <jwt>` and `X-Device-Id: <uuid>` headers are injected transparently
+/// by the `AuthInterceptor` registered on `dioProvider` — this
+/// repository never touches headers explicitly.
 ///
-/// MVP shortcut: every `movieId` downloads from a single hard-coded URL
-/// ([stubUrl], Big Buck Bunny). When the HTTP backend lands, the
-/// `DioDownloadRepository` will be used instead — the contract and
-/// local-file behavior stay identical.
-///
-/// File layout under `${documents}/downloads/`:
-/// - `${movieId}.mp4.partial` during download (resumable via `Range`).
-/// - `${movieId}.mp4` after successful completion (the `.partial` is
-///   renamed, never deleted).
-class InMemoryDownloadRepository implements DownloadRepository {
-  /// MVP: URL stub unique pour tous les films. Remplacée par l'endpoint
-  /// backend en phase 2.
-  ///
-  /// Source : `archive.org` (Big Buck Bunny, Creative Commons). ~62 MB,
-  /// MP4 H.264 720p ~10 min, `Accept-Ranges: bytes`. Redirect 302 vers
-  /// un CDN régional suivi automatiquement par dio. Durée suffisante
-  /// pour exercer resume dialog / seuil 90% / seek / auto-hide
-  /// contrôles.
-  static const String stubUrl =
-      'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4';
-
+/// Errors (4xx/5xx/network) are surfaced as
+/// [DownloadStatus.failed] with the dio-supplied message; no
+/// metier-level Domain exception mapping. `cancel` and `delete` operate
+/// on the local filesystem only — there is no documented backend
+/// endpoint for either.
+class DioDownloadRepository implements DownloadRepository {
   final Dio _dio;
   final Directory? _downloadsDirOverride;
   final Map<String, _ActiveDownload> _active = {};
   Directory? _cachedDir;
 
-  InMemoryDownloadRepository({Dio? dio, Directory? downloadsDirectory})
-    : _dio = dio ?? Dio(),
+  DioDownloadRepository({required Dio dio, Directory? downloadsDirectory})
+    : _dio = dio,
       _downloadsDirOverride = downloadsDirectory;
 
   @override
@@ -105,7 +90,7 @@ class InMemoryDownloadRepository implements DownloadRepository {
       final dir = await _resolveDir();
       final source = streamHttpDownload(
         dio: _dio,
-        url: stubUrl,
+        url: '/movies/$movieId/download',
         movieId: movieId,
         downloadsDir: dir,
         cancelToken: active.cancelToken,
