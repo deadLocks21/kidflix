@@ -10,6 +10,7 @@ import 'package:kidflix/infrastructure/providers/download.repository_provider.da
 import 'package:kidflix/infrastructure/providers/download_management.usecases_provider.dart';
 import 'package:kidflix/infrastructure/providers/profile_pin.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
+import 'package:kidflix/ui/pages/home/widgets/download_progress_button.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/unlock_pin_dialog.widget.dart';
 
 /// Secondary action displayed beside the primary `[Lire]` button on
@@ -57,15 +58,21 @@ class DownloadIntentButton extends ConsumerStatefulWidget {
 class _DownloadIntentButtonState extends ConsumerState<DownloadIntentButton> {
   bool _busy = false;
   Timer? _refreshTimer;
+  _ButtonState _state = _ButtonState.cacheOrAbsent;
 
   @override
   void initState() {
     super.initState();
+    _refresh();
     // Lightweight polling : the manifest can change out of band (other
     // surfaces, the manager page). A 1-second interval keeps the UI
-    // responsive without flooding the filesystem.
+    // responsive without flooding the filesystem. We update _state in
+    // place rather than rebuilding via FutureBuilder, otherwise the
+    // inFlight subtree (which holds a live Riverpod stream listener)
+    // would be torn down and re-mounted on every tick, losing the
+    // broadcast progress events.
     _refreshTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
+      _refresh();
     });
   }
 
@@ -75,32 +82,30 @@ class _DownloadIntentButtonState extends ConsumerState<DownloadIntentButton> {
     super.dispose();
   }
 
+  Future<void> _refresh() async {
+    final next = await _resolveState();
+    if (!mounted) return;
+    if (_state != next) setState(() => _state = next);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder(
-      future: _resolveState(),
-      builder: (context, snapshot) {
-        final state = snapshot.data ?? _ButtonState.cacheOrAbsent;
-        return switch (state) {
-          _ButtonState.inFlight => OutlinedButton.icon(
-              icon: const Icon(Icons.download),
-              label: const Text('Téléchargement…'),
-              onPressed: null,
-            ),
-          _ButtonState.kept => OutlinedButton.icon(
-              icon: const Icon(Icons.check_circle_outline),
-              label: const Text('Téléchargé'),
-              onPressed:
-                  _busy ? null : () => _showDownloadedActions(context),
-            ),
-          _ButtonState.cacheOrAbsent => OutlinedButton.icon(
-              icon: const Icon(Icons.file_download_outlined),
-              label: const Text('Télécharger'),
-              onPressed: _busy ? null : () => _onPromote(context),
-            ),
-        };
-      },
-    );
+    return switch (_state) {
+      _ButtonState.inFlight => _InFlightButton(
+          mediaId: widget.mediaId,
+          isEpisode: widget.isEpisode,
+        ),
+      _ButtonState.kept => OutlinedButton.icon(
+          icon: const Icon(Icons.check_circle_outline),
+          label: const Text('Téléchargé'),
+          onPressed: _busy ? null : () => _showDownloadedActions(context),
+        ),
+      _ButtonState.cacheOrAbsent => OutlinedButton.icon(
+          icon: const Icon(Icons.file_download_outlined),
+          label: const Text('Télécharger'),
+          onPressed: _busy ? null : () => _onPromote(context),
+        ),
+    };
   }
 
   Future<_ButtonState> _resolveState() async {
@@ -170,6 +175,7 @@ class _DownloadIntentButtonState extends ConsumerState<DownloadIntentButton> {
       }
       ref.invalidate(downloadInventoryProvider);
       ref.invalidate(storageSummaryProvider);
+      unawaited(_refresh());
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -286,3 +292,69 @@ class _DownloadIntentButtonState extends ConsumerState<DownloadIntentButton> {
 }
 
 enum _ButtonState { cacheOrAbsent, inFlight, kept }
+
+/// Polls `findForMovie` / `findForEpisode` every 250 ms while mounted.
+/// We can't rely on a Riverpod `StreamProvider` here: the underlying
+/// broadcast stream does not replay past events, so a late subscriber
+/// stays in `loading` until the next throttled tick and the autoDispose
+/// teardown can drop us back to zero. Polling the in-memory
+/// `currentSnapshot` is simple and always up to date.
+class _InFlightButton extends ConsumerStatefulWidget {
+  final String mediaId;
+  final bool isEpisode;
+
+  const _InFlightButton({required this.mediaId, required this.isEpisode});
+
+  @override
+  ConsumerState<_InFlightButton> createState() => _InFlightButtonState();
+}
+
+class _InFlightButtonState extends ConsumerState<_InFlightButton> {
+  Timer? _timer;
+  int _bytesReceived = 0;
+  int? _bytesTotal;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick();
+    _timer = Timer.periodic(const Duration(milliseconds: 250), (_) => _tick());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _tick() async {
+    final repo = ref.read(downloadRepositoryProvider);
+    int? received;
+    int? total;
+    if (widget.isEpisode) {
+      final snap = await repo.findForEpisode(widget.mediaId);
+      if (snap == null) return;
+      received = snap.bytesReceived;
+      total = snap.bytesTotal;
+    } else {
+      final snap = await repo.findForMovie(widget.mediaId);
+      if (snap == null) return;
+      received = snap.bytesReceived;
+      total = snap.bytesTotal;
+    }
+    if (!mounted) return;
+    if (received == _bytesReceived && total == _bytesTotal) return;
+    setState(() {
+      _bytesReceived = received!;
+      _bytesTotal = total;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DownloadProgressButton(
+      bytesReceived: _bytesReceived,
+      bytesTotal: _bytesTotal,
+    );
+  }
+}

@@ -39,6 +39,7 @@ class SeasonDownloadButton extends ConsumerStatefulWidget {
 class _SeasonDownloadButtonState extends ConsumerState<SeasonDownloadButton> {
   StreamSubscription<DownloadSeasonProgress>? _sub;
   int _done = 0;
+  DownloadSeasonProgress? _last;
   bool _busy = false;
 
   @override
@@ -52,10 +53,42 @@ class _SeasonDownloadButtonState extends ConsumerState<SeasonDownloadButton> {
   @override
   Widget build(BuildContext context) {
     if (_running) {
-      return TextButton.icon(
-        icon: const Icon(Icons.download),
-        label: Text('$_done / ${widget.episodeIds.length}'),
+      final snap = _last?.currentSnapshot;
+      final received = snap?.bytesReceived ?? 0;
+      final total = snap?.bytesTotal;
+      double? progress;
+      if (total != null && total > 0) {
+        progress = (received / total).clamp(0.0, 1.0);
+      }
+      final pctLabel = progress != null
+          ? '${(progress * 100).round()} %'
+          : _formatMo(received);
+      return TextButton(
         onPressed: () => _cancel(),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.download, size: 18),
+            const SizedBox(width: 8),
+            Text('$_done / ${widget.episodeIds.length}'),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 60,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 4,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 44,
+              child: Text(pctLabel, textAlign: TextAlign.end),
+            ),
+          ],
+        ),
       );
     }
     return IconButton(
@@ -80,7 +113,10 @@ class _SeasonDownloadButtonState extends ConsumerState<SeasonDownloadButton> {
       );
       _sub = stream.listen(
         (p) {
-          setState(() => _done = p.doneEpisodes);
+          setState(() {
+            _done = p.doneEpisodes;
+            _last = p;
+          });
         },
         onError: (e) {
           messenger.showSnackBar(SnackBar(content: Text('Erreur: $e')));
@@ -110,9 +146,17 @@ class _SeasonDownloadButtonState extends ConsumerState<SeasonDownloadButton> {
 
   void _cleanup() {
     _sub = null;
+    _last = null;
     if (mounted) setState(() {});
     ref.invalidate(downloadInventoryProvider);
     ref.invalidate(storageSummaryProvider);
+  }
+
+  static String _formatMo(int bytes) {
+    if (bytes <= 0) return '0 Mo';
+    final mo = bytes / (1024 * 1024);
+    if (mo < 10) return '${mo.toStringAsFixed(1)} Mo';
+    return '${mo.round()} Mo';
   }
 
   Future<bool> _kidsLockChallenge(BuildContext context) async {
