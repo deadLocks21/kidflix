@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:kidflix/core/application/dtos/catalog_item.dto.dart';
 import 'package:kidflix/core/application/dtos/catalog_row.dto.dart';
+import 'package:kidflix/core/application/dtos/continue_watching_card.dto.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/core/application/dtos/series.dto.dart';
 import 'package:kidflix/ui/pages/home/widgets/movie_card.widget.dart';
@@ -58,13 +59,25 @@ class CatalogRowWidget extends StatelessWidget {
   }
 
   Widget _buildCard(CatalogItemDto item) {
+    if (item is ContinueWatchingCardDto) {
+      return _buildLeaf(item.inner, progress: item.progress);
+    }
+    return _buildLeaf(item);
+  }
+
+  Widget _buildLeaf(CatalogItemDto item, {double? progress}) {
     if (item is MovieDto) {
-      return MovieCard(movie: item, onTap: () => onMovieTap(item));
+      return MovieCard(
+        movie: item,
+        onTap: () => onMovieTap(item),
+        progress: progress,
+      );
     }
     if (item is SeriesDto) {
       return SeriesCard(
         series: item,
         onTap: onSeriesTap == null ? null : () => onSeriesTap!(item),
+        progress: progress,
       );
     }
     // Unknown subtype: empty placeholder.

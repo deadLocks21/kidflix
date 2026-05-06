@@ -66,5 +66,47 @@ void main() {
       );
       expect(find.byIcon(Icons.movie_outlined), findsOneWidget);
     });
+
+    testWidgets('no progress bar by default', (tester) async {
+      const dto = MovieDto(
+        id: 'm',
+        title: 'T',
+        duration: Duration(minutes: 80),
+        ageCategory: 'enfant',
+      );
+      await tester.pumpWidget(
+        _harness(MovieCard(movie: dto, onTap: () {})),
+      );
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+    });
+
+    testWidgets('no bar when progress is 0', (tester) async {
+      const dto = MovieDto(
+        id: 'm',
+        title: 'T',
+        duration: Duration(minutes: 80),
+        ageCategory: 'enfant',
+      );
+      await tester.pumpWidget(
+        _harness(MovieCard(movie: dto, onTap: () {}, progress: 0)),
+      );
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+    });
+
+    testWidgets('renders bar with provided progress value', (tester) async {
+      const dto = MovieDto(
+        id: 'm',
+        title: 'T',
+        duration: Duration(minutes: 80),
+        ageCategory: 'enfant',
+      );
+      await tester.pumpWidget(
+        _harness(MovieCard(movie: dto, onTap: () {}, progress: 0.5)),
+      );
+      final bar = tester.widget<LinearProgressIndicator>(
+        find.byType(LinearProgressIndicator),
+      );
+      expect(bar.value, 0.5);
+    });
   });
 }

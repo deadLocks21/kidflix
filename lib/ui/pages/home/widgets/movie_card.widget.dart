@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/shared/duration_format.dart';
+import 'package:kidflix/ui/pages/home/widgets/resume_progress_bar.widget.dart';
 
 /// Compact movie tile rendered inside a horizontal [ListView].
 ///
@@ -15,7 +16,16 @@ class MovieCard extends StatelessWidget {
   final MovieDto movie;
   final VoidCallback onTap;
 
-  const MovieCard({super.key, required this.movie, required this.onTap});
+  /// Resume progress in `[0, 1]`. When non-null and `> 0`, a thin
+  /// progress strip is overlaid at the bottom of the poster.
+  final double? progress;
+
+  const MovieCard({
+    super.key,
+    required this.movie,
+    required this.onTap,
+    this.progress,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +46,20 @@ class MovieCard extends StatelessWidget {
                 child: SizedBox(
                   width: width,
                   height: posterHeight,
-                  child: _Poster(posterUrl: movie.posterUrl),
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: _Poster(posterUrl: movie.posterUrl),
+                      ),
+                      if (progress != null && progress! > 0)
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          child: ResumeProgressBar(progress: progress!),
+                        ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 8),

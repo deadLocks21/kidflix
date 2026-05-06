@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:kidflix/core/application/dtos/catalog_item.dto.dart';
 import 'package:kidflix/core/application/dtos/catalog_row.dto.dart';
+import 'package:kidflix/core/application/dtos/continue_watching_card.dto.dart';
 import 'package:kidflix/core/application/dtos/continue_watching_item.dto.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/core/application/dtos/profile.dto.dart';
@@ -106,15 +107,49 @@ class CatalogApplicationService {
   }
 
   /// Project a Continue Watching entry to a [CatalogItemDto] suitable
-  /// for the homepage row. The richer rendering (resume bar, episode
-  /// reference label) is the UI's responsibility (cf. tasks 29.x).
+  /// for the homepage row. Wraps the underlying `MovieDto` / `SeriesDto`
+  /// in a [ContinueWatchingCardDto] carrying the resume progress so the
+  /// row can overlay a progress bar on the poster.
+  ///
+  /// Progress for episodes is `0.0` when [ContinueWatchingState.kind]
+  /// is `nextAfterCompleted` or `restart` (the pointed episode starts
+  /// from zero). [ContinueWatchingState.never] is not expected on the
+  /// row (the resolve usecase only emits it via the series-modal helper)
+  /// — guarded with an assert for debug builds.
   CatalogItemDto _continueWatchingToCatalogItemDto(
     ContinueWatchingItemDto entry,
   ) {
     return switch (entry) {
-      MovieContinueDto() => entry.movie,
-      EpisodeContinueDto() => SeriesDto.fromDomain(entry.series),
+      MovieContinueDto() => ContinueWatchingCardDto(
+        inner: entry.movie,
+        progress: _movieProgress(entry),
+      ),
+      EpisodeContinueDto() => ContinueWatchingCardDto(
+        inner: SeriesDto.fromDomain(entry.series),
+        progress: _episodeProgress(entry),
+      ),
     };
+  }
+
+  double _movieProgress(MovieContinueDto entry) {
+    final total = entry.movie.duration.inSeconds;
+    if (total <= 0) return 0.0;
+    return entry.resumeSeconds / total;
+  }
+
+  double _episodeProgress(EpisodeContinueDto entry) {
+    switch (entry.kind) {
+      case ContinueWatchingState.inProgress:
+        final total = entry.episode.duration.inSeconds;
+        if (total <= 0) return 0.0;
+        return entry.resumeSeconds / total;
+      case ContinueWatchingState.nextAfterCompleted:
+      case ContinueWatchingState.restart:
+        return 0.0;
+      case ContinueWatchingState.never:
+        assert(false, 'never state should not appear in CW row');
+        return 0.0;
+    }
   }
 
   CatalogRow _buildRecentlyAddedRowFromAll(List<CatalogItem> items) {

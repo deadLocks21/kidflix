@@ -1,11 +1,19 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kidflix/core/application/dtos/continue_watching_card.dto.dart';
+import 'package:kidflix/core/application/dtos/continue_watching_item.dto.dart';
+import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/core/application/dtos/profile.dto.dart';
+import 'package:kidflix/core/application/dtos/series.dto.dart';
 import 'package:kidflix/core/application/services/catalog_application.service.dart';
+import 'package:kidflix/core/application/usecases/resolve_continue_watching.usecase.dart';
 import 'package:kidflix/core/domain/model/download_entry.dart';
 import 'package:kidflix/core/domain/model/download_kind.dart';
 import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
+import 'package:kidflix/core/domain/model/watch_progress.dart';
 import 'package:kidflix/core/domain/services/catalog.repository.dart';
+import 'package:kidflix/core/domain/services/series.repository.dart';
+import 'package:kidflix/core/domain/services/watch_progress.repository.dart';
 
 class _FakeRepo implements CatalogRepository {
   final List<CatalogItem> _pool;
@@ -22,6 +30,50 @@ class _FakeRepo implements CatalogRepository {
   @override
   Future<List<CatalogItem>> listCatalogForProfile(String profileId) async =>
       const [];
+}
+
+class _NoopProgressRepo implements WatchProgressRepository {
+  @override
+  Future<MovieProgress?> findForMovie({
+    required String profileId,
+    required String movieId,
+  }) async => null;
+  @override
+  Future<EpisodeProgress?> findForEpisode({
+    required String profileId,
+    required String episodeId,
+  }) async => null;
+  @override
+  Future<void> save(WatchProgress progress) async {}
+  @override
+  Future<List<WatchProgress>> listForProfile(String profileId) async => const [];
+}
+
+class _NoopSeriesRepo implements SeriesRepository {
+  @override
+  Future<Series> findById(String seriesId) async =>
+      throw StateError('not used');
+  @override
+  Future<Series> findByIdForProfile(String seriesId, String profileId) =>
+      findById(seriesId);
+}
+
+/// Bypasses the resolve pipeline entirely — returns canned items so the
+/// service test can assert how it projects them without rebuilding the
+/// catalog/progress/series fakes the usecase consumes upstream.
+class _CannedCWUseCase extends ResolveContinueWatchingUseCase {
+  final List<ContinueWatchingItemDto> _items;
+
+  _CannedCWUseCase(this._items)
+      : super(
+          progressRepo: _NoopProgressRepo(),
+          catalogRepo: _FakeRepo(const []),
+          seriesRepo: _NoopSeriesRepo(),
+        );
+
+  @override
+  Future<List<ContinueWatchingItemDto>> execute(String profileId) async =>
+      List.unmodifiable(_items);
 }
 
 Series _s({
@@ -379,6 +431,200 @@ void main() {
         );
         final dl = rows.firstWhere((r) => r.type == 'downloaded');
         expect(dl.items.map((i) => i.id).toList(), ['m3', 'm1', 'm2']);
+      });
+    });
+
+    group('Continuer à regarder row', () {
+      Movie nemo({Duration duration = const Duration(minutes: 60)}) => Movie(
+        id: 'nemo',
+        title: 'Nemo',
+        duration: duration,
+        synopsis: '',
+        ageCategory: AgeCategory.enfant,
+        genres: const [],
+        director: const [],
+        cast: const [],
+        addedAt: DateTime(2026, 1, 1),
+      );
+
+      Series pingu() => Series(
+        id: 'pingu',
+        title: 'Pingu',
+        synopsis: '',
+        ageCategory: AgeCategory.enfant,
+        genres: const [],
+        director: const [],
+        cast: const [],
+        addedAt: DateTime(2026, 1, 1),
+        seasonsCount: 1,
+        episodesCount: 1,
+      );
+
+      Episode episode({Duration duration = const Duration(minutes: 5)}) =>
+          Episode(
+            id: 'pingu-s01e01',
+            seriesId: 'pingu',
+            seasonNumber: 1,
+            episodeNumber: 1,
+            title: 'Hello',
+            duration: duration,
+            ageCategory: AgeCategory.enfant,
+            addedAt: DateTime(2026, 1, 1),
+          );
+
+      test('items are wrapped in ContinueWatchingCardDto', () async {
+        final m = nemo();
+        final cw = _CannedCWUseCase([
+          MovieContinueDto(
+            movie: MovieDto.fromDomain(m),
+            resumeSeconds: 600,
+            completed: false,
+          ),
+        ]);
+        final service = CatalogApplicationService(
+          _FakeRepo([m]),
+          continueWatching: cw,
+        );
+        final rows = await service.buildHomeRowsFor(
+          _profile(AgeCategory.enfant),
+        );
+        final row = rows.firstWhere((r) => r.type == 'continueWatching');
+        expect(row.items, hasLength(1));
+        expect(row.items.first, isA<ContinueWatchingCardDto>());
+      });
+
+      test('movie progress = resumeSeconds / duration', () async {
+        final m = nemo(duration: const Duration(seconds: 1800));
+        final cw = _CannedCWUseCase([
+          MovieContinueDto(
+            movie: MovieDto.fromDomain(m),
+            resumeSeconds: 600,
+            completed: false,
+          ),
+        ]);
+        final service = CatalogApplicationService(
+          _FakeRepo([m]),
+          continueWatching: cw,
+        );
+        final rows = await service.buildHomeRowsFor(
+          _profile(AgeCategory.enfant),
+        );
+        final row = rows.firstWhere((r) => r.type == 'continueWatching');
+        final wrapper = row.items.first as ContinueWatchingCardDto;
+        expect(wrapper.progress, closeTo(600 / 1800, 1e-9));
+        expect(wrapper.inner, isA<MovieDto>());
+      });
+
+      test('movie resume past end clamps to 1.0', () async {
+        final m = nemo(duration: const Duration(seconds: 100));
+        final cw = _CannedCWUseCase([
+          MovieContinueDto(
+            movie: MovieDto.fromDomain(m),
+            resumeSeconds: 99999,
+            completed: false,
+          ),
+        ]);
+        final service = CatalogApplicationService(
+          _FakeRepo([m]),
+          continueWatching: cw,
+        );
+        final rows = await service.buildHomeRowsFor(
+          _profile(AgeCategory.enfant),
+        );
+        final row = rows.firstWhere((r) => r.type == 'continueWatching');
+        final wrapper = row.items.first as ContinueWatchingCardDto;
+        expect(wrapper.progress, 1.0);
+      });
+
+      test('movie zero duration → progress 0.0 (no division by zero)',
+          () async {
+        final m = nemo(duration: Duration.zero);
+        final cw = _CannedCWUseCase([
+          MovieContinueDto(
+            movie: MovieDto.fromDomain(m),
+            resumeSeconds: 42,
+            completed: false,
+          ),
+        ]);
+        final service = CatalogApplicationService(
+          _FakeRepo([m]),
+          continueWatching: cw,
+        );
+        final rows = await service.buildHomeRowsFor(
+          _profile(AgeCategory.enfant),
+        );
+        final row = rows.firstWhere((r) => r.type == 'continueWatching');
+        final wrapper = row.items.first as ContinueWatchingCardDto;
+        expect(wrapper.progress, 0.0);
+      });
+
+      test('episode inProgress → progress = resume / episode duration',
+          () async {
+        final s = pingu();
+        final e = episode(duration: const Duration(seconds: 300));
+        final cw = _CannedCWUseCase([
+          EpisodeContinueDto(
+            series: s,
+            episode: e,
+            resumeSeconds: 75,
+            kind: ContinueWatchingState.inProgress,
+          ),
+        ]);
+        final service = CatalogApplicationService(
+          _FakeRepo([s]),
+          continueWatching: cw,
+        );
+        final rows = await service.buildHomeRowsFor(
+          _profile(AgeCategory.enfant),
+        );
+        final row = rows.firstWhere((r) => r.type == 'continueWatching');
+        final wrapper = row.items.first as ContinueWatchingCardDto;
+        expect(wrapper.progress, closeTo(75 / 300, 1e-9));
+        expect(wrapper.inner, isA<SeriesDto>());
+      });
+
+      test('episode nextAfterCompleted → progress 0.0', () async {
+        final s = pingu();
+        final cw = _CannedCWUseCase([
+          EpisodeContinueDto(
+            series: s,
+            episode: episode(),
+            resumeSeconds: 0,
+            kind: ContinueWatchingState.nextAfterCompleted,
+          ),
+        ]);
+        final service = CatalogApplicationService(
+          _FakeRepo([s]),
+          continueWatching: cw,
+        );
+        final rows = await service.buildHomeRowsFor(
+          _profile(AgeCategory.enfant),
+        );
+        final row = rows.firstWhere((r) => r.type == 'continueWatching');
+        final wrapper = row.items.first as ContinueWatchingCardDto;
+        expect(wrapper.progress, 0.0);
+      });
+
+      test('episode restart → progress 0.0', () async {
+        final s = pingu();
+        final cw = _CannedCWUseCase([
+          EpisodeContinueDto(
+            series: s,
+            episode: episode(),
+            resumeSeconds: 0,
+            kind: ContinueWatchingState.restart,
+          ),
+        ]);
+        final service = CatalogApplicationService(
+          _FakeRepo([s]),
+          continueWatching: cw,
+        );
+        final rows = await service.buildHomeRowsFor(
+          _profile(AgeCategory.enfant),
+        );
+        final row = rows.firstWhere((r) => r.type == 'continueWatching');
+        final wrapper = row.items.first as ContinueWatchingCardDto;
+        expect(wrapper.progress, 0.0);
       });
     });
 

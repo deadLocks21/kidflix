@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:kidflix/core/application/dtos/series.dto.dart';
+import 'package:kidflix/ui/pages/home/widgets/resume_progress_bar.widget.dart';
 
 /// Compact series tile rendered inside a horizontal [ListView].
 ///
@@ -14,7 +15,16 @@ class SeriesCard extends StatelessWidget {
   final SeriesDto series;
   final VoidCallback? onTap;
 
-  const SeriesCard({super.key, required this.series, this.onTap});
+  /// Resume progress in `[0, 1]`. When non-null and `> 0`, a thin
+  /// progress strip is overlaid at the bottom of the poster.
+  final double? progress;
+
+  const SeriesCard({
+    super.key,
+    required this.series,
+    this.onTap,
+    this.progress,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +45,20 @@ class SeriesCard extends StatelessWidget {
                 child: SizedBox(
                   width: width,
                   height: posterHeight,
-                  child: _Poster(posterUrl: series.posterUrl),
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: _Poster(posterUrl: series.posterUrl),
+                      ),
+                      if (progress != null && progress! > 0)
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          child: ResumeProgressBar(progress: progress!),
+                        ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
