@@ -1,6 +1,7 @@
-import 'package:kidflix/core/domain/model/movie.dart';
+import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/services/catalog.repository.dart';
+import 'package:kidflix/infrastructure/series/in_memory.series.repository.dart';
 import 'package:kidflix/shared/text_normalization.dart';
 
 /// In-memory fake [CatalogRepository] used until the HTTP backend is ready.
@@ -25,22 +26,58 @@ class InMemoryCatalogRepository implements CatalogRepository {
 
   static final List<Movie> _movies = _seed();
 
+  /// The seeded series projection in catalog form (no `seasons`, just
+  /// metadata + counts). The full series tree is owned by
+  /// [InMemorySeriesRepository] — this catalog projection deliberately
+  /// matches what the backend returns on `/catalog`, where series are
+  /// listed without their episode hierarchy (resolved separately via
+  /// `GET /series/{id}`).
+  static List<Series> _catalogProjectionOfSeries() => InMemorySeriesRepository
+      .seed
+      .map(
+        (s) => Series(
+          id: s.id,
+          title: s.title,
+          originalTitle: s.originalTitle,
+          year: s.year,
+          synopsis: s.synopsis,
+          tagline: s.tagline,
+          posterUrl: s.posterUrl,
+          backdropUrl: s.backdropUrl,
+          ageCategory: s.ageCategory,
+          genres: s.genres,
+          sagaId: s.sagaId,
+          sagaLabel: s.sagaLabel,
+          director: s.director,
+          cast: s.cast,
+          addedAt: s.addedAt,
+          seasonsCount: s.seasonsCount,
+          episodesCount: s.episodesCount,
+          // Catalog projection: empty seasons.
+          seasons: const [],
+        ),
+      )
+      .toList(growable: false);
+
   @override
-  Future<List<Movie>> listMoviesFor() async {
-    return List.unmodifiable(_movies);
+  Future<List<CatalogItem>> listCatalog() async {
+    return <CatalogItem>[..._movies, ..._catalogProjectionOfSeries()];
   }
 
   @override
-  Future<List<Movie>> searchMovies({required String query}) async {
+  Future<List<CatalogItem>> searchCatalog({required String query}) async {
     final needle = normalizeForSearch(query);
-    return _movies.where((m) {
-      if (normalizeForSearch(m.title).contains(needle)) return true;
-      final original = m.originalTitle;
+    bool matches(CatalogItem item) {
+      if (normalizeForSearch(item.title).contains(needle)) return true;
+      final original = item.originalTitle;
       if (original != null && normalizeForSearch(original).contains(needle)) {
         return true;
       }
       return false;
-    }).toList(growable: false);
+    }
+
+    final all = <CatalogItem>[..._movies, ..._catalogProjectionOfSeries()];
+    return all.where(matches).toList(growable: false);
   }
 
   static List<Movie> _seed() {

@@ -1,17 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:kidflix/core/application/dtos/catalog_item.dto.dart';
 import 'package:kidflix/core/application/dtos/catalog_row.dto.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
+import 'package:kidflix/core/application/dtos/series.dto.dart';
 import 'package:kidflix/ui/pages/home/widgets/movie_card.widget.dart';
+import 'package:kidflix/ui/pages/home/widgets/series_card.widget.dart';
 
-/// One horizontal row of [MovieCard]s, prefixed with a row label.
+/// One horizontal row of catalog items (mixed movie / series), prefixed
+/// with a row label.
+///
+/// Switches on the runtime DTO type to render the right card variant.
+/// Series tap currently delegates to a series-specific callback ; movie
+/// tap keeps the existing onMovieTap signature for backward compat with
+/// the homepage's controller.
 class CatalogRowWidget extends StatelessWidget {
   final CatalogRowDto row;
   final void Function(MovieDto movie) onMovieTap;
+  final void Function(SeriesDto series)? onSeriesTap;
 
   const CatalogRowWidget({
     super.key,
     required this.row,
     required this.onMovieTap,
+    this.onSeriesTap,
   });
 
   static const double _rowHeight = 300;
@@ -36,19 +47,27 @@ class CatalogRowWidget extends StatelessWidget {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: row.movies.length,
+              itemCount: row.items.length,
               separatorBuilder: (_, _) => const SizedBox(width: 12),
-              itemBuilder: (_, i) {
-                final movie = row.movies[i];
-                return MovieCard(
-                  movie: movie,
-                  onTap: () => onMovieTap(movie),
-                );
-              },
+              itemBuilder: (_, i) => _buildCard(row.items[i]),
             ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildCard(CatalogItemDto item) {
+    if (item is MovieDto) {
+      return MovieCard(movie: item, onTap: () => onMovieTap(item));
+    }
+    if (item is SeriesDto) {
+      return SeriesCard(
+        series: item,
+        onTap: onSeriesTap == null ? null : () => onSeriesTap!(item),
+      );
+    }
+    // Unknown subtype: empty placeholder.
+    return const SizedBox.shrink();
   }
 }

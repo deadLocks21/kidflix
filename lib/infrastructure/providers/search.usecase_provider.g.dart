@@ -57,8 +57,9 @@ final class SearchMoviesUseCaseProvider
 String _$searchMoviesUseCaseHash() =>
     r'fdc799de86e114d18895ec4c3750a1eb1f01a039';
 
-/// Returns the alphabetically-sorted list of movies matching
-/// [debouncedQuery] for the currently active profile.
+/// Returns the alphabetically-sorted list of catalog items (movies and
+/// series mixed) matching [debouncedQuery] for the currently active
+/// profile.
 ///
 /// Short-circuits to an empty list when the trimmed query is shorter than
 /// 2 characters or when no profile is active — the UI enforces the same
@@ -67,8 +68,9 @@ String _$searchMoviesUseCaseHash() =>
 @ProviderFor(searchResults)
 final searchResultsProvider = SearchResultsFamily._();
 
-/// Returns the alphabetically-sorted list of movies matching
-/// [debouncedQuery] for the currently active profile.
+/// Returns the alphabetically-sorted list of catalog items (movies and
+/// series mixed) matching [debouncedQuery] for the currently active
+/// profile.
 ///
 /// Short-circuits to an empty list when the trimmed query is shorter than
 /// 2 characters or when no profile is active — the UI enforces the same
@@ -77,13 +79,16 @@ final searchResultsProvider = SearchResultsFamily._();
 final class SearchResultsProvider
     extends
         $FunctionalProvider<
-          AsyncValue<List<MovieDto>>,
-          List<MovieDto>,
-          FutureOr<List<MovieDto>>
+          AsyncValue<List<CatalogItemDto>>,
+          List<CatalogItemDto>,
+          FutureOr<List<CatalogItemDto>>
         >
-    with $FutureModifier<List<MovieDto>>, $FutureProvider<List<MovieDto>> {
-  /// Returns the alphabetically-sorted list of movies matching
-  /// [debouncedQuery] for the currently active profile.
+    with
+        $FutureModifier<List<CatalogItemDto>>,
+        $FutureProvider<List<CatalogItemDto>> {
+  /// Returns the alphabetically-sorted list of catalog items (movies and
+  /// series mixed) matching [debouncedQuery] for the currently active
+  /// profile.
   ///
   /// Short-circuits to an empty list when the trimmed query is shorter than
   /// 2 characters or when no profile is active — the UI enforces the same
@@ -111,12 +116,12 @@ final class SearchResultsProvider
 
   @$internal
   @override
-  $FutureProviderElement<List<MovieDto>> $createElement(
+  $FutureProviderElement<List<CatalogItemDto>> $createElement(
     $ProviderPointer pointer,
   ) => $FutureProviderElement(pointer);
 
   @override
-  FutureOr<List<MovieDto>> create(Ref ref) {
+  FutureOr<List<CatalogItemDto>> create(Ref ref) {
     final argument = this.argument as String;
     return searchResults(ref, argument);
   }
@@ -132,17 +137,18 @@ final class SearchResultsProvider
   }
 }
 
-String _$searchResultsHash() => r'b5f08557e783e9f3a36789218ce9eb7a36e390ee';
+String _$searchResultsHash() => r'd3bacb04b2da605973f26cae6b16f2646de2765e';
 
-/// Returns the alphabetically-sorted list of movies matching
-/// [debouncedQuery] for the currently active profile.
+/// Returns the alphabetically-sorted list of catalog items (movies and
+/// series mixed) matching [debouncedQuery] for the currently active
+/// profile.
 ///
 /// Short-circuits to an empty list when the trimmed query is shorter than
 /// 2 characters or when no profile is active — the UI enforces the same
 /// preconditions but this provider is the final fail-safe.
 
 final class SearchResultsFamily extends $Family
-    with $FunctionalFamilyOverride<FutureOr<List<MovieDto>>, String> {
+    with $FunctionalFamilyOverride<FutureOr<List<CatalogItemDto>>, String> {
   SearchResultsFamily._()
     : super(
         retry: null,
@@ -152,8 +158,9 @@ final class SearchResultsFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// Returns the alphabetically-sorted list of movies matching
-  /// [debouncedQuery] for the currently active profile.
+  /// Returns the alphabetically-sorted list of catalog items (movies and
+  /// series mixed) matching [debouncedQuery] for the currently active
+  /// profile.
   ///
   /// Short-circuits to an empty list when the trimmed query is shorter than
   /// 2 characters or when no profile is active — the UI enforces the same

@@ -7,5 +7,5 @@ class DeleteMovieDownloadUseCase {
 
   const DeleteMovieDownloadUseCase(this._repository);
 
-  Future<void> execute(String movieId) => _repository.delete(movieId);
+  Future<void> execute(String movieId) => _repository.deleteMovie(movieId);
 }

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/core/application/dtos/catalog_row.dto.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
+import 'package:kidflix/core/application/dtos/series.dto.dart';
 import 'package:kidflix/core/application/session_state.dart';
+import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/infrastructure/providers/catalog.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/catalog.usecases_provider.dart';
 import 'package:kidflix/infrastructure/providers/search.controller_provider.dart';
@@ -12,6 +14,7 @@ import 'package:kidflix/ui/pages/home/widgets/catalog_skeleton.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/movie_detail_modal.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/search_app_bar.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/search_results.widget.dart';
+import 'package:kidflix/ui/pages/home/widgets/series_detail_modal.widget.dart';
 
 /// Homepage catalog: vertical scroll of horizontal rows built for the
 /// active profile. Rows are filtered strictly by the profile's age
@@ -58,6 +61,7 @@ class HomePage extends ConsumerWidget {
           _HomeBody(
             rows: rows,
             onMovieTap: (movie) => _openDetail(context, ref, movie),
+            onSeriesTap: (series) => _openSeriesDetail(context, ref, series),
           ),
           const SearchResults(),
         ],
@@ -73,18 +77,38 @@ class HomePage extends ConsumerWidget {
     final repository = ref.read(catalogRepositoryProvider);
     final state = ref.read(sessionControllerProvider);
     if (state is! ProfileSelected) return;
-    final pool = await repository.listMoviesFor();
-    final domain = pool.firstWhere((m) => m.id == movie.id);
+    final pool = await repository.listCatalog();
+    final domain = pool.whereType<Movie>().firstWhere((m) => m.id == movie.id);
     if (!context.mounted) return;
     await showMovieDetailModal(context, MovieDetailDto.fromDomain(domain));
+  }
+
+  Future<void> _openSeriesDetail(
+    BuildContext context,
+    WidgetRef ref,
+    SeriesDto series,
+  ) async {
+    final repository = ref.read(catalogRepositoryProvider);
+    final state = ref.read(sessionControllerProvider);
+    if (state is! ProfileSelected) return;
+    final pool = await repository.listCatalog();
+    final domain =
+        pool.whereType<Series>().firstWhere((s) => s.id == series.id);
+    if (!context.mounted) return;
+    await showSeriesDetailModal(context, domain);
   }
 }
 
 class _HomeBody extends StatelessWidget {
   final AsyncValue<List<CatalogRowDto>> rows;
   final void Function(MovieDto movie) onMovieTap;
+  final void Function(SeriesDto series) onSeriesTap;
 
-  const _HomeBody({required this.rows, required this.onMovieTap});
+  const _HomeBody({
+    required this.rows,
+    required this.onMovieTap,
+    required this.onSeriesTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -93,7 +117,11 @@ class _HomeBody extends StatelessWidget {
       error: (_, _) => const _ErrorState(),
       data: (list) => list.isEmpty
           ? const _EmptyState()
-          : _CatalogList(rows: list, onMovieTap: onMovieTap),
+          : _CatalogList(
+              rows: list,
+              onMovieTap: onMovieTap,
+              onSeriesTap: onSeriesTap,
+            ),
     );
   }
 }
@@ -101,8 +129,13 @@ class _HomeBody extends StatelessWidget {
 class _CatalogList extends StatelessWidget {
   final List<CatalogRowDto> rows;
   final void Function(MovieDto movie) onMovieTap;
+  final void Function(SeriesDto series) onSeriesTap;
 
-  const _CatalogList({required this.rows, required this.onMovieTap});
+  const _CatalogList({
+    required this.rows,
+    required this.onMovieTap,
+    required this.onSeriesTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -114,6 +147,7 @@ class _CatalogList extends StatelessWidget {
           itemBuilder: (_, i) => CatalogRowWidget(
             row: rows[i],
             onMovieTap: onMovieTap,
+            onSeriesTap: onSeriesTap,
           ),
         ),
         const SliverToBoxAdapter(child: SizedBox(height: 24)),

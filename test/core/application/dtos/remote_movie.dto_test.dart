@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kidflix/core/application/dtos/remote_movie.dto.dart';
-import 'package:kidflix/core/domain/model/movie.dart';
+import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 
 Map<String, dynamic> _asterixJson() => {
@@ -147,6 +147,26 @@ void main() {
       expect(member.name, 'Hayao Miyazaki');
       expect(member.role, isNull);
       expect(member.photoUrl, isNull);
+    });
+  });
+
+  group('RemoteMovieDto wire compatibility with kind discriminator', () {
+    test('tolerates a top-level "kind" field in the payload', () {
+      final payload = _asterixJson()..['kind'] = 'movie';
+
+      final dto = RemoteMovieDto.fromJson(payload);
+
+      expect(dto.id, 'asterix-empire-du-milieu');
+      expect(dto.title, contains('Astérix'));
+    });
+
+    test('parses without a "kind" field (legacy fixtures)', () {
+      final payload = Map<String, dynamic>.from(_asterixJson());
+      expect(payload.containsKey('kind'), isFalse);
+
+      final dto = RemoteMovieDto.fromJson(payload);
+
+      expect(dto.id, 'asterix-empire-du-milieu');
     });
   });
 }

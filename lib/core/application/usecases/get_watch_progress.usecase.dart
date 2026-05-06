@@ -12,7 +12,7 @@ class GetWatchProgressUseCase {
     required String profileId,
     required String movieId,
   }) async {
-    final domain = await _repository.findFor(
+    final domain = await _repository.findForMovie(
       profileId: profileId,
       movieId: movieId,
     );

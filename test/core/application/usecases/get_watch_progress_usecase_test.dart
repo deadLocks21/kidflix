@@ -11,7 +11,7 @@ void main() {
   });
 
   test('maps domain to DTO when repo returns progress', () async {
-    final domain = WatchProgress(
+    final domain = MovieProgress(
       profileId: 'p1',
       movieId: 'abc',
       positionSeconds: 1800,
@@ -31,13 +31,19 @@ void main() {
 class _FakeRepo implements WatchProgressRepository {
   _FakeRepo({this.value});
 
-  final WatchProgress? value;
+  final MovieProgress? value;
 
   @override
-  Future<WatchProgress?> findFor({
+  Future<MovieProgress?> findForMovie({
     required String profileId,
     required String movieId,
   }) async => value;
+
+  @override
+  Future<EpisodeProgress?> findForEpisode({
+    required String profileId,
+    required String episodeId,
+  }) async => null;
 
   @override
   Future<void> save(WatchProgress progress) async {}

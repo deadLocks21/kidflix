@@ -1,12 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/core/application/dtos/profile.dto.dart';
+import 'package:kidflix/core/application/dtos/series.dto.dart';
 import 'package:kidflix/core/application/services/search_application.service.dart';
-import 'package:kidflix/core/domain/model/movie.dart';
+import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/services/catalog.repository.dart';
 
 class _RecordingRepo implements CatalogRepository {
-  final List<Movie> results;
+  final List<CatalogItem> results;
 
   String? lastQuery;
   int callCount = 0;
@@ -14,10 +16,10 @@ class _RecordingRepo implements CatalogRepository {
   _RecordingRepo(this.results);
 
   @override
-  Future<List<Movie>> listMoviesFor() async => throw UnimplementedError();
+  Future<List<CatalogItem>> listCatalog() async => throw UnimplementedError();
 
   @override
-  Future<List<Movie>> searchMovies({required String query}) async {
+  Future<List<CatalogItem>> searchCatalog({required String query}) async {
     lastQuery = query;
     callCount += 1;
     return results;
@@ -37,6 +39,20 @@ Movie _m(String id, String title, {AgeCategory age = AgeCategory.enfant}) {
     addedAt: DateTime(2026, 1, 1),
   );
 }
+
+Series _s(String id, String title, {AgeCategory age = AgeCategory.ado}) =>
+    Series(
+      id: id,
+      title: title,
+      synopsis: '',
+      ageCategory: age,
+      genres: const [],
+      director: const [],
+      cast: const [],
+      addedAt: DateTime(2026, 5, 1),
+      seasonsCount: 5,
+      episodesCount: 96,
+    );
 
 const _profile = ProfileDto(
   id: 'p1',
@@ -65,17 +81,33 @@ void main() {
       final service = SearchApplicationService(repo);
       final result = await service.searchFor(query: 'q', profile: _profile);
       expect(
-        result.map((m) => m.title).toList(),
+        result.map((i) => i.title).toList(),
         ['Astérix', 'Harry Potter', 'Totoro'],
       );
     });
 
-    test('returns MovieDto (no Movie entities cross the boundary)', () async {
-      final repo = _RecordingRepo([_m('x', 'X')]);
+    test('returns mixed CatalogItemDto (movies + series)', () async {
+      final repo = _RecordingRepo([
+        _m('m1', 'Astérix'),
+        _s('s1', 'Code Lyoko'),
+      ]);
       final service = SearchApplicationService(repo);
       final result = await service.searchFor(query: 'q', profile: _profile);
-      expect(result, isNotEmpty);
-      expect(result.first.id, 'x');
+      expect(result, hasLength(2));
+      expect(result.whereType<MovieDto>(), hasLength(1));
+      expect(result.whereType<SeriesDto>(), hasLength(1));
+    });
+
+    test('alphabetical sort applies across both kinds', () async {
+      final repo = _RecordingRepo([
+        _s('s1', 'Zelda'),
+        _m('m1', 'Astérix'),
+        _s('s2', 'Pingu'),
+      ]);
+      final service = SearchApplicationService(repo);
+      final result = await service.searchFor(query: 'q', profile: _profile);
+      expect(result.map((i) => i.title).toList(),
+          ['Astérix', 'Pingu', 'Zelda']);
     });
 
     test('empty repository result yields empty dto list', () async {

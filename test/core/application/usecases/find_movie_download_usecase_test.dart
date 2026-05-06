@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kidflix/core/application/dtos/movie_download.dto.dart';
 import 'package:kidflix/core/application/usecases/find_movie_download.usecase.dart';
+import 'package:kidflix/core/domain/model/episode_download.dart';
 import 'package:kidflix/core/domain/model/movie_download.dart';
 import 'package:kidflix/core/domain/services/download.repository.dart';
 
@@ -34,14 +35,27 @@ class _FakeRepo implements DownloadRepository {
   final MovieDownload? value;
 
   @override
-  Future<MovieDownload?> findByMovieId(String movieId) async => value;
+  Future<MovieDownload?> findForMovie(String movieId) async => value;
 
   @override
-  Stream<MovieDownload> download(String movieId) => const Stream.empty();
+  Stream<MovieDownload> downloadMovie(String movieId) => const Stream.empty();
 
   @override
-  Future<void> cancel(String movieId) async {}
+  Future<void> cancelMovie(String movieId) async {}
 
   @override
-  Future<void> delete(String movieId) async {}
+  Future<void> deleteMovie(String movieId) async {}
+
+  @override
+  Future<EpisodeDownload?> findForEpisode(String episodeId) async => null;
+
+  @override
+  Stream<EpisodeDownload> downloadEpisode(String episodeId) =>
+      const Stream.empty();
+
+  @override
+  Future<void> cancelEpisode(String episodeId) async {}
+
+  @override
+  Future<void> deleteEpisode(String episodeId) async {}
 }

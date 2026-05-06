@@ -1,5 +1,5 @@
 import 'package:kidflix/core/application/dtos/age_category_wire.dart';
-import 'package:kidflix/core/domain/model/movie.dart';
+import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 
 /// Wire-format DTO for a [Movie] — direction of flow: `JSON → Domain` only.

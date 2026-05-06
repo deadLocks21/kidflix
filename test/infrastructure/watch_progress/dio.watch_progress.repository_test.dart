@@ -65,14 +65,16 @@ Dio _makeDio(_FakeAdapter adapter) {
 }
 
 Map<String, dynamic> _progressJson({
+  String kind = 'movie',
   String profileId = 'p1',
   String movieId = 'm1',
   int positionSeconds = 1845,
   bool completed = false,
   String updatedAt = '2026-04-22T10:30:00Z',
 }) => {
+  'kind': kind,
   'profile_id': profileId,
-  'movie_id': movieId,
+  'media_id': movieId,
   'position_seconds': positionSeconds,
   'completed': completed,
   'updated_at': updatedAt,
@@ -86,7 +88,8 @@ void main() {
       );
       final repo = DioWatchProgressRepository(dio: _makeDio(adapter));
 
-      final result = await repo.findFor(profileId: 'p1', movieId: 'm1');
+      final result =
+          await repo.findForMovie(profileId: 'p1', movieId: 'm1');
 
       expect(result, isNotNull);
       expect(result!.profileId, 'p1');
@@ -96,14 +99,14 @@ void main() {
       expect(result.updatedAt, DateTime.utc(2026, 4, 22, 10, 30));
       expect(adapter.requests, hasLength(1));
       expect(adapter.requests.single.method, 'GET');
-      expect(adapter.requests.single.path, '/profiles/p1/progress/m1');
+      expect(adapter.requests.single.path, '/profiles/p1/progress/movies/m1');
     });
 
     test('returns null on 204 No Content without parsing body', () async {
       final adapter = _FakeAdapter((_) => _emptyResponse(204));
       final repo = DioWatchProgressRepository(dio: _makeDio(adapter));
 
-      final result = await repo.findFor(profileId: 'p1', movieId: 'm1');
+      final result = await repo.findForMovie(profileId: 'p1', movieId: 'm1');
 
       expect(result, isNull);
     });
@@ -112,7 +115,7 @@ void main() {
       final adapter = _FakeAdapter((_) => _nullJsonResponse(200));
       final repo = DioWatchProgressRepository(dio: _makeDio(adapter));
 
-      final result = await repo.findFor(profileId: 'p1', movieId: 'm1');
+      final result = await repo.findForMovie(profileId: 'p1', movieId: 'm1');
 
       expect(result, isNull);
     });
@@ -126,7 +129,7 @@ void main() {
       final repo = DioWatchProgressRepository(dio: _makeDio(adapter));
 
       await expectLater(
-        repo.findFor(profileId: 'p1', movieId: 'unknown'),
+        repo.findForMovie(profileId: 'p1', movieId: 'unknown'),
         throwsA(
           isA<DioException>().having(
             (e) => e.response?.statusCode,
@@ -146,7 +149,7 @@ void main() {
       final repo = DioWatchProgressRepository(dio: _makeDio(adapter));
 
       await repo.save(
-        WatchProgress(
+        MovieProgress(
           profileId: 'p1',
           movieId: 'm1',
           positionSeconds: 1900,
@@ -158,7 +161,7 @@ void main() {
       expect(adapter.requests, hasLength(1));
       final request = adapter.requests.single;
       expect(request.method, 'PUT');
-      expect(request.path, '/profiles/p1/progress/m1');
+      expect(request.path, '/profiles/p1/progress/movies/m1');
       expect(request.data, {
         'position_seconds': 1900,
         'completed': false,
@@ -170,7 +173,7 @@ void main() {
       final repo = DioWatchProgressRepository(dio: _makeDio(adapter));
 
       await repo.save(
-        WatchProgress(
+        MovieProgress(
           profileId: 'p1',
           movieId: 'm1',
           positionSeconds: 100,
@@ -193,7 +196,7 @@ void main() {
 
       await expectLater(
         repo.save(
-          WatchProgress(
+          MovieProgress(
             profileId: 'p1',
             movieId: 'm1',
             positionSeconds: 200,
@@ -211,7 +214,7 @@ void main() {
 
       await expectLater(
         repo.save(
-          WatchProgress(
+          MovieProgress(
             profileId: 'p1',
             movieId: 'm1',
             positionSeconds: 200,
@@ -245,10 +248,10 @@ void main() {
       final result = await repo.listForProfile('p1');
 
       expect(result, hasLength(2));
-      expect(result[0].movieId, 'm1');
+      expect((result[0] as MovieProgress).movieId, 'm1');
       expect(result[0].positionSeconds, 100);
       expect(result[0].completed, isFalse);
-      expect(result[1].movieId, 'm2');
+      expect((result[1] as MovieProgress).movieId, 'm2');
       expect(result[1].positionSeconds, 200);
       expect(result[1].completed, isTrue);
       expect(adapter.requests, hasLength(1));
@@ -289,9 +292,9 @@ void main() {
       );
       final repo = DioWatchProgressRepository(dio: _makeDio(adapter));
 
-      await repo.findFor(profileId: 'p1', movieId: 'm1');
+      await repo.findForMovie(profileId: 'p1', movieId: 'm1');
       await repo.save(
-        WatchProgress(
+        MovieProgress(
           profileId: 'p1',
           movieId: 'm1',
           positionSeconds: 100,
@@ -309,6 +312,87 @@ void main() {
         );
         expect(request.headers.containsKey('X-Device-Id'), isFalse);
       }
+    });
+  });
+
+  group('DioWatchProgressRepository.findForEpisode', () {
+    test('issues GET on /progress/episodes/{id} and parses 200', () async {
+      final adapter = _FakeAdapter(
+        (_) => _jsonResponse(
+          200,
+          _progressJson(kind: 'episode', movieId: 'ep-uuid-2'),
+        ),
+      );
+      final repo = DioWatchProgressRepository(dio: _makeDio(adapter));
+
+      final result =
+          await repo.findForEpisode(profileId: 'p1', episodeId: 'ep-uuid-2');
+
+      expect(result, isNotNull);
+      expect(result!.episodeId, 'ep-uuid-2');
+      expect(adapter.requests.single.method, 'GET');
+      expect(adapter.requests.single.path,
+          '/profiles/p1/progress/episodes/ep-uuid-2');
+    });
+
+    test('returns null on 204', () async {
+      final adapter = _FakeAdapter((_) => _emptyResponse(204));
+      final repo = DioWatchProgressRepository(dio: _makeDio(adapter));
+
+      final result =
+          await repo.findForEpisode(profileId: 'p1', episodeId: 'ghost');
+      expect(result, isNull);
+    });
+  });
+
+  group('DioWatchProgressRepository.save (episode)', () {
+    test('PUT on /progress/episodes/{id} for an EpisodeProgress', () async {
+      final adapter = _FakeAdapter((_) => _emptyResponse(200));
+      final repo = DioWatchProgressRepository(dio: _makeDio(adapter));
+
+      await repo.save(
+        EpisodeProgress(
+          profileId: 'p1',
+          episodeId: 'ep-uuid-2',
+          positionSeconds: 240,
+          completed: false,
+          updatedAt: DateTime.utc(2026, 5, 4, 18, 30),
+        ),
+      );
+
+      final request = adapter.requests.single;
+      expect(request.method, 'PUT');
+      expect(request.path, '/profiles/p1/progress/episodes/ep-uuid-2');
+      final body = request.data as Map<String, dynamic>;
+      expect(body['position_seconds'], 240);
+      expect(body['completed'], isFalse);
+    });
+  });
+
+  group('DioWatchProgressRepository.listForProfile (mixed)', () {
+    test('parses mixed entries with kind discriminator', () async {
+      final adapter = _FakeAdapter(
+        (_) => _jsonResponse(200, {
+          'progress': [
+            _progressJson(kind: 'movie', movieId: 'nemo'),
+            _progressJson(
+              kind: 'episode',
+              movieId: 'ep-1',
+              positionSeconds: 100,
+              completed: true,
+            ),
+          ],
+        }),
+      );
+      final repo = DioWatchProgressRepository(dio: _makeDio(adapter));
+
+      final result = await repo.listForProfile('p1');
+
+      expect(result, hasLength(2));
+      expect(result[0], isA<MovieProgress>());
+      expect((result[0] as MovieProgress).movieId, 'nemo');
+      expect(result[1], isA<EpisodeProgress>());
+      expect((result[1] as EpisodeProgress).episodeId, 'ep-1');
     });
   });
 }

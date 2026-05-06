@@ -1,4 +1,5 @@
-import 'package:kidflix/core/domain/model/movie.dart';
+import 'package:kidflix/core/application/dtos/catalog_item.dto.dart';
+import 'package:kidflix/core/domain/model/media.dart';
 
 /// Compact UI-facing projection of a [Movie], suitable for card rendering.
 ///
@@ -7,12 +8,17 @@ import 'package:kidflix/core/domain/model/movie.dart';
 /// re-target the catalog repository at the right category when they need the
 /// full details (e.g. opening the modal from a search result whose category
 /// may differ from the active profile's).
-class MovieDto {
+class MovieDto implements CatalogItemDto {
+  @override
   final String id;
+  @override
   final String title;
+  @override
   final int? year;
   final Duration duration;
+  @override
   final String? posterUrl;
+  @override
   final String ageCategory;
 
   const MovieDto({

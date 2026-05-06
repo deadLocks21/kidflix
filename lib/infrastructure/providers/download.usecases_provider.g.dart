@@ -203,6 +203,202 @@ final class DeleteMovieDownloadUseCaseProvider
 String _$deleteMovieDownloadUseCaseHash() =>
     r'109eccc4844deb641c9f5132a887819ff31df616';
 
+@ProviderFor(startEpisodeDownloadUseCase)
+final startEpisodeDownloadUseCaseProvider =
+    StartEpisodeDownloadUseCaseProvider._();
+
+final class StartEpisodeDownloadUseCaseProvider
+    extends
+        $FunctionalProvider<
+          StartEpisodeDownloadUseCase,
+          StartEpisodeDownloadUseCase,
+          StartEpisodeDownloadUseCase
+        >
+    with $Provider<StartEpisodeDownloadUseCase> {
+  StartEpisodeDownloadUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'startEpisodeDownloadUseCaseProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$startEpisodeDownloadUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<StartEpisodeDownloadUseCase> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  StartEpisodeDownloadUseCase create(Ref ref) {
+    return startEpisodeDownloadUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(StartEpisodeDownloadUseCase value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<StartEpisodeDownloadUseCase>(value),
+    );
+  }
+}
+
+String _$startEpisodeDownloadUseCaseHash() =>
+    r'bea564976c284f48722b46c1dbaecb5c06399dcc';
+
+@ProviderFor(findEpisodeDownloadUseCase)
+final findEpisodeDownloadUseCaseProvider =
+    FindEpisodeDownloadUseCaseProvider._();
+
+final class FindEpisodeDownloadUseCaseProvider
+    extends
+        $FunctionalProvider<
+          FindEpisodeDownloadUseCase,
+          FindEpisodeDownloadUseCase,
+          FindEpisodeDownloadUseCase
+        >
+    with $Provider<FindEpisodeDownloadUseCase> {
+  FindEpisodeDownloadUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'findEpisodeDownloadUseCaseProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$findEpisodeDownloadUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<FindEpisodeDownloadUseCase> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  FindEpisodeDownloadUseCase create(Ref ref) {
+    return findEpisodeDownloadUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(FindEpisodeDownloadUseCase value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<FindEpisodeDownloadUseCase>(value),
+    );
+  }
+}
+
+String _$findEpisodeDownloadUseCaseHash() =>
+    r'5dd440ea389225cdb579cf73a697999091798633';
+
+@ProviderFor(cancelEpisodeDownloadUseCase)
+final cancelEpisodeDownloadUseCaseProvider =
+    CancelEpisodeDownloadUseCaseProvider._();
+
+final class CancelEpisodeDownloadUseCaseProvider
+    extends
+        $FunctionalProvider<
+          CancelEpisodeDownloadUseCase,
+          CancelEpisodeDownloadUseCase,
+          CancelEpisodeDownloadUseCase
+        >
+    with $Provider<CancelEpisodeDownloadUseCase> {
+  CancelEpisodeDownloadUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'cancelEpisodeDownloadUseCaseProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$cancelEpisodeDownloadUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<CancelEpisodeDownloadUseCase> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  CancelEpisodeDownloadUseCase create(Ref ref) {
+    return cancelEpisodeDownloadUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(CancelEpisodeDownloadUseCase value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<CancelEpisodeDownloadUseCase>(value),
+    );
+  }
+}
+
+String _$cancelEpisodeDownloadUseCaseHash() =>
+    r'a52151fa07ade75cc867adb3df2edf80ebd669a2';
+
+@ProviderFor(deleteEpisodeDownloadUseCase)
+final deleteEpisodeDownloadUseCaseProvider =
+    DeleteEpisodeDownloadUseCaseProvider._();
+
+final class DeleteEpisodeDownloadUseCaseProvider
+    extends
+        $FunctionalProvider<
+          DeleteEpisodeDownloadUseCase,
+          DeleteEpisodeDownloadUseCase,
+          DeleteEpisodeDownloadUseCase
+        >
+    with $Provider<DeleteEpisodeDownloadUseCase> {
+  DeleteEpisodeDownloadUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'deleteEpisodeDownloadUseCaseProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$deleteEpisodeDownloadUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<DeleteEpisodeDownloadUseCase> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  DeleteEpisodeDownloadUseCase create(Ref ref) {
+    return deleteEpisodeDownloadUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(DeleteEpisodeDownloadUseCase value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<DeleteEpisodeDownloadUseCase>(value),
+    );
+  }
+}
+
+String _$deleteEpisodeDownloadUseCaseHash() =>
+    r'286f5164da338ae4aa3b534579e1dc0a6e3cc786';
+
 /// Observes the download for [movieId], emitting [MovieDownloadDto]
 /// snapshots. Re-subscribes to an in-flight download if one exists,
 /// otherwise initiates a new one.
@@ -296,4 +492,96 @@ final class MovieDownloadStreamFamily extends $Family
 
   @override
   String toString() => r'movieDownloadStreamProvider';
+}
+
+/// Observes the download for [episodeId], emitting [EpisodeDownloadDto]
+/// snapshots.
+
+@ProviderFor(episodeDownloadStream)
+final episodeDownloadStreamProvider = EpisodeDownloadStreamFamily._();
+
+/// Observes the download for [episodeId], emitting [EpisodeDownloadDto]
+/// snapshots.
+
+final class EpisodeDownloadStreamProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<EpisodeDownloadDto>,
+          EpisodeDownloadDto,
+          Stream<EpisodeDownloadDto>
+        >
+    with
+        $FutureModifier<EpisodeDownloadDto>,
+        $StreamProvider<EpisodeDownloadDto> {
+  /// Observes the download for [episodeId], emitting [EpisodeDownloadDto]
+  /// snapshots.
+  EpisodeDownloadStreamProvider._({
+    required EpisodeDownloadStreamFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'episodeDownloadStreamProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$episodeDownloadStreamHash();
+
+  @override
+  String toString() {
+    return r'episodeDownloadStreamProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $StreamProviderElement<EpisodeDownloadDto> $createElement(
+    $ProviderPointer pointer,
+  ) => $StreamProviderElement(pointer);
+
+  @override
+  Stream<EpisodeDownloadDto> create(Ref ref) {
+    final argument = this.argument as String;
+    return episodeDownloadStream(ref, argument);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is EpisodeDownloadStreamProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$episodeDownloadStreamHash() =>
+    r'9bffa6b3d3b2ec9084d597c40e66eb9f75f598ea';
+
+/// Observes the download for [episodeId], emitting [EpisodeDownloadDto]
+/// snapshots.
+
+final class EpisodeDownloadStreamFamily extends $Family
+    with $FunctionalFamilyOverride<Stream<EpisodeDownloadDto>, String> {
+  EpisodeDownloadStreamFamily._()
+    : super(
+        retry: null,
+        name: r'episodeDownloadStreamProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Observes the download for [episodeId], emitting [EpisodeDownloadDto]
+  /// snapshots.
+
+  EpisodeDownloadStreamProvider call(String episodeId) =>
+      EpisodeDownloadStreamProvider._(argument: episodeId, from: this);
+
+  @override
+  String toString() => r'episodeDownloadStreamProvider';
 }

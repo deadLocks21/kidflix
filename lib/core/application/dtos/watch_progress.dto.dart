@@ -16,16 +16,21 @@ class WatchProgressDto {
     required this.updatedAt,
   });
 
-  factory WatchProgressDto.fromDomain(WatchProgress progress) =>
-      WatchProgressDto(
-        profileId: progress.profileId,
-        movieId: progress.movieId,
-        positionSeconds: progress.positionSeconds,
-        completed: progress.completed,
-        updatedAt: progress.updatedAt,
-      );
+  factory WatchProgressDto.fromDomain(WatchProgress progress) {
+    final mediaId = switch (progress) {
+      MovieProgress(:final movieId) => movieId,
+      EpisodeProgress(:final episodeId) => episodeId,
+    };
+    return WatchProgressDto(
+      profileId: progress.profileId,
+      movieId: mediaId,
+      positionSeconds: progress.positionSeconds,
+      completed: progress.completed,
+      updatedAt: progress.updatedAt,
+    );
+  }
 
-  WatchProgress toDomain() => WatchProgress(
+  WatchProgress toDomain() => MovieProgress(
     profileId: profileId,
     movieId: movieId,
     positionSeconds: positionSeconds,

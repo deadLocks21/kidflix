@@ -13,85 +13,77 @@ ultérieurs.
 ## Requirements
 ### Requirement: Movie domain model
 
-The system SHALL represent a movie as an immutable Domain entity `Movie` with
-the following fields:
+The system SHALL represent a movie as an immutable Domain entity
+`Movie` defined in `lib/core/domain/model/media.dart` (no longer in
+`movie.dart` — the file is removed in this change due to the Dart
+sealed-class library constraint requiring all subtypes to live in the
+same library).
 
-- `id`: stable identifier (string) — derived from the external source (e.g.
-  IMDb or TMDB id).
-- `title`: display title (non-empty string).
-- `originalTitle`: original title (nullable string, same as `title` when
-  absent).
-- `year`: release year (integer, nullable if unknown).
-- `duration`: total runtime as a `Duration`.
-- `synopsis`: long-form plot description (string, may be empty).
-- `tagline`: short marketing line (nullable string).
-- `posterUrl`: URL of the poster artwork (nullable string; when null, the UI
-  displays a fallback placeholder).
-- `backdropUrl`: URL of the fanart / backdrop used in the detail modal
-  (nullable string).
-- `ageCategory`: `AgeCategory` enum value — REUSES the enum defined by the
-  `profile-selection` capability (`bebe`, `enfant`, `ado`, `jeuneAdulte`,
-  `adulte`).
-- `genres`: ordered `List<String>` — the first entry is the "primary genre"
-  used for row grouping.
-- `sagaId`: stable identifier of the saga the movie belongs to (nullable
-  string). When non-null, `sagaLabel` SHALL also be non-null.
-- `sagaLabel`: display name of the saga (nullable string).
-- `director`: `List<String>` of director names (possibly empty).
-- `cast`: ordered `List<CastMember>` — order reflects billing from the
-  source metadata (tinyMediaManager NFO ordering).
-- `addedAt`: `DateTime` when the movie entered the catalog (used to compute
-  the "Récemment ajoutés" row).
+`Movie` SHALL `extends CatalogItem` and `implements PlayableMedia` (the
+latter from the `series-viewing` capability). Its fields are unchanged
+from the prior version of this capability:
 
-A `CastMember` SHALL contain `name` (string), `role` (nullable string), and
-`photoUrl` (nullable string).
+- `id`, `title`, `originalTitle`, `year`, `duration`, `synopsis`,
+  `tagline`, `posterUrl`, `backdropUrl`, `ageCategory`, `genres`,
+  `sagaId`, `sagaLabel`, `director`, `cast`, `addedAt`.
 
-The entity SHALL be equatable by `id`.
+Equality remains by `id` ; `hasSaga`, `primaryGenre` accessors are
+preserved.
 
-#### Scenario: Movie without saga
+`CastMember` SHALL also live in `media.dart` (moved alongside `Movie`
+for the same library-membership reason).
 
-- **WHEN** a `Movie` is constructed with `sagaId = null` and `sagaLabel = null`
-- **THEN** it is accepted and considered standalone for row composition
+#### Scenario: Movie is a CatalogItem
 
-#### Scenario: Movie with saga
+- **GIVEN** a `Movie` instance
+- **THEN** `movie is CatalogItem` is true
 
-- **WHEN** a `Movie` is constructed with `sagaId = "asterix"` and `sagaLabel = "Astérix"`
-- **THEN** it is considered a member of the `"asterix"` saga for row composition
+#### Scenario: Movie is a PlayableMedia
 
-#### Scenario: Primary genre is the first in the list
+- **GIVEN** a `Movie` instance
+- **THEN** `movie is PlayableMedia` is true
 
-- **GIVEN** a `Movie` with `genres = ["Familial", "Comédie", "Aventure"]`
-- **THEN** its primary genre is `"Familial"`
+#### Scenario: Movie equality by id is preserved
+
+- **GIVEN** two `Movie` instances with the same `id` but different
+  field values otherwise
+- **THEN** they are equal
 
 ---
 
 ### Requirement: CatalogRow and CatalogRowType model
 
-The system SHALL represent a row as an immutable data class `CatalogRow` with
-the following fields:
+The system SHALL represent a row as an immutable data class
+`CatalogRow` with the following fields:
 
 - `label`: display label shown above the row (non-empty string).
 - `type`: `CatalogRowType` enum value.
-- `movies`: ordered `List<Movie>` — may be empty.
+- `items`: ordered `List<CatalogItem>` — may be empty, may mix
+  `Movie` and `Series` instances depending on the row type.
 
-The `CatalogRowType` enum SHALL contain exactly the following variants:
+The field is renamed from `movies: List<Movie>` to `items: List<CatalogItem>`.
+Sites that previously accessed `row.movies` SHALL be updated to
+`row.items`. Sites that depended on the static type `List<Movie>`
+SHALL switch on the `CatalogItem` sealed or use `whereType<Movie>()`
+when they specifically need movies.
 
-- `continueWatching`
-- `recentlyAdded`
-- `favorites`
-- `saga`
-- `genre`
-- `neverWatched`
-- `downloaded`
+The `CatalogRowType` enum is unchanged — same seven variants
+(`continueWatching`, `recentlyAdded`, `favorites`, `saga`, `genre`,
+`neverWatched`, `downloaded`).
 
-For rows of type `saga` and `genre`, multiple `CatalogRow` instances can be
-emitted by the application service (one per distinct saga and per distinct
-genre present in the catalog). For all other types, at most one `CatalogRow`
-instance SHALL be emitted.
+For rows of type `saga` and `genre`, the application service emits
+**only `Movie` instances** at MVP (see "Row composition includes /
+excludes series" requirement below). For `recentlyAdded` and
+`continueWatching`, both kinds may appear.
+
+#### Scenario: CatalogRow can hold mixed Movies and Series
+
+- **WHEN** a `CatalogRow` is constructed with `items = [movie, series, movie]`
+- **THEN** it is a valid instance and the field type accepts both kinds
 
 #### Scenario: CatalogRow can be empty
 
-- **WHEN** a `CatalogRow` is constructed with `movies = []`
+- **WHEN** a `CatalogRow` is constructed with `items = []`
 - **THEN** it is a valid instance
 - **AND** the UI layer is responsible for hiding it (see empty-row requirement)
 
@@ -103,57 +95,60 @@ The system SHALL define a Domain interface `CatalogRepository`. For
 homepage composition, it exposes:
 
 ```dart
-Future<List<Movie>> listMoviesFor();
+Future<List<CatalogItem>> listCatalog();
 ```
 
-The repository SHALL return all movies the active profile is allowed to
-see. The repository itself SHALL NOT know which profile is active —
-the filter is applied **outside the repository**:
+The method is renamed from `listMoviesFor()` and now returns a
+heterogeneous list of `Movie` and `Series` instances (the wire payload
+discriminates via `kind`).
 
-- In the HTTP implementation (`DioCatalogRepository`), the backend
-  filters server-side based on the `X-Profile-Id` header injected by
-  the `AuthInterceptor`. The repository sends `GET /movies` with no
-  query parameters; the backend resolves the active profile and returns
-  only movies whose `ageCategory == profile.ageCategory`.
-- In the in-memory implementation (`InMemoryCatalogRepository`), no
-  filter is applied at all — the repository returns the full seeded
-  list. In-memory mode is for dev/test of the chain
-  UI/usecase/service ; profile-scoped age filtering is validated by
-  the HTTP integration tests and the backend's own test suite, not by
-  the in-memory repo.
+The repository SHALL return all catalog items the active profile is
+allowed to see. The filter is applied **outside the repository**:
+
+- HTTP : the backend filters server-side via `X-Profile-Id` (returning
+  only items whose `ageCategory == profile.ageCategory`). The
+  repository sends `GET /catalog` with no query parameters.
+- In-memory : no filter is applied — the repository returns the full
+  seeded list (movies + series) regardless of the active profile.
 
 The repository SHALL NOT know about rows, grouping, or the active
-profile. The signature `listMoviesFor()` (no parameter) is the wire
+profile. The signature `listCatalog()` (no parameter) is the wire
 guarantee that the repository has no profile-awareness.
 
-In this change, the in-memory implementation SHALL continue to seed at
-least 10 fictional movies distributed across all five age categories,
-with at least:
+The in-memory implementation SHALL seed at least 10 fictional movies
+distributed across all five age categories (unchanged from prior
+versions) **plus** at least one series in the `enfant` category (the
+Pingu seed defined in the `series-viewing` capability).
 
-- One saga of ≥ 2 movies (so the saga row can be exercised).
-- Movies from at least 3 different primary genres in the `enfant`
-  category.
-- At least one movie in each age category.
+#### Scenario: In-memory repository returns the full seeded catalog
 
-The seed is unchanged from prior versions ; only the *return* of
-`listMoviesFor()` is no longer filtered.
+- **GIVEN** an `InMemoryCatalogRepository` containing movies across all
+  age categories plus the Pingu series
+- **WHEN** `listCatalog()` is called
+- **THEN** the returned list contains every seeded movie and every
+  seeded series
+- **AND** no item is filtered out at the repository layer
 
-#### Scenario: In-memory repository returns the full seed regardless of any active profile
+#### Scenario: HTTP repository sends GET /catalog with no query parameters
 
-- **GIVEN** an `InMemoryCatalogRepository` containing movies across all age categories
-- **WHEN** `listMoviesFor()` is called
-- **THEN** the returned list contains every seeded movie
-- **AND** no movie is filtered out based on age category at the repository layer
+- **GIVEN** a `DioCatalogRepository` whose `Dio` has `baseUrl ==
+  "http://test.local"`
+- **AND** the backend responds 200 with `{"items": [<movie1>,
+  <series1>]}`
+- **WHEN** `listCatalog()` is called
+- **THEN** the request method is `GET` on path `/catalog`
+- **AND** the request has no query parameters
+- **AND** the future completes with a `List<CatalogItem>` of length 2
+  whose first element is a `Movie` and second is a `Series` (per the
+  `kind` discriminator)
 
-#### Scenario: HTTP repository sends GET /movies with no query parameters
+#### Scenario: HTTP repository preserves backend item order
 
-- **GIVEN** a `DioCatalogRepository` whose `Dio` has `baseUrl == "http://test.local"`
-- **AND** the backend responds 200 with `{"movies": [<movie1>, <movie2>]}`
-- **WHEN** `listMoviesFor()` is called
-- **THEN** the request method is `GET` on path `/movies`
-- **AND** the request has no query parameter `age_category`
-- **AND** the request has no query parameter at all (the path is `/movies` exactly)
-- **AND** the future completes with a `List<Movie>` of length 2 whose elements match the parsed `<movie1>` and `<movie2>`
+- **GIVEN** the backend responds with `{"items": [<series_a>,
+  <movie_b>, <series_c>]}`
+- **WHEN** `listCatalog()` is called
+- **THEN** the returned list is in the same order
+  `[seriesA, movieB, seriesC]`
 
 ---
 
@@ -168,50 +163,68 @@ Future<List<CatalogRowDto>> buildHomeRowsFor(ProfileDto profile);
 
 The service SHALL:
 
-1. Call `CatalogRepository.listMoviesFor()` to get the raw movies
-   available to the **active** profile (filtering is the repository
-   implementation's responsibility — server-side in HTTP mode, no-op
-   in in-memory mode).
-2. Assemble a list of `CatalogRow` instances following the row
-   composition rules (see subsequent requirements).
-3. Apply the fixed row ordering (see row-ordering requirement).
-4. Convert each `CatalogRow` into a `CatalogRowDto` (containing
-   `List<MovieDto>` instead of `List<Movie>`).
-5. Return only rows with at least one movie (empty rows are filtered
-   out).
+1. Call `CatalogRepository.listCatalog()` to get the raw mixed catalog
+   items available to the active profile.
+2. **In parallel** (`Future.wait`), call
+   `ResolveContinueWatchingUseCase.execute(profile)` (defined in the
+   `series-viewing` capability) to compute the Continue Watching row.
+3. Assemble a list of `CatalogRow` instances following these
+   composition rules:
+   - `continueWatching` row : items come directly from the usecase
+     output (mixed `MovieContinueDto` / `EpisodeContinueDto`, exposed
+     via `CatalogItemDto` projection).
+   - `recentlyAdded` row : both `Movie` and `Series` from `listCatalog`,
+     sorted by `addedAt` desc, capped at 20.
+   - `favorites`, `neverWatched`, `downloaded`, `saga`, `genre` rows :
+     only `Movie` items (`whereType<Movie>()` filter applied).
+4. Apply the fixed row ordering (unchanged sequence).
+5. Convert each `CatalogRow` into a `CatalogRowDto` (containing
+   `List<CatalogItemDto>` or its sealed equivalent).
+6. Return only rows with at least one item (empty rows filtered out).
 
-The service SHALL NOT pass `profile.ageCategory` (or any age value)
-to the repository. The `ProfileDto` parameter is preserved on the
-method signature because future row-composition decisions may consume
-profile metadata other than the age category (e.g. row labels, badge
-display), but the parameter is no longer used as an age filter.
+The service SHALL NOT pass `profile.ageCategory` to the repository
+(unchanged from `add-profile-aware-permissions`).
 
-The service SHALL expose its behavior through a Riverpod provider
-configured under `lib/infrastructure/providers/` per project
-convention.
-
-A usecase `ListHomeCatalogUseCase` SHALL wrap the service call,
-accepting a `ProfileDto` and returning `Future<List<CatalogRowDto>>`.
-The homepage consumes the usecase via its Riverpod provider.
+The usecase `ListHomeCatalogUseCase` SHALL continue to wrap the service
+call with no signature change.
 
 #### Scenario: Service returns only non-empty rows
 
-- **GIVEN** a profile with no `favorites`, no `continueWatching`, and no catalog movies
+- **GIVEN** a profile with no progress and no catalog items
 - **WHEN** `buildHomeRowsFor(profile)` is called
 - **THEN** the returned list is empty
 
-#### Scenario: Service does not expose Domain entities to the UI
+#### Scenario: Recently Added mixes movies and series
 
-- **WHEN** the service returns rows
-- **THEN** each row contains `MovieDto` objects (not `Movie`)
-- **AND** no `Movie` Domain entity crosses the Application/UI boundary
+- **GIVEN** the catalog returns `[Movie(addedAt: 2026-05-04),
+  Series(addedAt: 2026-05-03)]`
+- **WHEN** rows are built
+- **THEN** the `recentlyAdded` row contains both items
+- **AND** the order is `[Movie, Series]`
 
-#### Scenario: Service does not pass ageCategory to the repository
+#### Scenario: Saga row excludes series
 
-- **GIVEN** a profile with `ageCategory == AgeCategory.enfant`
+- **GIVEN** the catalog returns two movies sharing `sagaId =
+  "asterix"` and a series with the same `sagaId`
+- **WHEN** rows are built
+- **THEN** the saga row contains only the two movies (the series is
+  filtered out)
+
+#### Scenario: Genre row excludes series
+
+- **GIVEN** the catalog returns a `Movie(genres: ["Animation"])` and a
+  `Series(genres: ["Animation"])`
+- **WHEN** rows are built
+- **THEN** the `genre: "Animation"` row contains only the movie
+
+#### Scenario: Continue Watching uses ResolveContinueWatchingUseCase
+
+- **GIVEN** the active profile has progress on `nemo` and on episode
+  `s1e3` of pingu
 - **WHEN** `buildHomeRowsFor(profile)` is called
-- **THEN** `CatalogRepository.listMoviesFor()` is called with no argument (the new signature has no parameter)
-- **AND** the service does not inspect or forward `profile.ageCategory` to the repository
+- **THEN** the `continueWatching` row is populated by the result of
+  `ResolveContinueWatchingUseCase.execute(profile)` (verified by
+  injecting a fake usecase and asserting its `execute` was called)
 
 ---
 
@@ -614,65 +627,47 @@ The `CatalogRepository` Domain interface SHALL expose a second method
 used by the `search` capability:
 
 ```dart
-Future<List<Movie>> searchMovies({required String query});
+Future<List<CatalogItem>> searchCatalog({required String query});
 ```
 
-The method SHALL return every movie whose normalized `title` OR
-normalized `originalTitle` (when non-null) contains the normalized
-`query` as a substring, where normalization is case-insensitive and
-accent-insensitive (see the `search` capability for the exact rules).
-The age-hierarchy filter (`movie.ageCategory ≤ active profile age
-category`) is applied **outside the repository**:
+The method is renamed from `searchMovies` and now returns mixed
+movies and series.
 
-- In the HTTP implementation (`DioCatalogRepository`), the backend
-  filters server-side based on the `X-Profile-Id` header. The
-  repository sends `GET /movies/search?q=<query>` with only the `q`
-  query parameter — the backend resolves the active profile and applies
-  the hierarchical scope.
-- In the in-memory implementation (`InMemoryCatalogRepository`), no
-  age filter is applied. The repository returns every seeded movie
-  whose normalized title matches the normalized query, regardless of
-  age category. In-memory tests SHALL adjust their fixtures or
-  assertions accordingly.
+The method SHALL return every catalog item whose normalized `title`
+OR normalized `originalTitle` (when non-null) contains the normalized
+`query` as a substring. Normalization is case- and
+accent-insensitive (NFD + strip diacritics + lowercase ; applied
+symmetrically server-side).
 
-The method SHALL NOT know about rows, the active profile, sorting, or
-debouncing. Sorting the results is the responsibility of the
-`SearchApplicationService`. Debouncing and minimum-query-length
-enforcement are responsibilities of the UI/controller layer.
+The age-hierarchy filter (`item.ageCategory ≤ active profile age
+category`) is applied **outside the repository** as before:
 
-The HTTP implementation maps this method to the single backend endpoint
-`GET /movies/search?q={query}`, preserving the 1:1 signature. The HTTP
-implementation does not normalize the query client-side — it forwards
-the raw string and the backend applies normalization symmetrically on
-both query and titles.
+- HTTP : the backend filters server-side via `X-Profile-Id`. The
+  repository sends `GET /catalog/search?q=<query>` (route renamed
+  from `/movies/search`).
+- In-memory : no age filter is applied.
 
-#### Scenario: In-memory repository returns matches across all categories
+The repository SHALL NOT know about rows, the active profile, sorting,
+or debouncing. Sorting and debouncing remain the responsibility of
+the `SearchApplicationService` and the UI controller respectively.
 
-- **GIVEN** an `InMemoryCatalogRepository` containing a `bebe` movie "Shaun", an `enfant` movie "Totoro", and a `jeuneAdulte` movie "Inception", all matching the query "o"
-- **WHEN** `searchMovies(query: "o")` is called
-- **THEN** the returned list contains Shaun, Totoro and Inception
-- **AND** no age-hierarchy filter is applied at the in-memory repository layer
+#### Scenario: searchCatalog returns matches across both kinds
 
-#### Scenario: Repository applies normalized substring matching
+- **GIVEN** an `InMemoryCatalogRepository` containing a `Movie` "Pikachu"
+  and a `Series` "Pingu"
+- **WHEN** `searchCatalog(query: "pi")` is called
+- **THEN** the returned list contains both items
 
-- **GIVEN** a repository containing a movie with `title = "Astérix"`
-- **WHEN** `searchMovies(query: "asterix")` is called
-- **THEN** the movie is present in the returned list
+#### Scenario: HTTP searchCatalog sends GET /catalog/search
 
-#### Scenario: Repository does not sort
-
-- **WHEN** `searchMovies(query: "o")` is called
-- **THEN** the returned list order is implementation-defined (natural iteration)
-- **AND** sorting is applied by the application service, not by the repository
-
-#### Scenario: HTTP repository sends only the q query parameter
-
-- **GIVEN** a `DioCatalogRepository` whose `Dio` has `baseUrl == "http://test.local"`
-- **AND** the backend responds 200 with `{"movies": []}`
-- **WHEN** `searchMovies(query: "astérix")` is called
-- **THEN** the request method is `GET` on path `/movies/search`
-- **AND** the request has query parameter `q == "astérix"` (raw, accents preserved)
-- **AND** the request has NO query parameter `up_to_age_category`
+- **GIVEN** a `DioCatalogRepository` whose `Dio` has `baseUrl ==
+  "http://test.local"`
+- **AND** the backend responds 200 with `{"items": []}`
+- **WHEN** `searchCatalog(query: "astérix")` is called
+- **THEN** the request method is `GET` on path `/catalog/search`
+- **AND** the request has query parameter `q == "astérix"` (raw,
+  accents preserved)
+- **AND** the request has NO other query parameter
 
 ---
 
@@ -726,79 +721,42 @@ The file SHALL NOT depend on any specific DTO. Its only Domain dependency is the
 
 ### Requirement: RemoteMovieDto wire-format DTO
 
-The system SHALL define a wire-format DTO `RemoteMovieDto` in `lib/core/application/dtos/remote_movie.dto.dart` that mediates between the JSON payload returned by the backend `/movies` endpoints and the Domain `Movie` entity.
+The system SHALL define a wire-format DTO `RemoteMovieDto` in
+`lib/core/application/dtos/remote_movie.dto.dart` that mediates between
+the JSON payload of a `kind: "movie"` catalog item (from `/catalog` or
+`/catalog/search`) and the Domain `Movie` entity.
 
-The DTO SHALL expose:
+The wire schema is unchanged from the prior version of this
+capability EXCEPT that:
 
-- `factory RemoteMovieDto.fromJson(Map<String, dynamic> json)` — parses a single movie wire payload.
-- `Movie toDomain()` — projects the DTO to its Domain entity.
+- The wire payload now carries a top-level `kind: "movie"` field
+  (added by the `add-series-viewing` server-side change). The DTO
+  SHALL **tolerate and ignore** this field — it is not stored on the
+  DTO. The DTO knows it represents a Movie by construction (called
+  through the dispatch helper `catalogItemFromJson`).
 
-The DTO SHALL NOT expose `toJson()` — the client does not push movies to the backend in any current or planned flow.
+All other fields (`id`, `title`, `original_title`, `year`,
+`duration_seconds`, `synopsis`, `tagline`, `poster_url`,
+`backdrop_url`, `age_category`, `genres`, `saga_id`, `saga_label`,
+`director`, `cast`, `added_at`) and their Domain mapping are preserved
+verbatim.
 
-The wire schema SHALL be parsed as follows:
+#### Scenario: Tolerates the kind field in input
 
-| Wire field | Wire type | DTO field | Domain mapping |
-|---|---|---|---|
-| `id` | `String` | `id` | direct |
-| `title` | `String` | `title` | direct |
-| `original_title` | `String?` | `originalTitle` | direct |
-| `year` | `int?` | `year` | direct |
-| `duration_seconds` | `int` | `durationSeconds` | `Duration(seconds: ...)` in `toDomain` |
-| `synopsis` | `String` | `synopsis` | direct |
-| `tagline` | `String?` | `tagline` | direct |
-| `poster_url` | `String?` | `posterUrl` | direct |
-| `backdrop_url` | `String?` | `backdropUrl` | direct |
-| `age_category` | `String` | `ageCategory: AgeCategory` | `ageCategoryFromWire(...)` in `fromJson` |
-| `genres` | `List<String>` | `genres` | direct |
-| `saga_id` | `String?` | `sagaId` | direct |
-| `saga_label` | `String?` | `sagaLabel` | direct |
-| `director` | `List<String>` | `director` | direct |
-| `cast` | `List<Map>` | `cast: List<RemoteCastMemberDto>` | each via `RemoteCastMemberDto.fromJson` |
-| `added_at` | `String` (ISO 8601) | `addedAt: DateTime` | `DateTime.parse(...)` in `fromJson` |
-
-The `cast` list SHALL be parsed via a nested `RemoteCastMemberDto` (see next requirement).
-
-`fromJson` SHALL parse the wire `int` for `duration_seconds` directly into an `int` field on the DTO; the conversion to `Duration` happens in `toDomain`. This preserves the convention that `fromJson` describes the post-JSON-parse Dart primitive shape, and `toDomain` performs the wire-to-Domain projection.
-
-`fromJson` SHALL parse `added_at` directly into a `DateTime` (via `DateTime.parse`), since the wire format is unambiguous and there is no additional projection step needed.
-
-`fromJson` SHALL NOT silently coerce missing required fields (`id`, `title`, `synopsis`, `duration_seconds`, `age_category`, `genres`, `director`, `cast`, `added_at`). A missing required field SHALL surface as a runtime cast/null error during parsing.
-
-#### Scenario: Parses a complete movie payload
-
-- **GIVEN** a wire payload with all fields populated (matching the example in `API.md` § Catalogue)
+- **GIVEN** a wire payload that includes `"kind": "movie"` alongside
+  the standard fields
 - **WHEN** `RemoteMovieDto.fromJson(payload).toDomain()` is called
-- **THEN** the returned `Movie` has every field populated to match the wire payload
-- **AND** `Movie.duration` equals `Duration(seconds: payload['duration_seconds'])`
-- **AND** `Movie.ageCategory` equals the variant returned by `ageCategoryFromWire(payload['age_category'])`
-- **AND** `Movie.addedAt` equals `DateTime.parse(payload['added_at'])`
+- **THEN** the call succeeds and the returned `Movie` has every other
+  field populated correctly
 
-#### Scenario: Parses a payload with all nullable fields absent
+#### Scenario: Parses without the kind field (backward compatibility)
 
-- **GIVEN** a wire payload where `original_title`, `year`, `tagline`, `poster_url`, `backdrop_url`, `saga_id`, `saga_label` are all `null`
-- **WHEN** `RemoteMovieDto.fromJson(payload).toDomain()` is called
-- **THEN** the returned `Movie` has all those fields equal to `null`
-- **AND** required fields parse normally
-
-#### Scenario: Parses an empty cast list
-
-- **GIVEN** a wire payload with `cast: []`
-- **WHEN** parsed and projected to Domain
-- **THEN** the `Movie.cast` is an empty list
-
-#### Scenario: Round-trips ageCategory through the shared helper
-
-- **GIVEN** a wire payload with `age_category: "jeune_adulte"`
-- **WHEN** parsed
-- **THEN** `RemoteMovieDto.ageCategory` equals `AgeCategory.jeuneAdulte`
-
-#### Scenario: Throws on unknown age_category wire value
-
-- **GIVEN** a wire payload with `age_category: "teen"`
-- **WHEN** `RemoteMovieDto.fromJson(payload)` is called
-- **THEN** the call throws `FormatException` (propagated from `ageCategoryFromWire`)
-
----
+- **GIVEN** a wire payload without a `kind` field (e.g. for tests or a
+  legacy fixture)
+- **WHEN** `RemoteMovieDto.fromJson(payload)` is called directly (not
+  via the dispatch helper)
+- **THEN** the call succeeds (the `kind` field is optional from the
+  DTO's perspective)
 
 ### Requirement: RemoteCastMemberDto nested wire DTO
 
@@ -833,106 +791,85 @@ The wire schema SHALL be:
 
 ### Requirement: HTTP implementation of CatalogRepository (DioCatalogRepository)
 
-The system SHALL provide an HTTP implementation `DioCatalogRepository implements CatalogRepository` in `lib/infrastructure/catalog/dio.catalog.repository.dart` that calls the backend `/movies` endpoints documented in `API.md` § Catalogue.
+The system SHALL provide an HTTP implementation `DioCatalogRepository
+implements CatalogRepository` in
+`lib/infrastructure/catalog/dio.catalog.repository.dart` that calls
+the backend `/catalog` and `/catalog/search` endpoints documented in
+`API.md` § Catalogue.
 
-The class SHALL accept a `Dio` instance via its constructor and SHALL NOT instantiate its own — the `Dio` is provided by `dioProvider`, which has the `AuthInterceptor` registered. The repository itself SHALL NOT add `Authorization`, `X-Device-Id`, or `X-Profile-Id` headers explicitly — these are injected transparently by the interceptor since `/movies` does not start with `/auth/` and is not the `GET /profiles` bootstrap exemption.
+The class SHALL accept a `Dio` instance via its constructor.
+`AuthInterceptor` injects `Authorization`, `X-Device-Id`, and
+`X-Profile-Id` transparently for every protected request, including
+`/catalog` and `/catalog/search`.
 
-`listMoviesFor()` SHALL:
+`listCatalog()` SHALL:
 
-1. Issue `GET /movies` with **no query parameters**. The backend resolves the filter from the `X-Profile-Id` header injected by the `AuthInterceptor`.
-2. On HTTP 200, parse the response body as `Map<String, dynamic>`, read the `movies` key as a `List`, cast each element to `Map<String, dynamic>`, and project each via `RemoteMovieDto.fromJson(...).toDomain()`.
-3. Return the resulting `List<Movie>` in iteration order (no client-side sorting).
-4. On any `DioException`, rethrow. No metier-level exception mapping — the contract has no documented business error code on this endpoint beyond `400 missing_profile_id` (which the client surfaces generically since the interceptor is responsible for injecting the header).
+1. Issue `GET /catalog` with **no query parameters**.
+2. On HTTP 200, parse the response body as `Map<String, dynamic>`,
+   read the `items` key as a `List`, cast each element to
+   `Map<String, dynamic>`, and project each via `catalogItemFromJson`
+   (which dispatches based on `kind`).
+3. Return the resulting `List<CatalogItem>` in iteration order
+   (no client-side sorting).
+4. On any `DioException`, rethrow. No metier-level exception mapping.
 
-`searchMovies({required String query})` SHALL:
+`searchCatalog({required String query})` SHALL:
 
-1. Issue `GET /movies/search` with the single query parameter `q=<query>`.
-2. The `query` SHALL be passed through verbatim — no client-side trimming, lowercasing, or accent normalization. Normalization is applied symmetrically by the backend on both query and titles.
-3. The repository SHALL NOT short-circuit on empty/whitespace-only `query` — minimum query length and debouncing are the UI/controller's responsibility per the Domain interface contract.
-4. On HTTP 200, parse the response body using the same `{ movies: [...] }` envelope unwrap as `listMoviesFor`.
-5. Return the resulting `List<Movie>` in iteration order (no client-side sorting — sorting is the application service's responsibility).
-6. On any `DioException`, rethrow. No metier-level exception mapping.
+1. Issue `GET /catalog/search` with the single query parameter
+   `q=<query>`.
+2. The query SHALL be passed verbatim — no client-side trimming,
+   lowercasing, or accent normalization.
+3. The repository SHALL NOT short-circuit on empty/whitespace-only
+   `query` — minimum query length and debouncing remain the UI/controller's
+   responsibility.
+4. On HTTP 200, parse `response.data['items']` and project via
+   `catalogItemFromJson`.
+5. Return the resulting `List<CatalogItem>` in iteration order
+   (sorting is the application service's responsibility).
+6. On any `DioException`, rethrow.
 
-The implementation SHALL NOT log raw response bodies, the `Authorization` header, the JWT, or the `X-Profile-Id` value at any log level.
+The implementation SHALL NOT log raw response bodies or any header
+value at any log level.
 
-The implementation SHALL NOT retry failed requests — retry policy is out of scope for this change.
+#### Scenario: listCatalog sends GET /catalog without query params and parses items envelope
 
-The repository SHALL NOT serialize an `AgeCategory` enum value into any outbound query parameter — there is no longer any age value travelling client-side. The shared helper `ageCategoryToWire` continues to exist for `RemoteProfileDto` and `RemoteMovieDto` (which parse age categories from inbound JSON), but `DioCatalogRepository` no longer consumes it.
-
-#### Scenario: listMoviesFor sends GET /movies without query params and parses the envelope
-
-- **GIVEN** the backend responds 200 with body `{"movies": [<movie1>, <movie2>]}` for `GET /movies`
-- **WHEN** `listMoviesFor()` is called
-- **THEN** the request method is `GET` on path `/movies`
+- **GIVEN** the backend responds 200 with body `{"items": [<movie1>,
+  <series1>]}` for `GET /catalog`
+- **WHEN** `listCatalog()` is called
+- **THEN** the request method is `GET` on path `/catalog` (NOT `/movies`)
 - **AND** the request has no query parameters
-- **AND** the future completes with a `List<Movie>` of length 2 whose elements match the parsed `<movie1>` and `<movie2>`
+- **AND** the future completes with a `List<CatalogItem>` of length 2
 
-#### Scenario: listMoviesFor preserves backend order
+#### Scenario: searchCatalog sends GET /catalog/search?q=...
 
-- **GIVEN** the backend responds 200 with `movies` in order `[m_z, m_a, m_m]`
-- **WHEN** `listMoviesFor()` is called
-- **THEN** the returned `List<Movie>` is in the same order `[m_z, m_a, m_m]` (the repository does not sort)
-
-#### Scenario: listMoviesFor returns empty list when backend has none
-
-- **GIVEN** the backend responds 200 with `{"movies": []}`
-- **WHEN** `listMoviesFor()` is called
-- **THEN** the future completes with an empty `List<Movie>`
-
-#### Scenario: searchMovies sends only the q query param
-
-- **GIVEN** the backend responds 200 with `{"movies": [<movie1>]}` for `GET /movies/search?q=astérix`
-- **WHEN** `searchMovies(query: "astérix")` is called
-- **THEN** the request method is `GET` on path `/movies/search`
-- **AND** the request has query parameter `q == "astérix"` (raw, accents preserved)
-- **AND** the request has NO query parameter `up_to_age_category`
-- **AND** the future completes with a `List<Movie>` of length 1
-
-#### Scenario: searchMovies passes empty query verbatim without bail-out
-
-- **GIVEN** the backend responds 200 with `{"movies": []}` for `GET /movies/search?q=`
-- **WHEN** `searchMovies(query: "")` is called
-- **THEN** the request is sent to the backend with `q` parameter equal to the empty string
-- **AND** the future completes with an empty `List<Movie>`
-
-#### Scenario: searchMovies does not normalize the query client-side
-
-- **GIVEN** the backend responds 200 with `{"movies": []}`
-- **WHEN** `searchMovies(query: "  ASTÉRIX  ")` is called
-- **THEN** the request has query parameter `q == "  ASTÉRIX  "` (whitespace, casing, and accents all preserved)
+- **GIVEN** the backend responds 200 with `{"items": [<movie1>]}`
+  for `GET /catalog/search?q=astérix`
+- **WHEN** `searchCatalog(query: "astérix")` is called
+- **THEN** the request method is `GET` on path `/catalog/search` (NOT
+  `/movies/search`)
+- **AND** the request has query parameter `q == "astérix"` (raw)
+- **AND** the future completes with a `List<CatalogItem>` of length 1
 
 #### Scenario: rethrows on 401 invalid_token
 
-- **GIVEN** the backend responds 401 with body `{"error": {"code": "invalid_token"}}` on either method
-- **WHEN** the method is called
+- **GIVEN** the backend responds 401 with body `{"error": {"code":
+  "invalid_token"}}` on either method
 - **THEN** the future throws `DioException` with `statusCode == 401`
-- **AND** does NOT throw a Domain exception
-
-#### Scenario: rethrows on 400 missing_profile_id
-
-- **GIVEN** the backend responds 400 with body `{"error": {"code": "missing_profile_id"}}` (e.g. an interceptor bug failed to inject `X-Profile-Id`)
-- **WHEN** the method is called
-- **THEN** the future throws `DioException` with `statusCode == 400`
-- **AND** does NOT throw a Domain exception
 
 #### Scenario: rethrows on 5xx
 
-- **GIVEN** the backend responds 500 with empty body on either method
-- **WHEN** the method is called
+- **GIVEN** the backend responds 500 on either method
 - **THEN** the future throws `DioException` with `statusCode == 500`
 
-#### Scenario: rethrows on network error
+#### Scenario: throws on unknown kind in items array
 
-- **GIVEN** the network is unreachable
-- **WHEN** either method is called
-- **THEN** the future throws `DioException` of type `DioExceptionType.connectionError` (or equivalent)
+- **GIVEN** the backend responds 200 with `{"items": [{"kind":
+  "podcast", ...}]}`
+- **WHEN** `listCatalog()` is called
+- **THEN** the future throws `FormatException` (propagated from
+  `catalogItemFromJson`) — fail-fast on backend contract violation
 
-#### Scenario: AuthInterceptor injects all three headers transparently
-
-- **GIVEN** a session is established, a profile is selected, and `dioProvider` has the `AuthInterceptor` registered
-- **WHEN** `listMoviesFor()` is called
-- **THEN** the outbound request carries `Authorization: Bearer <jwt>`, `X-Device-Id: <device.id>`, and `X-Profile-Id: <profile.id>` headers
-- **AND** the repository code does not reference these headers explicitly
+---
 
 ### Requirement: CatalogRepository implementation selection via API_BASE_URL
 
@@ -978,4 +915,109 @@ The selection SHALL be consistent with `authRepositoryProvider` and `profileMana
 - **GIVEN** a test that overrides `catalogRepositoryProvider` with a fake implementation via `ProviderContainer.test`
 - **WHEN** the consumer reads `catalogRepositoryProvider` in the test
 - **THEN** the fake is returned regardless of the `API_BASE_URL` value the test was compiled with
+
+### Requirement: Sealed CatalogItem hierarchy
+
+The system SHALL define a `sealed class CatalogItem` in
+`lib/core/domain/model/media.dart` with the following abstract getters,
+which represent the fields common to every catalog tile shown on the
+homepage:
+
+- `String get id`
+- `String get title`
+- `String? get originalTitle`
+- `int? get year`
+- `String get synopsis`
+- `String? get tagline`
+- `String? get posterUrl`
+- `String? get backdropUrl`
+- `AgeCategory get ageCategory`
+- `List<String> get genres`
+- `String? get sagaId`
+- `String? get sagaLabel`
+- `List<String> get director`
+- `List<CastMember> get cast`
+- `DateTime get addedAt`
+
+The sealed hierarchy SHALL contain exactly two variants:
+- `Movie` (defined in this capability) — `extends CatalogItem` and
+  `implements PlayableMedia` (the latter is defined in the
+  `series-viewing` capability).
+- `Series` (defined in the `series-viewing` capability) —
+  `extends CatalogItem` only.
+
+Any switch over `CatalogItem` SHALL be exhaustive at compile-time
+without a `default` branch.
+
+#### Scenario: Exhaustive switch over CatalogItem
+
+- **GIVEN** a function that switches on `CatalogItem`
+- **WHEN** the function omits a branch for `Movie` or `Series`
+- **THEN** the Dart analyzer emits a non-exhaustive switch error
+
+#### Scenario: Movie satisfies CatalogItem getters
+
+- **GIVEN** a `Movie` with `title == "Nemo"` and `addedAt == 2026-04-01`
+- **WHEN** treated as `CatalogItem`
+- **THEN** `item.title == "Nemo"` and `item.addedAt == 2026-04-01`
+
+#### Scenario: Series satisfies CatalogItem getters
+
+- **GIVEN** a `Series` with `title == "Pingu"` and `addedAt == 2026-05-04`
+- **WHEN** treated as `CatalogItem`
+- **THEN** `item.title == "Pingu"` and `item.addedAt == 2026-05-04`
+
+---
+
+### Requirement: catalogItemFromJson dispatch helper
+
+The system SHALL define a top-level function `catalogItemFromJson` in
+`lib/core/application/dtos/remote_catalog_item.dto.dart` that parses a
+single catalog item wire payload from the `/catalog` and
+`/catalog/search` responses:
+
+```dart
+CatalogItem catalogItemFromJson(Map<String, dynamic> json);
+```
+
+The function SHALL switch on `json['kind']`:
+
+- `"movie"` → `RemoteMovieDto.fromJson(json).toDomain()`
+- `"series"` → `RemoteSeriesCatalogDto.fromJson(json).toDomain()` (DTO
+  defined in the `series-viewing` capability)
+- any other value (including missing key) → throws `FormatException`
+  whose message contains `"Unknown catalog kind"` and the offending
+  value.
+
+The function SHALL NOT silently coerce a missing or null `kind` — that
+indicates a backend contract bug and SHALL fail fast.
+
+#### Scenario: Dispatches movie payload to RemoteMovieDto
+
+- **GIVEN** a wire payload `{"kind": "movie", "id": "nemo", ...}`
+- **WHEN** `catalogItemFromJson(payload)` is called
+- **THEN** the result is a `Movie` whose `id == "nemo"`
+
+#### Scenario: Dispatches series payload to RemoteSeriesCatalogDto
+
+- **GIVEN** a wire payload `{"kind": "series", "id": "pingu",
+  "seasons_count": 6, ...}`
+- **WHEN** `catalogItemFromJson(payload)` is called
+- **THEN** the result is a `Series` whose `id == "pingu"` and
+  `seasonsCount == 6`
+
+#### Scenario: Throws on unknown kind
+
+- **GIVEN** a wire payload `{"kind": "podcast", "id": "x", ...}`
+- **WHEN** `catalogItemFromJson(payload)` is called
+- **THEN** the call throws `FormatException` whose message contains
+  `"Unknown catalog kind"` and `"podcast"`
+
+#### Scenario: Throws on missing kind
+
+- **GIVEN** a wire payload `{"id": "nemo", ...}` without a `kind` key
+- **WHEN** `catalogItemFromJson(payload)` is called
+- **THEN** the call throws `FormatException`
+
+---
 

@@ -9,7 +9,7 @@ class FindMovieDownloadUseCase {
   const FindMovieDownloadUseCase(this._repository);
 
   Future<MovieDownloadDto?> execute(String movieId) async {
-    final domain = await _repository.findByMovieId(movieId);
+    final domain = await _repository.findForMovie(movieId);
     return domain == null ? null : MovieDownloadDto.fromDomain(domain);
   }
 }

@@ -5,51 +5,68 @@ TBD - created by archiving change add-video-playback-and-downloads. Update Purpo
 ## Requirements
 ### Requirement: WatchProgress domain model
 
-The system SHALL represent a watch progress as an immutable Domain value
-object `WatchProgress` with the following fields:
+The system SHALL define a `sealed class WatchProgress` in
+`lib/core/domain/model/watch_progress.dart` exposing the fields
+common to all watch progress entries:
 
-- `profileId`: stable identifier of the profile this progress belongs to
-  (string, equals `Profile.id`).
-- `movieId`: stable identifier of the movie (string, equals `Movie.id`).
-- `positionSeconds`: integer number of seconds from the start of the
-  movie (`>= 0`).
-- `completed`: boolean flag indicating the movie has been watched past
-  the completion threshold (see completion threshold requirement).
-- `updatedAt`: `DateTime` of the last save.
+- `String get profileId`
+- `int get positionSeconds`
+- `bool get completed`
+- `DateTime get updatedAt`
 
-The entity SHALL be equatable by the pair `(profileId, movieId)` — two
-`WatchProgress` instances for the same profile/movie are considered
-identical for lookup purposes, regardless of position or timestamp. The
-most recent `updatedAt` wins when multiple writes race.
+The sealed hierarchy SHALL contain exactly two variants:
 
-The model SHALL NOT include `deviceId`. Multi-device identity is a
-server-side concern introduced by the future HTTP implementation; the
-client contract is unchanged.
+- `MovieProgress` — adds `final String movieId`. Equatable by
+  `(profileId, movieId)`.
+- `EpisodeProgress` — adds `final String episodeId`. Equatable by
+  `(profileId, episodeId)`.
 
-#### Scenario: Equality by profile and movie
+Any switch over `WatchProgress` SHALL be exhaustive at compile-time
+without a `default` branch.
 
-- **GIVEN** two `WatchProgress` instances with the same `profileId` and `movieId` but different `positionSeconds`
-- **THEN** `a == b` is true
-- **AND** they are treated as the same progress for lookup
+The model SHALL NOT include `deviceId` (unchanged from prior version :
+multi-device identity is server-side).
+
+The previous `WatchProgress(profileId, movieId, ...)` constructor is
+removed ; sites SHALL migrate to either `MovieProgress(...)` or
+`EpisodeProgress(...)` explicitly.
+
+#### Scenario: Exhaustive switch over WatchProgress
+
+- **GIVEN** a function that switches on `WatchProgress` runtime type
+- **WHEN** a branch for `MovieProgress` or `EpisodeProgress` is omitted
+- **THEN** the Dart analyzer emits a non-exhaustive switch error
+
+#### Scenario: MovieProgress equality by profile and movie
+
+- **GIVEN** two `MovieProgress` instances with the same `profileId`
+  and `movieId`
+- **THEN** `a == b` is true regardless of position or timestamp
 
 #### Scenario: Valid zero-position progress
 
-- **GIVEN** a `WatchProgress` with `positionSeconds = 0` and `completed = false`
-- **THEN** the value is valid and represents "never watched past the start"
+- **GIVEN** a `MovieProgress` (or `EpisodeProgress`) with
+  `positionSeconds = 0`, `completed = false`
+- **THEN** the value is valid and represents "never watched past the
+  start"
 
 ---
 
 ### Requirement: WatchProgressRepository domain interface
 
-The system SHALL define a Domain interface `WatchProgressRepository` in
-`lib/core/domain/services/watch_progress.repository.dart` with the
-following methods:
+The system SHALL define a Domain interface `WatchProgressRepository`
+in `lib/core/domain/services/watch_progress.repository.dart` :
 
 ```dart
 abstract interface class WatchProgressRepository {
-  Future<WatchProgress?> findFor({
+  Future<MovieProgress?>   findForMovie({
     required String profileId,
     required String movieId,
+  });
+
+  Future<EpisodeProgress?> findForEpisode({
+    required String profileId,
+    required String episodeId,
   });
 
   Future<void> save(WatchProgress progress);
@@ -60,64 +77,65 @@ abstract interface class WatchProgressRepository {
 
 Contract semantics:
 
-- `findFor` — returns the current `WatchProgress` for the given
-  `(profileId, movieId)`, or `null` if none exists. Never throws on
-  missing data.
-- `save` — upserts the progress. If a `WatchProgress` already exists
-  for the same `(profileId, movieId)`, it is replaced. If not, it is
-  inserted. The `updatedAt` of the passed instance is stored verbatim
-  (the HTTP backend MAY override it with its own clock — clients do
-  not rely on it for conflict resolution).
-- `listForProfile` — returns all progresses recorded for `profileId`,
-  in implementation-defined order. Used by future capabilities
-  (e.g., a real `continueWatching` row). Returns an empty list when
-  no progresses exist.
+- `findForMovie` — returns the `MovieProgress` for `(profileId,
+  movieId)`, or `null` if none. Never throws on missing data.
+- `findForEpisode` — returns the `EpisodeProgress` for `(profileId,
+  episodeId)`, or `null` if none.
+- `save` — accepts the sealed `WatchProgress` and routes internally
+  (switch on the sealed) to upsert into the right namespace. The
+  sites that call `save` always know the concrete subtype at compile
+  time (the player layer).
+- `listForProfile` — returns every progress (movies + episodes) for
+  the profile in implementation-defined order. The caller is
+  responsible for sorting / filtering by kind if desired (the
+  application service typically sorts by `updatedAt` desc).
 
-The repository SHALL NOT know about UI, routes, `Movie` internals, or
-download concerns.
+The previous `findFor({profileId, movieId})` method is removed in
+favor of the two typed methods. Sites that called the previous
+method SHALL migrate explicitly to one or the other.
 
-The Domain interface SHALL be implementation-agnostic. Two
-implementations live under `lib/infrastructure/watch_progress/`:
+#### Scenario: findForMovie returns null when no progress
 
-- `InMemoryWatchProgressRepository` — RAM-only, used by default in
-  `flutter run` (no flag) and `flutter test`. Entries are lost at app
-  restart. Acceptable for local development and unit tests.
-- `DioWatchProgressRepository` — HTTP, selected when
-  `--dart-define=API_BASE_URL=...` is provided. See the dedicated
-  `HTTP implementation of WatchProgressRepository` requirement for the
-  full HTTP contract.
+- **GIVEN** the repository has no entry for `(profileId, movieId)`
+- **WHEN** `findForMovie(profileId: "p", movieId: "nemo")` is called
+- **THEN** the future completes with `null`
+- **AND** does NOT throw
 
-The active implementation is selected at compile time via the
-`watchProgressRepository` provider — see the
-`WatchProgressRepository implementation selection via API_BASE_URL`
-requirement.
+#### Scenario: findForEpisode returns null when no progress
 
-#### Scenario: Save then findFor returns the saved progress
+- **GIVEN** the repository has no entry for `(profileId, episodeId)`
+- **WHEN** `findForEpisode(profileId: "p", episodeId: "s1e3")` is called
+- **THEN** the future completes with `null`
 
-- **GIVEN** no progress exists for `(profile "p1", movie "abc")`
-- **WHEN** `save(WatchProgress(profileId: "p1", movieId: "abc", positionSeconds: 300, completed: false, updatedAt: t1))` is called
-- **AND** `findFor(profileId: "p1", movieId: "abc")` is called
-- **THEN** the returned `WatchProgress` has `positionSeconds == 300` and `completed == false`
+#### Scenario: save routes by subtype
 
-#### Scenario: Second save overwrites the first
+- **GIVEN** a `MovieProgress(profileId: "p", movieId: "nemo", ...)` and
+  an `EpisodeProgress(profileId: "p", episodeId: "s1e3", ...)`
+- **WHEN** `save(...)` is called on each
+- **THEN** the movie progress is stored under the movie namespace
+- **AND** the episode progress is stored under the episode namespace
+- **AND** subsequent `findForMovie` / `findForEpisode` retrieve them
+  independently
 
-- **GIVEN** an existing progress for `(p1, abc)` with `positionSeconds = 300`
-- **WHEN** `save(WatchProgress(..., positionSeconds: 600, ...))` is called for the same `(p1, abc)`
-- **AND** `findFor(profileId: "p1", movieId: "abc")` is called
-- **THEN** the returned `WatchProgress` has `positionSeconds == 600`
+#### Scenario: listForProfile returns mixed kinds
 
-#### Scenario: findFor returns null for unknown pair
+- **GIVEN** the active profile has one `MovieProgress` and one
+  `EpisodeProgress`
+- **WHEN** `listForProfile(profileId)` is called
+- **THEN** the returned list contains both entries
+- **AND** the list type is `List<WatchProgress>` (mixed sealed)
 
-- **GIVEN** no progress exists for `(p1, xyz)`
-- **WHEN** `findFor(profileId: "p1", movieId: "xyz")` is called
-- **THEN** the result is `null`
+#### Scenario: HTTP repo uses /progress/movies/ and /progress/episodes/ routes
 
-#### Scenario: listForProfile returns only that profile's entries
-
-- **GIVEN** progresses saved for `(p1, abc)`, `(p1, def)`, `(p2, abc)`
-- **WHEN** `listForProfile("p1")` is called
-- **THEN** the result contains exactly the progresses for `(p1, abc)` and `(p1, def)`
-- **AND** does NOT contain `(p2, abc)`
+- **GIVEN** a `DioWatchProgressRepository` consuming
+  `findForMovie(profileId: "p", movieId: "nemo")` and
+  `findForEpisode(profileId: "p", episodeId: "s1e3")`
+- **WHEN** the calls are made
+- **THEN** the first request hits
+  `GET /profiles/p/progress/movies/nemo`
+- **AND** the second request hits
+  `GET /profiles/p/progress/episodes/s1e3`
+- **AND** `listForProfile("p")` hits `GET /profiles/p/progress`
 
 ---
 
@@ -184,62 +202,58 @@ and the user is routed to the appropriate screen per the session state.
 
 ### Requirement: Player page orchestrates download-then-play
 
-The `PlayerPage` SHALL, on mount:
+The `PlayerPage` widget SHALL accept a `PlayableMedia media` parameter
+(the sealed defined in the `series-viewing` capability) instead of the
+prior `Movie movie` parameter.
 
-1. Read the active profile from the session controller.
-2. Call `findByMovieId(movieId)` on the `DownloadRepository`:
-   - If the result has `status == complete`: skip directly to step 4
-     with `localPath` as the source.
-   - Otherwise (null, `downloading`, `readyToPlay`, `failed`,
-     `cancelled`): proceed to step 3.
-3. Subscribe to `DownloadRepository.download(movieId)`:
-   - While events are `downloading`: render the download gate
-     (progress bar + bytes received / total + cancel button).
-   - On the first `readyToPlay` event: transition to step 4 using
-     `event.localPath` as the source.
-   - On `failed` or `cancelled`: render the error state (see error
-     state requirement) and stay there until the user acts.
-4. Resolve the initial playback position:
-   - Call `GetWatchProgressUseCase.execute(profileId, movieId)`.
-   - If the returned `WatchProgressDto` is null, OR
-     `positionSeconds < 10`, OR `completed == true`: the initial
-     position is 0 seconds (no dialog).
-   - Otherwise: show the resume dialog (see resume dialog
-     requirement). The dialog's chosen action determines the initial
-     position (either the stored `positionSeconds`, or 0).
-5. Instantiate a `media_kit` `Player` and `VideoController`, open the
-   `localPath` as `file://${localPath}`, seek to the initial position
-   (if > 0), then call `play()`.
+The widget internally switches on the sealed:
 
-The transition from step 3 to step 4 MUST happen without tearing down
-the page. The download stream MUST continue to be observed in the
-background while the player plays, so the UI can reflect ongoing
-download progress on the seek bar (buffered indicator) and detect
-`complete` to update the source path if needed.
+- `case Movie m:` → invokes `StartMoviePlaybackUseCase(m)` and saves
+  progress as `MovieProgress`.
+- `case Episode e:` → invokes `StartEpisodePlaybackUseCase(e)` and
+  saves progress as `EpisodeProgress`. The widget MAY accept an
+  optional `Series series` parameter passed by the caller (the
+  series detail modal already has it loaded) to display the title bar
+  as `"{series.title} — S{e.seasonNumber}E{e.episodeNumber} —
+  {e.title}"`. When the series is not provided (e.g. from Continue
+  Watching), the title bar shows just `"S{n}E{m} — {e.title}"` as a
+  graceful fallback.
 
-If `complete` is emitted after `readyToPlay` and the `localPath`
-switches from `.partial` to `.mp4`, the `PlayerPage` SHALL NOT
-re-open the media in `media_kit` — the already-opened file descriptor
-remains valid (POSIX inode semantics). Platform-specific exceptions
-(Windows) are handled as documented in `design.md`.
+The `PlayerPage` SHALL NOT make calls to `SeriesRepository` itself —
+the parent widget that already has the series in scope passes it
+along ; otherwise the player works without it.
 
-#### Scenario: Already-downloaded movie plays immediately
+The "Lire" button on the movie detail modal continues to construct
+the player with a `Movie` ; the episode card on the series detail
+modal constructs it with an `Episode` ; the Continue Watching cards
+construct it with the corresponding kind.
 
-- **GIVEN** `findByMovieId("totoro")` returns `status == complete` with a valid `localPath`
-- **WHEN** the `PlayerPage` mounts for `movieId = "totoro"`
-- **THEN** the download gate is NOT shown
-- **AND** the resume-dialog check proceeds immediately
-- **AND** the player opens the local file
+#### Scenario: PlayerPage with a Movie invokes movie playback
 
-#### Scenario: Fresh download shows gate then transitions to player
+- **GIVEN** a `PlayerPage(media: someMovie)`
+- **WHEN** the widget mounts
+- **THEN** `StartMoviePlaybackUseCase` is invoked
+- **AND** `StartEpisodePlaybackUseCase` is NOT invoked
 
-- **GIVEN** no prior download for `"totoro"` exists
-- **WHEN** the `PlayerPage` mounts for `movieId = "totoro"`
-- **THEN** the download gate is shown first with a progress bar
-- **AND** when the download emits `readyToPlay`, the gate is replaced by the player surface
-- **AND** the player starts playing the `.partial` file
+#### Scenario: PlayerPage with an Episode invokes episode playback
 
----
+- **GIVEN** a `PlayerPage(media: someEpisode)`
+- **WHEN** the widget mounts
+- **THEN** `StartEpisodePlaybackUseCase` is invoked
+- **AND** `StartMoviePlaybackUseCase` is NOT invoked
+
+#### Scenario: Title bar displays full episode reference when series is provided
+
+- **GIVEN** a `PlayerPage(media: pinguS1E3, series: pinguSeries)`
+- **WHEN** rendered
+- **THEN** the title bar shows `"Pingu — S1E3 — {episodeTitle}"`
+
+#### Scenario: Title bar shows graceful fallback without series
+
+- **GIVEN** a `PlayerPage(media: pinguS1E3)` (series not passed)
+- **WHEN** rendered
+- **THEN** the title bar shows `"S1E3 — {episodeTitle}"` (no series
+  prefix)
 
 ### Requirement: Download gate UI shows progress and cancel affordance
 
@@ -982,4 +996,39 @@ infrastructure concern. Its only Domain dependency is the
 - **GIVEN** a wire payload missing the `position_seconds` key
 - **WHEN** `RemoteWatchProgressDto.fromJson(payload)` is called
 - **THEN** the call throws (cast/null error), without silently defaulting
+
+### Requirement: EpisodeProgress domain model
+
+The system SHALL represent an episode watch progress as an immutable
+Domain value object `EpisodeProgress` extending the sealed
+`WatchProgress` class (see modified requirement below). Its fields:
+
+- `profileId`: stable identifier of the profile (string).
+- `episodeId`: stable identifier of the episode (string).
+- `positionSeconds`: integer number of seconds from the start of the
+  episode (`>= 0`).
+- `completed`: boolean flag indicating the episode has been watched
+  past the completion threshold (the same threshold used for movies).
+- `updatedAt`: `DateTime` of the last save.
+
+`EpisodeProgress` SHALL be equatable by `(profileId, episodeId)` —
+two `EpisodeProgress` instances for the same profile/episode are
+identical for lookup, regardless of position or timestamp.
+
+`EpisodeProgress` SHALL NOT be considered equal to a `MovieProgress`
+even when `episodeId == movieId` (different runtime types).
+
+#### Scenario: EpisodeProgress equality by profile and episode
+
+- **GIVEN** two `EpisodeProgress` instances with the same `profileId`
+  and `episodeId` but different `positionSeconds`
+- **THEN** `a == b` is true
+
+#### Scenario: EpisodeProgress and MovieProgress with same string ids are not equal
+
+- **GIVEN** a `MovieProgress(profileId: "p", movieId: "x", ...)` and
+  an `EpisodeProgress(profileId: "p", episodeId: "x", ...)`
+- **THEN** `movieProgress == episodeProgress` is false
+
+---
 

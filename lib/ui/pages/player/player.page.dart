@@ -5,20 +5,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:kidflix/core/application/dtos/episode_download.dto.dart';
 import 'package:kidflix/core/application/dtos/movie_download.dto.dart';
 import 'package:kidflix/core/application/session_state.dart';
 import 'package:kidflix/core/application/usecases/save_watch_progress.usecase.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
+import 'package:kidflix/core/domain/model/watch_progress.dart';
 import 'package:kidflix/core/domain/services/kids_lock.service.dart';
 import 'package:kidflix/core/domain/services/profile_pin.service.dart';
 import 'package:kidflix/infrastructure/providers/catalog.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/download.usecases_provider.dart';
 import 'package:kidflix/infrastructure/providers/kids_lock.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/profile_pin.service_provider.dart';
+import 'package:kidflix/infrastructure/providers/series.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
+import 'package:kidflix/infrastructure/providers/watch_progress.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/watch_progress.usecases_provider.dart';
 import 'package:kidflix/ui/pages/player/media_kit_player_engine.dart';
 import 'package:kidflix/ui/pages/player/player_engine.dart';
+import 'package:kidflix/ui/pages/player/player_media_ref.dart';
 import 'package:kidflix/ui/pages/player/widgets/lock_button.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/player_download_gate.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/player_error_state.widget.dart';
@@ -33,19 +38,73 @@ const Duration _seekDetectionThreshold = Duration(seconds: 2);
 const int _resumeMinSeconds = 10;
 const double _completionThreshold = 0.9;
 
+/// Internal projection of either [MovieDownloadDto] or
+/// [EpisodeDownloadDto], used by the player widget without caring about
+/// the underlying media kind.
+typedef _DownloadView = ({
+  DownloadStatusDto status,
+  int bytesReceived,
+  int? bytesTotal,
+  String? localPath,
+  String? errorMessage,
+});
+
+_DownloadView _viewFromMovie(MovieDownloadDto d) => (
+      status: d.status,
+      bytesReceived: d.bytesReceived,
+      bytesTotal: d.bytesTotal,
+      localPath: d.localPath,
+      errorMessage: d.errorMessage,
+    );
+
+_DownloadView _viewFromEpisode(EpisodeDownloadDto d) => (
+      status: d.status,
+      bytesReceived: d.bytesReceived,
+      bytesTotal: d.bytesTotal,
+      localPath: d.localPath,
+      errorMessage: d.errorMessage,
+    );
+
 /// Fullscreen player page. Orchestrates the download → play pipeline,
 /// the resume dialog, progress saves, and wires media_kit's built-in
 /// controls (MaterialVideoControls) with a custom top bar containing
-/// the Close affordance and the movie title.
+/// the Close affordance and the title.
+///
+/// Polymorphic on [media]: routes the download / progress calls to the
+/// movie or episode pipeline based on the sealed [PlayerMediaRef]
+/// variant.
 class PlayerPage extends ConsumerStatefulWidget {
-  final String movieId;
+  final PlayerMediaRef media;
   final PlayerEngineFactory engineFactory;
 
   const PlayerPage({
     super.key,
-    required this.movieId,
+    required this.media,
     this.engineFactory = defaultPlayerEngineFactory,
   });
+
+  /// Convenience constructor for the existing movie-based route — the
+  /// router still hands a `String movieId` from the URL.
+  PlayerPage.movie({
+    Key? key,
+    required String movieId,
+    PlayerEngineFactory engineFactory = defaultPlayerEngineFactory,
+  }) : this(
+          key: key,
+          media: PlayerMediaRef.movie(movieId),
+          engineFactory: engineFactory,
+        );
+
+  /// Convenience constructor for the new episode-based route.
+  PlayerPage.episode({
+    Key? key,
+    required String episodeId,
+    PlayerEngineFactory engineFactory = defaultPlayerEngineFactory,
+  }) : this(
+          key: key,
+          media: PlayerMediaRef.episode(episodeId),
+          engineFactory: engineFactory,
+        );
 
   @override
   ConsumerState<PlayerPage> createState() => _PlayerPageState();
@@ -53,13 +112,14 @@ class PlayerPage extends ConsumerStatefulWidget {
 
 class _PlayerPageState extends ConsumerState<PlayerPage> {
   PlayerEngine? _engine;
-  StreamSubscription<MovieDownloadDto>? _downloadSub;
+  StreamSubscription<MovieDownloadDto>? _movieDownloadSub;
+  StreamSubscription<EpisodeDownloadDto>? _episodeDownloadSub;
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<Duration?>? _durationSub;
   StreamSubscription<bool>? _playingSub;
 
-  MovieDownloadDto? _lastDownload;
-  String? _movieTitle;
+  _DownloadView? _lastDownload;
+  String? _mediaTitle;
   Duration _position = Duration.zero;
   Duration? _lastObservedPosition;
   Duration? _duration;
@@ -95,7 +155,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   void dispose() {
     _disposed = true;
     _periodicSaveTimer?.cancel();
-    _downloadSub?.cancel();
+    _movieDownloadSub?.cancel();
+    _episodeDownloadSub?.cancel();
     _positionSub?.cancel();
     _durationSub?.cancel();
     _playingSub?.cancel();
@@ -132,14 +193,12 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     final session = ref.read(sessionControllerProvider);
     if (session is ProfileSelected) {
       _profileId = session.profile.id;
-      _mainProfile = session.session.profiles
-          .where((p) => p.isMain)
-          .firstOrNull;
+      _mainProfile =
+          session.session.profiles.where((p) => p.isMain).firstOrNull;
     }
 
-    await _resolveMovieTitle();
-    final find = ref.read(findMovieDownloadUseCaseProvider);
-    final existing = await find.execute(widget.movieId);
+    await _resolveMediaTitle();
+    final existing = await _findExistingDownload();
     if (_disposed) return;
 
     if (existing != null && existing.status == DownloadStatusDto.complete) {
@@ -150,43 +209,103 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     _observeDownload();
   }
 
-  Future<void> _resolveMovieTitle() async {
+  Future<_DownloadView?> _findExistingDownload() async {
+    return switch (widget.media) {
+      PlayerMovieRef(:final movieId) => await ref
+          .read(findMovieDownloadUseCaseProvider)
+          .execute(movieId)
+          .then((d) => d == null ? null : _viewFromMovie(d)),
+      PlayerEpisodeRef(:final episodeId) => await ref
+          .read(findEpisodeDownloadUseCaseProvider)
+          .execute(episodeId)
+          .then((d) => d == null ? null : _viewFromEpisode(d)),
+    };
+  }
+
+  Future<void> _resolveMediaTitle() async {
     final state = ref.read(sessionControllerProvider);
     if (state is! ProfileSelected) return;
-    final repo = ref.read(catalogRepositoryProvider);
-    final pool = await repo.listMoviesFor();
-    final movie = pool.where((m) => m.id == widget.movieId).firstOrNull;
-    if (_disposed) return;
-    setState(() => _movieTitle = movie?.title ?? '');
+    switch (widget.media) {
+      case PlayerMovieRef(:final movieId):
+        final repo = ref.read(catalogRepositoryProvider);
+        final pool = await repo.listCatalog();
+        final movie = pool.where((m) => m.id == movieId).firstOrNull;
+        if (_disposed) return;
+        setState(() => _mediaTitle = movie?.title ?? '');
+      case PlayerEpisodeRef(:final episodeId):
+        // Title format: "{Series title} — S{n}E{m} {Episode title}".
+        // Look up the episode by walking the series catalog.
+        final catalog =
+            await ref.read(catalogRepositoryProvider).listCatalog();
+        final seriesIds = catalog
+            .where((i) => i.runtimeType.toString() == 'Series')
+            .map((s) => s.id);
+        // Fallback simpler: find via SeriesRepository — we don't know
+        // the series id. Walk the catalog until we find one that
+        // contains this episode after a findById.
+        final seriesRepo = ref.read(seriesRepositoryProvider);
+        for (final id in seriesIds) {
+          try {
+            final full = await seriesRepo.findById(id);
+            for (final s in full.seasons) {
+              for (final e in s.episodes) {
+                if (e.id == episodeId) {
+                  if (_disposed) return;
+                  setState(() => _mediaTitle =
+                      '${full.title} — S${e.seasonNumber}E${e.episodeNumber} · ${e.title}');
+                  return;
+                }
+              }
+            }
+          } catch (_) {
+            // ignore per-series failures
+          }
+        }
+        // Final fallback: just the episode id.
+        if (_disposed) return;
+        setState(() => _mediaTitle = '');
+    }
   }
 
   void _observeDownload() {
-    final startUseCase = ref.read(startMovieDownloadUseCaseProvider);
-    _downloadSub = startUseCase.execute(widget.movieId).listen(
-      (dto) async {
-        if (_disposed) return;
-        setState(() => _lastDownload = dto);
-        if (!_readyEmitted &&
-            (dto.status == DownloadStatusDto.readyToPlay ||
-                dto.status == DownloadStatusDto.complete)) {
-          _readyEmitted = true;
-          await _onReadyToPlay(dto.localPath!);
-        }
-      },
-      onError: (error) {
-        if (_disposed) return;
-        setState(() {
-          _lastDownload = MovieDownloadDto(
-            movieId: widget.movieId,
-            status: DownloadStatusDto.failed,
-            bytesReceived: _lastDownload?.bytesReceived ?? 0,
-            bytesTotal: _lastDownload?.bytesTotal,
-            errorMessage: error.toString(),
-            updatedAt: DateTime.now(),
-          );
-        });
-      },
-    );
+    switch (widget.media) {
+      case PlayerMovieRef(:final movieId):
+        final useCase = ref.read(startMovieDownloadUseCaseProvider);
+        _movieDownloadSub = useCase.execute(movieId).listen(
+          (dto) => _onDownloadEvent(_viewFromMovie(dto)),
+          onError: _onDownloadError,
+        );
+      case PlayerEpisodeRef(:final episodeId):
+        final useCase = ref.read(startEpisodeDownloadUseCaseProvider);
+        _episodeDownloadSub = useCase.execute(episodeId).listen(
+          (dto) => _onDownloadEvent(_viewFromEpisode(dto)),
+          onError: _onDownloadError,
+        );
+    }
+  }
+
+  Future<void> _onDownloadEvent(_DownloadView dto) async {
+    if (_disposed) return;
+    setState(() => _lastDownload = dto);
+    if (!_readyEmitted &&
+        (dto.status == DownloadStatusDto.readyToPlay ||
+            dto.status == DownloadStatusDto.complete)) {
+      _readyEmitted = true;
+      await _onReadyToPlay(dto.localPath!);
+    }
+  }
+
+  void _onDownloadError(Object error) {
+    if (_disposed) return;
+    setState(() {
+      _lastDownload = (
+        status: DownloadStatusDto.failed,
+        bytesReceived: _lastDownload?.bytesReceived ?? 0,
+        bytesTotal: _lastDownload?.bytesTotal,
+        localPath: null,
+        errorMessage: error.toString(),
+      );
+    });
   }
 
   Future<void> _onReadyToPlay(String localPath) async {
@@ -232,11 +351,17 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   Future<Duration> _resolveInitialPosition() async {
     final session = ref.read(sessionControllerProvider);
     if (session is! ProfileSelected) return Duration.zero;
-    final getProgress = ref.read(getWatchProgressUseCaseProvider);
-    final progress = await getProgress.execute(
-      profileId: session.profile.id,
-      movieId: widget.movieId,
-    );
+    final progressRepo = ref.read(watchProgressRepositoryProvider);
+    final progress = switch (widget.media) {
+      PlayerMovieRef(:final movieId) => await progressRepo.findForMovie(
+          profileId: session.profile.id,
+          movieId: movieId,
+        ),
+      PlayerEpisodeRef(:final episodeId) => await progressRepo.findForEpisode(
+          profileId: session.profile.id,
+          episodeId: episodeId,
+        ),
+    };
     if (progress == null ||
         progress.positionSeconds < _resumeMinSeconds ||
         progress.completed) {
@@ -273,15 +398,37 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     if (useCase == null || profileId == null) return;
     _saving = true;
     try {
-      await useCase.execute(
-        profileId: profileId,
-        movieId: widget.movieId,
-        positionSeconds: _position.inSeconds,
-        completed: _completedSaved,
-      );
+      switch (widget.media) {
+        case PlayerMovieRef(:final movieId):
+          await useCase.execute(
+            profileId: profileId,
+            movieId: movieId,
+            positionSeconds: _position.inSeconds,
+            completed: _completedSaved,
+          );
+        case PlayerEpisodeRef():
+          await _saveEpisodeProgress(_position.inSeconds, _completedSaved);
+      }
     } finally {
       _saving = false;
     }
+  }
+
+  Future<void> _saveEpisodeProgress(int positionSeconds, bool completed) async {
+    final profileId = _profileId;
+    if (profileId == null) return;
+    final mediaRef = widget.media;
+    if (mediaRef is! PlayerEpisodeRef) return;
+    final repo = ref.read(watchProgressRepositoryProvider);
+    await repo.save(
+      EpisodeProgress(
+        profileId: profileId,
+        episodeId: mediaRef.episodeId,
+        positionSeconds: positionSeconds,
+        completed: completed,
+        updatedAt: DateTime.now(),
+      ),
+    );
   }
 
   void _checkCompletion() {
@@ -293,14 +440,19 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       final useCase = _saveUseCase;
       final profileId = _profileId;
       if (useCase == null || profileId == null) return;
-      unawaited(
-        useCase.execute(
-          profileId: profileId,
-          movieId: widget.movieId,
-          positionSeconds: _position.inSeconds,
-          completed: true,
-        ),
-      );
+      switch (widget.media) {
+        case PlayerMovieRef(:final movieId):
+          unawaited(
+            useCase.execute(
+              profileId: profileId,
+              movieId: movieId,
+              positionSeconds: _position.inSeconds,
+              completed: true,
+            ),
+          );
+        case PlayerEpisodeRef():
+          unawaited(_saveEpisodeProgress(_position.inSeconds, true));
+      }
     }
   }
 
@@ -330,8 +482,14 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   }
 
   void _onCancelDownload() {
-    final cancel = ref.read(cancelMovieDownloadUseCaseProvider);
-    unawaited(cancel.execute(widget.movieId));
+    switch (widget.media) {
+      case PlayerMovieRef(:final movieId):
+        final cancel = ref.read(cancelMovieDownloadUseCaseProvider);
+        unawaited(cancel.execute(movieId));
+      case PlayerEpisodeRef(:final episodeId):
+        final cancel = ref.read(cancelEpisodeDownloadUseCaseProvider);
+        unawaited(cancel.execute(episodeId));
+    }
     _onClose();
   }
 
@@ -340,41 +498,30 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       _lastDownload = null;
       _readyEmitted = false;
     });
-    _downloadSub?.cancel();
+    _movieDownloadSub?.cancel();
+    _episodeDownloadSub?.cancel();
     _observeDownload();
   }
 
   List<Widget> _topButtonBar() => [
-    IconButton(
-      icon: const Icon(Icons.close, color: Colors.white),
-      tooltip: 'Fermer',
-      onPressed: _onClose,
-    ),
-    const SizedBox(width: 8),
-    Expanded(child: _titleText()),
-  ];
+        IconButton(
+          icon: const Icon(Icons.close, color: Colors.white),
+          tooltip: 'Fermer',
+          onPressed: _onClose,
+        ),
+        const SizedBox(width: 8),
+        Expanded(child: _titleText()),
+      ];
 
   List<Widget> _lockedTopButtonBar() => [Expanded(child: _titleText())];
 
   Widget _titleText() => Text(
-    _movieTitle ?? '',
-    maxLines: 1,
-    overflow: TextOverflow.ellipsis,
-    style: const TextStyle(color: Colors.white, fontSize: 16),
-  );
+        _mediaTitle ?? '',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(color: Colors.white, fontSize: 16),
+      );
 
-  /// Screen insets the controls must avoid.
-  ///
-  /// Platform split because `SystemUiMode.immersiveSticky` behaves
-  /// differently:
-  /// - **Android** truly hides the status/nav bars, so `padding`
-  ///   (which is zeroed by the hidden system UI) is correct. Using
-  ///   `viewPadding` here would push controls below areas that are
-  ///   actually free.
-  /// - **iOS** cannot hide the home indicator — its physical area
-  ///   stays live. `viewPadding` always reflects that inset, so
-  ///   controls correctly steer clear.
-  /// - **Desktop** has no notch / indicator → both return zero.
   EdgeInsets _safeInsets(BuildContext context) {
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       return MediaQuery.viewPaddingOf(context);
@@ -516,12 +663,6 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     if (engine != null) {
       final mobileTheme = _buildMobileTheme(context);
       final desktopTheme = _buildDesktopTheme(context);
-      // The `MaterialVideoControlsTheme` from media_kit_video 1.3.1 has an
-      // inverted `updateShouldNotify` (returns `false` on real change),
-      // so its `MaterialVideoControls` descendants never react to theme
-      // swaps. We force a subtree remount via a key tied to `_isLocked`.
-      // Playback survives because the `Player` and `VideoController` are
-      // owned by the engine, not by the disposed Video element.
       return MaterialVideoControlsTheme(
         key: ValueKey(_isLocked),
         normal: mobileTheme,
@@ -552,10 +693,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     }
 
     return PlayerDownloadGate(
-      movieTitle: _movieTitle ?? '',
+      movieTitle: _mediaTitle ?? '',
       bytesReceived: download.bytesReceived,
       bytesTotal: download.bytesTotal,
       onCancel: _onCancelDownload,
     );
   }
 }
+

@@ -1,22 +1,40 @@
-/// Playback progress of a single movie for a single profile.
+/// Playback progress of a single playable media item for a single profile.
 ///
-/// Two progresses are considered equal when they share the same
-/// `(profileId, movieId)` — position and timestamp are state, not
-/// identity. The repository uses this identity for upsert semantics:
-/// saving a new [WatchProgress] for an existing pair replaces the old
-/// entry.
+/// Two progresses share identity by `(profileId, mediaId)` within their
+/// own kind — position and timestamp are state, not identity. The
+/// repository uses this identity for upsert semantics: saving a new
+/// progress for an existing pair replaces the old entry.
+///
+/// `WatchProgress` is sealed: it is either a [MovieProgress] (keyed on
+/// `movieId`) or an [EpisodeProgress] (keyed on `episodeId`). The sealed
+/// modifier lets the player layer switch exhaustively without a default
+/// branch.
 ///
 /// No `deviceId` field: device identity is a server-side concern. The
-/// backend infers it from the JWT. The client contract stays the same
-/// when the in-memory implementation is replaced by the HTTP one.
-class WatchProgress {
+/// backend infers it from the JWT.
+sealed class WatchProgress {
+  String get profileId;
+  int get positionSeconds;
+  bool get completed;
+  DateTime get updatedAt;
+}
+
+/// Playback progress of a movie.
+///
+/// Equatable by `(profileId, movieId)`. A [MovieProgress] is never equal
+/// to an [EpisodeProgress] even when their string ids happen to coincide.
+class MovieProgress extends WatchProgress {
+  @override
   final String profileId;
   final String movieId;
+  @override
   final int positionSeconds;
+  @override
   final bool completed;
+  @override
   final DateTime updatedAt;
 
-  const WatchProgress({
+  MovieProgress({
     required this.profileId,
     required this.movieId,
     required this.positionSeconds,
@@ -27,7 +45,7 @@ class WatchProgress {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is WatchProgress &&
+      (other is MovieProgress &&
           other.profileId == profileId &&
           other.movieId == movieId);
 
@@ -36,6 +54,45 @@ class WatchProgress {
 
   @override
   String toString() =>
-      'WatchProgress(profileId: $profileId, movieId: $movieId, '
+      'MovieProgress(profileId: $profileId, movieId: $movieId, '
+      'positionSeconds: $positionSeconds, completed: $completed)';
+}
+
+/// Playback progress of an episode of a series.
+///
+/// Equatable by `(profileId, episodeId)`. A [EpisodeProgress] is never
+/// equal to a [MovieProgress].
+class EpisodeProgress extends WatchProgress {
+  @override
+  final String profileId;
+  final String episodeId;
+  @override
+  final int positionSeconds;
+  @override
+  final bool completed;
+  @override
+  final DateTime updatedAt;
+
+  EpisodeProgress({
+    required this.profileId,
+    required this.episodeId,
+    required this.positionSeconds,
+    required this.completed,
+    required this.updatedAt,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is EpisodeProgress &&
+          other.profileId == profileId &&
+          other.episodeId == episodeId);
+
+  @override
+  int get hashCode => Object.hash(profileId, episodeId);
+
+  @override
+  String toString() =>
+      'EpisodeProgress(profileId: $profileId, episodeId: $episodeId, '
       'positionSeconds: $positionSeconds, completed: $completed)';
 }

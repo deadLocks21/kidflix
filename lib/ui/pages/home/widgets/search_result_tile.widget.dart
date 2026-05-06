@@ -1,19 +1,25 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:kidflix/core/application/dtos/catalog_item.dto.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
+import 'package:kidflix/core/application/dtos/series.dto.dart';
 import 'package:kidflix/shared/duration_format.dart';
 
 /// Single-line result row rendered inside the search results list.
+///
+/// Renders both [MovieDto] and [SeriesDto] entries — the caption switches
+/// on the runtime type ([MovieDto] shows the duration ; [SeriesDto] shows
+/// the saisons / épisodes count).
 class SearchResultTile extends StatelessWidget {
   static const double _posterWidth = 60;
   static const double _posterHeight = 90;
 
-  final MovieDto movie;
+  final CatalogItemDto item;
   final VoidCallback onTap;
 
   const SearchResultTile({
     super.key,
-    required this.movie,
+    required this.item,
     required this.onTap,
   });
 
@@ -31,7 +37,7 @@ class SearchResultTile extends StatelessWidget {
               child: SizedBox(
                 width: _posterWidth,
                 height: _posterHeight,
-                child: _Poster(posterUrl: movie.posterUrl),
+                child: _Poster(posterUrl: item.posterUrl, item: item),
               ),
             ),
             const SizedBox(width: 16),
@@ -41,14 +47,14 @@ class SearchResultTile extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    movie.title,
+                    item.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.titleMedium,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _caption(movie),
+                    _caption(item),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(
@@ -69,21 +75,32 @@ class SearchResultTile extends StatelessWidget {
     );
   }
 
-  static String _caption(MovieDto movie) {
-    final duration = formatDurationHuman(movie.duration);
-    if (movie.year == null) return duration;
-    return '${movie.year} · $duration';
+  static String _caption(CatalogItemDto item) {
+    if (item is MovieDto) {
+      final duration = formatDurationHuman(item.duration);
+      return item.year == null ? duration : '${item.year} · $duration';
+    }
+    if (item is SeriesDto) {
+      final seasons = item.seasonsCount;
+      final saisonsLabel =
+          seasons <= 1 ? '$seasons saison' : '$seasons saisons';
+      return item.year == null
+          ? saisonsLabel
+          : '${item.year} · $saisonsLabel';
+    }
+    return '';
   }
 }
 
 class _Poster extends StatelessWidget {
   final String? posterUrl;
+  final CatalogItemDto item;
 
-  const _Poster({required this.posterUrl});
+  const _Poster({required this.posterUrl, required this.item});
 
   @override
   Widget build(BuildContext context) {
-    final fallback = _PosterFallback();
+    final fallback = _PosterFallback(item: item);
     final url = posterUrl;
     if (url == null || url.isEmpty) return fallback;
     return CachedNetworkImage(
@@ -105,6 +122,10 @@ class _PosterPlaceholder extends StatelessWidget {
 }
 
 class _PosterFallback extends StatelessWidget {
+  final CatalogItemDto item;
+
+  const _PosterFallback({required this.item});
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -112,7 +133,7 @@ class _PosterFallback extends StatelessWidget {
       color: theme.colorScheme.surfaceContainerHigh,
       alignment: Alignment.center,
       child: Icon(
-        Icons.movie_outlined,
+        item is SeriesDto ? Icons.tv_outlined : Icons.movie_outlined,
         size: 24,
         color: theme.colorScheme.onSurfaceVariant,
       ),

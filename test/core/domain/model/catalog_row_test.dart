@@ -3,13 +3,13 @@ import 'package:kidflix/core/domain/model/catalog_row.dart';
 
 void main() {
   group('CatalogRow', () {
-    test('can be constructed with an empty movies list', () {
+    test('can be constructed with an empty items list', () {
       const row = CatalogRow(
         label: 'Empty',
         type: CatalogRowType.favorites,
-        movies: [],
+        items: [],
       );
-      expect(row.movies, isEmpty);
+      expect(row.items, isEmpty);
     });
   });
 

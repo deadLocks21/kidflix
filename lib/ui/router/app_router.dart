@@ -28,6 +28,7 @@ abstract final class AppRoutes {
   static const manageEdit = '/profiles/manage/:id/edit';
   static const manageMainPin = '/profiles/manage/main/pin';
   static const player = '/player/:movieId';
+  static const playerEpisode = '/player/episode/:episodeId';
 }
 
 String _targetRouteFor(SessionState state) => switch (state) {
@@ -104,7 +105,12 @@ GoRouter appRouter(Ref ref) {
       ),
       GoRoute(
         path: AppRoutes.player,
-        builder: (_, s) => PlayerPage(movieId: s.pathParameters['movieId']!),
+        builder: (_, s) => PlayerPage.movie(movieId: s.pathParameters['movieId']!),
+      ),
+      GoRoute(
+        path: AppRoutes.playerEpisode,
+        builder: (_, s) =>
+            PlayerPage.episode(episodeId: s.pathParameters['episodeId']!),
       ),
     ],
   );

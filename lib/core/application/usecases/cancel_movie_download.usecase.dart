@@ -6,5 +6,5 @@ class CancelMovieDownloadUseCase {
 
   const CancelMovieDownloadUseCase(this._repository);
 
-  Future<void> execute(String movieId) => _repository.cancel(movieId);
+  Future<void> execute(String movieId) => _repository.cancelMovie(movieId);
 }

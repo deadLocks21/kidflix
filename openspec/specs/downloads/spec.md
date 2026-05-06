@@ -63,71 +63,60 @@ updatedAt)` combined.
 ### Requirement: DownloadRepository domain interface
 
 The system SHALL define a Domain interface `DownloadRepository` in
-`lib/core/domain/services/download.repository.dart` with the following
-methods:
+`lib/core/domain/services/download.repository.dart` exposing:
 
 ```dart
 abstract interface class DownloadRepository {
-  Future<MovieDownload?> findByMovieId(String movieId);
+  // Movie pipeline (renamed methods, semantics unchanged)
+  Future<MovieDownload?>   findForMovie(String movieId);
+  Stream<MovieDownload>    downloadMovie(String movieId);
+  Future<void>             cancelMovie(String movieId);
+  Future<void>             deleteMovie(String movieId);
 
-  Stream<MovieDownload> download(String movieId);
-
-  Future<void> cancel(String movieId);
-
-  Future<void> delete(String movieId);
+  // Episode pipeline (new)
+  Future<EpisodeDownload?> findForEpisode(String episodeId);
+  Stream<EpisodeDownload>  downloadEpisode(String episodeId);
+  Future<void>             cancelEpisode(String episodeId);
+  Future<void>             deleteEpisode(String episodeId);
 }
 ```
 
-Contract semantics:
+The methods are explicitly typed by kind rather than polymorphic on
+`PlayableMedia` (see `add-series-viewing/design.md` D-7) — the call
+sites always know statically whether they handle a movie or an
+episode, and the namespacing of filesystem paths and HTTP routes is
+inherently distinct.
 
-- `findByMovieId` — returns the current state of the download for `movieId`,
-  or `null` if no download has ever been initiated (never persisted, never
-  cached). Returns a `MovieDownload` with `status == complete` if the file
-  is fully downloaded on disk. A `status == downloading` or `readyToPlay`
-  result indicates an in-flight download the caller can attach to via
-  `download(movieId)`.
-- `download` — initiates a new download or attaches to an in-flight one for
-  `movieId`. Returns a broadcast-style stream: multiple listeners observing
-  the same `movieId` simultaneously SHALL all receive the same events. The
-  stream emits at least one event immediately (the current state) and
-  further events on every meaningful status change. The stream completes
-  when the download reaches `complete`, `failed`, or `cancelled`. Calling
-  `download` on a `movieId` whose download is already `complete` SHALL emit
-  a single `complete` event and close.
-- `cancel` — cancels an in-flight download for `movieId`. No-op if the
-  download is not active. Sets `status` to `cancelled` and closes the
-  associated stream. Partial file is preserved for later resumption.
-- `delete` — removes the local file(s) for `movieId` (both `.partial` and
-  `.mp4` if present), cancels any in-flight download, and clears any cached
-  state. Idempotent: safe to call when no download exists.
+The previous methods `download`, `findByMovieId`, `cancel`, `delete`
+(taking a movie id) SHALL be renamed to their `Movie`-suffixed
+counterparts. Sites that consumed the previous names SHALL be
+updated.
 
-The repository SHALL NOT know about `Profile`, UI routing, `Movie`, or
-playback concerns.
+The contract semantics for the movie methods are preserved verbatim
+from the prior version of this capability — only the names change.
 
-A future HTTP implementation SHALL map `download` to a streaming
-`GET /download/:movieId` request with `Range` support for resumption,
-preserving the Stream-of-snapshots contract.
+#### Scenario: Renamed movie methods preserve previous behavior
 
-#### Scenario: Idempotent delete
+- **GIVEN** a `DownloadRepository` implementation
+- **WHEN** `downloadMovie("nemo")` is called
+- **THEN** the behavior is identical to what `download("nemo")` was
+  in the prior version of this capability (same stream semantics,
+  same ready-threshold logic, same terminal-status closure)
 
-- **GIVEN** no download exists for `movieId "unknown"`
-- **WHEN** `delete("unknown")` is called
-- **THEN** the call completes successfully
-- **AND** no exception is thrown
+#### Scenario: cancelEpisode is a no-op when no download exists
 
-#### Scenario: Two listeners observe the same in-flight download
+- **GIVEN** no download has been initiated for `episodeId == "ghost"`
+- **WHEN** `cancelEpisode("ghost")` is called
+- **THEN** the future completes successfully without error
+- **AND** no filesystem mutation occurs
 
-- **GIVEN** a download for `movieId "abc"` is at `readyToPlay`
-- **WHEN** a second caller subscribes via `download("abc")`
-- **THEN** the second caller immediately receives a `readyToPlay` event
-- **AND** both callers receive every subsequent event in sync until completion
+#### Scenario: deleteEpisode removes both .partial and .mp4 if present
 
-#### Scenario: Attaching to a completed download
-
-- **GIVEN** `movieId "abc"` is already fully downloaded to disk
-- **WHEN** `download("abc")` is called
-- **THEN** the stream emits a single `complete` event
-- **AND** the stream then closes
+- **GIVEN** an episode download that has produced a `.partial` file
+  but not yet the final `.mp4` (cancelled mid-flight)
+- **WHEN** `deleteEpisode(episodeId)` is called
+- **THEN** the `.partial` file is removed
+- **AND** the future completes successfully
 
 ---
 
@@ -378,44 +367,25 @@ event.
 
 ### Requirement: In-memory repository uses a single stub URL for every movie
 
-The `InMemoryDownloadRepository` SHALL be the offline / dev-mode implementation of `DownloadRepository`. It SHALL coexist with `DioDownloadRepository` (the HTTP-backed implementation), with selection at build time via `String.fromEnvironment('API_BASE_URL')` (see the *DownloadRepository implementation selection* requirement). It SHALL:
+The in-memory implementation SHALL support both pipelines (movie and
+episode) with the same simulation mechanics : an artificial throttled
+byte-progression yielding `downloading → readyToPlay → complete`
+events on a Stream.
 
-1. Use a **single hard-coded URL** for every `movieId` it downloads:
-   `https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4`
-   (defined as a `const` in the implementation file, documented as a
-   stub for offline-mode and for the default `flutter run` developer experience). ~62 MB, MP4 H.264 720p ~10 min, supports
-   `Accept-Ranges: bytes`. Archive.org issues a 302 redirect to a
-   regional CDN — dio follows it automatically.
-2. Perform the actual HTTP transfer by delegating to `streamHttpDownload(...)` (see the *Shared HTTP download streaming helper* requirement) with a privately-instantiated `Dio` instance (no `AuthInterceptor`, no `baseUrl`). The private `Dio` is a structural guarantee that no `Authorization: Bearer <jwt>` is ever sent to the third-party archive.org URL — the auth interceptor is bound to `dioProvider`, not to this private instance.
-3. Compute `bytesTotal` via the helper from the `Content-Length` (or `Content-Range`) response header when present, null otherwise.
-4. Respect the 2 MiB + 3% `readyToPlay` threshold, the 4 Hz progress
-   throttling, and the `.partial` → `.mp4` rename on completion — all delegated to the helper.
-5. Honor `Range` requests on resumption — delegated to the helper.
-6. Keep in-process state (map `movieId → active download`) for dedup
-   and cancellation. No persistence of this state across app restarts
-   — `findByMovieId` reconstructs state by inspecting the filesystem on
-   demand via `inspectDownloadOnDisk(...)`.
+The seed SHALL include at least one episode of the seeded series
+(Pingu) reachable via `downloadEpisode("<some_pingu_episode_id>")` so
+the smoke-test of the player on episodes is exercisable in
+`flutter run` mode without a backend.
 
-The HTTP implementation `DioDownloadRepository` (see the *HTTP implementation of DownloadRepository* requirement) SHALL share the same on-disk file layout (`${documents}/downloads/${movieId}.mp4` and `${movieId}.mp4.partial`), the same `MovieDownload` snapshot contract, and the same `cancel`/`delete` filesystem-only semantics. The contract (stream of `MovieDownload` snapshots, `.partial` → `.mp4` on disk, `findByMovieId` is filesystem-only) SHALL be preserved 1:1 across both implementations — they differ only in the URL the helper hits and in whether auth headers are injected by an interceptor.
+#### Scenario: In-memory downloadEpisode emits the standard sequence
 
-#### Scenario: All movies download from the same URL
-
-- **GIVEN** the in-memory repository
-- **WHEN** `download("hp-ecole-des-sorciers")` is called
-- **THEN** the HTTP request targets `https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4`
-
-#### Scenario: Different movieIds produce different local files
-
-- **WHEN** `download("abc")` and `download("xyz")` both complete
-- **THEN** two distinct files exist on disk: `${documents}/downloads/abc.mp4` and `${documents}/downloads/xyz.mp4`
-- **AND** both have identical bytes (same source URL)
-
-#### Scenario: In-memory repository never sends auth headers to archive.org
-
-- **GIVEN** a session is established (`currentSessionProvider` returns a non-null `Session`)
-- **WHEN** `InMemoryDownloadRepository.download("abc")` is consumed
-- **THEN** the outbound HTTP request to archive.org carries no `Authorization` header
-- **AND** carries no `X-Device-Id` header
+- **GIVEN** an `InMemoryDownloadRepository` and an episode id from the
+  Pingu seed
+- **WHEN** `downloadEpisode(episodeId)` is subscribed to
+- **THEN** the stream emits a sequence
+  `downloading* → readyToPlay → complete` and then closes
+- **AND** all emitted snapshots are `EpisodeDownload` instances (NOT
+  `MovieDownload`)
 
 ### Requirement: Shared HTTP download streaming helper
 
@@ -562,95 +532,66 @@ The function SHALL be called by every `DownloadRepository.findByMovieId(movieId)
 
 ### Requirement: HTTP implementation of DownloadRepository (DioDownloadRepository)
 
-The system SHALL provide an HTTP implementation `DioDownloadRepository implements DownloadRepository` in `lib/infrastructure/downloads/dio.download.repository.dart` that calls the backend `GET /movies/{movie_id}/download` endpoint documented in `API.md` § Téléchargement de fichier vidéo.
+The system SHALL provide an HTTP implementation `DioDownloadRepository
+implements DownloadRepository` in
+`lib/infrastructure/downloads/dio.download.repository.dart` that
+calls both `/movies/<id>/download` (existing) and `/episodes/<id>/download`
+(new).
 
-The class SHALL accept a `Dio` instance via its constructor and SHALL NOT instantiate its own — the `Dio` is provided by `dioProvider`, which has the `AuthInterceptor` registered. The repository itself SHALL NOT add `Authorization`, `X-Device-Id`, or `X-Profile-Id` headers explicitly — these are injected transparently by the interceptor since `/movies/{movie_id}/download` does not start with `/auth/` and is not the `GET /profiles` bootstrap exemption.
+`downloadMovie` SHALL preserve its prior contract (route, Range
+headers, transcode of failures into `DownloadStatus.failed`,
+`cache-control: private, max-age=3600`).
 
-```dart
-DioDownloadRepository({required Dio dio, Directory? downloadsDirectory});
-```
+`downloadEpisode` SHALL be a structural twin: same Range / HEAD
+handling, same header whitelist, same transcode of `DioException` into
+`DownloadStatus.failed`, same proxy follow-of-`302` from the upstream
+Infomaniak CDN. The HTTP path is the only difference.
 
-The optional `downloadsDirectory` SHALL be used only for tests; in production it falls back to `${applicationDocumentsDirectory}/downloads`. The class SHALL maintain an in-process map `Map<String, _ActiveDownload>` for dedup and cancellation, identical in shape and semantics to the in-memory implementation.
+The 403 errors documented in `API.md` are surfaced generically:
 
-`download(String movieId)` SHALL:
+- `403 forbidden_age_category` on `/movies/{id}/download` →
+  `DownloadStatus.failed` with `errorMessage` set from the response.
+- `403 forbidden_age_category` on `/episodes/{id}/download` (the
+  parent series is out of profile range) → idem.
+- `404 not_found` on either endpoint → idem.
 
-1. If a download is already active for `movieId`, return the existing broadcast stream — no second HTTP request.
-2. Otherwise, create a `StreamController<MovieDownload>.broadcast()` and a `CancelToken`, register the `_ActiveDownload`, and start a fire-and-forget call to `streamHttpDownload(...)` with:
-   - `dio` = the constructor-injected `Dio` (with `AuthInterceptor`).
-   - `url` = `'/movies/$movieId/download'` (relative path; resolves against `dio.options.baseUrl == $API_BASE_URL`).
-   - `movieId`, `downloadsDir`, `cancelToken`, `isCancelled` = the active state.
-3. Pipe every event from the helper into the controller and update the cached `currentSnapshot`. Close the controller when the helper closes.
+The repository SHALL NOT do retry or backoff. The repository SHALL
+NOT log the raw `Authorization` header or any session/profile id.
 
-`findByMovieId(String movieId)` SHALL:
+#### Scenario: downloadEpisode emits failed on 403 forbidden_age_category
 
-1. Return the active in-process snapshot if a download is in flight for this `movieId`.
-2. Otherwise, delegate to `inspectDownloadOnDisk(movieId, downloadsDir)` and return its result.
-3. The repository SHALL NOT issue any HTTP request to determine `findByMovieId` — there is no documented `HEAD /movies/{movie_id}/download` or status endpoint, and the contract `findByMovieId` is filesystem-only.
+- **GIVEN** the backend responds 403 with `{"error": {"code":
+  "forbidden_age_category"}}` on `GET /episodes/E1/download`
+- **WHEN** subscribing to `downloadEpisode("E1")`
+- **THEN** the stream emits one `EpisodeDownload` with `status ==
+  failed` and an `errorMessage` deriving from the response body
+- **AND** the stream closes after the failure event
 
-`cancel(String movieId)` SHALL behave identically to the in-memory implementation: cancel the `CancelToken`, await the controller's close, preserve the `.partial`. No HTTP DELETE or cancel call to the backend.
+#### Scenario: downloadEpisode emits failed on 404 not_found
 
-`delete(String movieId)` SHALL behave identically to the in-memory implementation: cancel any active download, then remove both `${movieId}.mp4` and `${movieId}.mp4.partial` if they exist. No HTTP DELETE call to the backend.
+- **GIVEN** the backend responds 404 on `GET /episodes/E1/download`
+- **WHEN** subscribing to `downloadEpisode("E1")`
+- **THEN** the stream emits `status == failed` and closes
 
-The implementation SHALL NOT log raw response bodies, the `Authorization` header, the JWT, or the `X-Profile-Id` value at any log level.
+#### Scenario: HEAD request supported on episode endpoint
 
-The implementation SHALL NOT retry failed requests — retry policy is out of scope for this change.
+- **GIVEN** a Dio call that issues HEAD on `/episodes/E1/download` (used
+  by player size probes)
+- **WHEN** the call is made
+- **THEN** the request method is `HEAD` (not `GET`)
+- **AND** the response carries the same headers as a `GET` would
+- **AND** the body is empty
 
-The implementation SHALL NOT map HTTP error codes (401 / 403 / 404 / 5xx) to specific Domain exception types or specific `errorMessage` discriminators. Any non-2xx outcome is propagated by `streamHttpDownload` as `DownloadStatus.failed` with the dio-supplied error message verbatim. This includes the new `403 movie_above_age_category` code (introduced server-side by the `add-profile-permissions` backend change to enforce the age gate when a `:movie_id` exceeds the active profile's age category) — it is curl-only in practice (the homepage and search results never expose movies the profile cannot watch in HTTP mode), so the absence of a typed Domain exception is intentional. A future change MAY introduce typed sub-statuses (`unauthorized`, `forbidden`, `notFound`, `aboveAge`) if UI rendering requirements emerge.
+#### Scenario: cache-control overrides upstream
 
-#### Scenario: download() targets the relative path /movies/{id}/download
+- **GIVEN** the upstream Infomaniak responds with `cache-control:
+  public, max-age=86400` on either endpoint
+- **WHEN** the client receives the response
+- **THEN** the response's `cache-control` header (as forwarded by the
+  backend) is `private, max-age=3600` (server-side override per
+  API.md § Téléchargement)
 
-- **GIVEN** `dio.options.baseUrl == "http://localhost:8080"`
-- **AND** the backend responds 200 with a 10 MB stream for `GET http://localhost:8080/movies/abc/download`
-- **WHEN** `DioDownloadRepository.download("abc")` is consumed
-- **THEN** the outbound HTTP request method is `GET` on path `/movies/abc/download` against `dio.options.baseUrl`
-- **AND** the stream eventually emits `complete` with `localPath` ending in `abc.mp4`
-
-#### Scenario: AuthInterceptor injects all three headers transparently
-
-- **GIVEN** a session is established, a profile is selected, and `dioProvider` has the `AuthInterceptor` registered
-- **WHEN** `download("abc")` is consumed
-- **THEN** the outbound request to `/movies/abc/download` carries `Authorization: Bearer <jwt>`, `X-Device-Id: <device.id>`, and `X-Profile-Id: <profile.id>` headers
-- **AND** the repository code does not reference these headers explicitly
-
-#### Scenario: Concurrent download() calls for the same movieId share the stream
-
-- **GIVEN** a download for `"abc"` is in flight
-- **WHEN** `download("abc")` is called a second time before the first completes
-- **THEN** no second HTTP request is initiated (verifiable via fake adapter request count)
-- **AND** the second call returns a stream that receives the same events as the first
-
-#### Scenario: findByMovieId after a fresh install returns null
-
-- **GIVEN** the downloads directory is empty
-- **AND** no download is in flight
-- **WHEN** `findByMovieId("abc")` is called
-- **THEN** the result is `null`
-- **AND** no HTTP request is issued
-
-#### Scenario: 4xx is surfaced as DownloadStatus.failed
-
-- **GIVEN** the backend responds 403 with body `{"error": {"code": "movie_above_age_category"}}` on `GET /movies/abc/download`
-- **WHEN** `download("abc")` is consumed
-- **THEN** the stream emits a final event with `status == DownloadStatus.failed` and `errorMessage` non-null
-- **AND** the stream closes
-- **AND** no specific Domain exception is thrown
-
-#### Scenario: cancel() preserves the .partial without backend call
-
-- **GIVEN** a download for `"abc"` is in progress at 5 MB received
-- **WHEN** `cancel("abc")` is called
-- **THEN** no HTTP DELETE or cancel request is issued to the backend
-- **AND** the in-flight GET is cancelled via the `CancelToken` (TCP close)
-- **AND** a `cancelled` event is emitted with `localPath` ending in `abc.mp4.partial`
-- **AND** the `.partial` file still exists on disk
-
-#### Scenario: delete() removes local files without backend call
-
-- **GIVEN** `${downloadsDir}/abc.mp4` exists
-- **WHEN** `delete("abc")` is called
-- **THEN** no HTTP DELETE is issued to the backend
-- **AND** the file is removed from disk
-- **AND** a subsequent `findByMovieId("abc")` returns `null`
+---
 
 ### Requirement: DownloadRepository implementation selection via API_BASE_URL
 
@@ -696,4 +637,108 @@ The selection SHALL be consistent with `authRepositoryProvider`, `profileManagem
 - **GIVEN** a test that overrides `downloadRepositoryProvider` with a fake implementation via `ProviderContainer.test`
 - **WHEN** the consumer reads `downloadRepositoryProvider` in the test
 - **THEN** the fake is returned regardless of the `API_BASE_URL` value the test was compiled with
+
+### Requirement: EpisodeDownload domain model
+
+The system SHALL represent an episode download as an immutable Domain
+value object `EpisodeDownload` in
+`lib/core/domain/model/episode_download.dart` (or co-located with
+`movie_download.dart` — implementation choice). Its fields mirror
+those of `MovieDownload` exactly, with the identifier renamed:
+
+- `episodeId`: stable identifier of the episode being downloaded
+  (string, equals `Episode.id`).
+- `status`: `DownloadStatus` enum value (the same enum used by
+  `MovieDownload` — no new variant).
+- `bytesReceived`: integer.
+- `bytesTotal`: nullable integer.
+- `localPath`: nullable absolute path.
+- `errorMessage`: nullable string, non-null only when `status ==
+  failed`.
+- `updatedAt`: `DateTime`.
+
+The entity SHALL be equatable by `(episodeId, status, bytesReceived,
+updatedAt)`.
+
+`EpisodeDownload` SHALL NOT extend or implement `MovieDownload` (and
+vice-versa). The two types are siblings without a shared sealed
+parent — see `add-series-viewing/design.md` D-7.
+
+#### Scenario: EpisodeDownload during active download
+
+- **GIVEN** an episode download in progress at 500 KB received out of
+  20 MB total
+- **THEN** the `EpisodeDownload` has `status == downloading`,
+  `bytesReceived == 512_000`, `bytesTotal == 20_971_520`, `localPath
+  == null`
+
+#### Scenario: EpisodeDownload at completion
+
+- **GIVEN** an episode download that has just finished
+- **THEN** the `EpisodeDownload` has `status == complete`, `localPath`
+  pointing to a file ending in `.mp4` (no `.partial` suffix)
+
+#### Scenario: MovieDownload and EpisodeDownload are not assignable
+
+- **GIVEN** a `MovieDownload` instance
+- **WHEN** trying to assign it to an `EpisodeDownload` reference
+- **THEN** the Dart analyzer rejects the assignment (different types)
+
+---
+
+### Requirement: DownloadRepository.downloadEpisode
+
+The Domain interface `DownloadRepository` SHALL expose a method jumelle
+to `downloadMovie` for episodes:
+
+```dart
+Stream<EpisodeDownload> downloadEpisode(String episodeId);
+```
+
+`downloadEpisode` SHALL behave identically to `downloadMovie` (same
+broadcast stream semantics, same `notStarted` exclusion, same
+ready-to-play threshold semantics, same terminal-status closure
+behavior) on the episode endpoint.
+
+The HTTP implementation SHALL hit `GET /episodes/<episodeId>/download`
+documented in `API.md` § Téléchargement de fichier vidéo (jumeau
+endpoint of `/movies/<movieId>/download`). All HTTP transport
+guarantees are identical: Range requests, HEAD support, header
+whitelist (`content-type`, `content-length`, `content-range`,
+`accept-ranges`, `last-modified`, `etag`), `cache-control: private,
+max-age=3600` from the server.
+
+The local filesystem layout SHALL namespace episode downloads
+separately from movie downloads to avoid id collisions:
+
+- `<documentsDir>/downloads/movies/<movieId>.mp4` (existing).
+- `<documentsDir>/downloads/episodes/<episodeId>.mp4` (new).
+
+#### Scenario: downloadEpisode emits readyToPlay event
+
+- **GIVEN** an episode download crossing the ready threshold
+- **WHEN** subscribing to `downloadEpisode(episodeId)`
+- **THEN** the stream emits an `EpisodeDownload` with `status ==
+  readyToPlay` and a `localPath` ending in `.mp4.partial` under
+  `/downloads/episodes/`
+
+#### Scenario: downloadEpisode hits the episode endpoint, not the movie endpoint
+
+- **GIVEN** the HTTP backend would respond 200 to either
+  `/movies/x/download` or `/episodes/x/download`
+- **WHEN** `downloadEpisode("x")` is called
+- **THEN** the outbound HTTP request path is `/episodes/x/download`
+- **AND** NOT `/movies/x/download`
+
+#### Scenario: Episode download file is namespaced
+
+- **GIVEN** a movie with `id == "alpha"` that has been downloaded
+- **AND** an episode with `id == "alpha"` (same id, different kind)
+  that is being downloaded
+- **THEN** the two artifacts coexist on disk at
+  `/downloads/movies/alpha.mp4` and
+  `/downloads/episodes/alpha.mp4`
+- **AND** they do NOT overwrite each other
+
+---
 

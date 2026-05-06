@@ -92,7 +92,7 @@ void main() {
       await _flushDebounce(tester);
       await tester.pumpAndSettle();
       expect(
-        find.text('Aucun film ne correspond à « xyz ».'),
+        find.text('Aucun résultat ne correspond à « xyz ».'),
         findsOneWidget,
       );
     });

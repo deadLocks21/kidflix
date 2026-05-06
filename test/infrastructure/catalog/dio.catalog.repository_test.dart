@@ -59,6 +59,7 @@ Map<String, dynamic> _movieJson({
   int durationSeconds = 6000,
   String addedAt = '2026-04-22T10:00:00Z',
 }) => {
+  'kind': 'movie',
   'id': id,
   'title': title,
   'original_title': null,
@@ -78,12 +79,12 @@ Map<String, dynamic> _movieJson({
 };
 
 void main() {
-  group('DioCatalogRepository.listMoviesFor', () {
-    test('issues GET /movies with no query parameter and parses envelope',
+  group('DioCatalogRepository.listCatalog', () {
+    test('issues GET /catalog with no query parameter and parses envelope',
         () async {
       final adapter = _FakeAdapter(
         (_) => _jsonResponse(200, {
-          'movies': [
+          'items': [
             _movieJson(id: 'm1', title: 'Movie 1'),
             _movieJson(id: 'm2', title: 'Movie 2'),
           ],
@@ -91,13 +92,13 @@ void main() {
       );
       final repo = DioCatalogRepository(_makeDio(adapter));
 
-      final movies = await repo.listMoviesFor();
+      final movies = await repo.listCatalog();
 
       expect(movies, hasLength(2));
       expect(movies[0].id, 'm1');
       expect(movies[1].id, 'm2');
       expect(adapter.requests, hasLength(1));
-      expect(adapter.requests.single.path, '/movies');
+      expect(adapter.requests.single.path, '/catalog');
       expect(adapter.requests.single.method, 'GET');
       expect(
         adapter.requests.single.queryParameters,
@@ -109,7 +110,7 @@ void main() {
     test('preserves backend order (no client-side sort)', () async {
       final adapter = _FakeAdapter(
         (_) => _jsonResponse(200, {
-          'movies': [
+          'items': [
             _movieJson(id: 'z', title: 'Z'),
             _movieJson(id: 'a', title: 'A'),
             _movieJson(id: 'm', title: 'M'),
@@ -118,18 +119,18 @@ void main() {
       );
       final repo = DioCatalogRepository(_makeDio(adapter));
 
-      final movies = await repo.listMoviesFor();
+      final movies = await repo.listCatalog();
 
       expect(movies.map((m) => m.id).toList(), ['z', 'a', 'm']);
     });
 
     test('returns empty list when backend has none', () async {
       final adapter = _FakeAdapter(
-        (_) => _jsonResponse(200, {'movies': <Map<String, dynamic>>[]}),
+        (_) => _jsonResponse(200, {'items': <Map<String, dynamic>>[]}),
       );
       final repo = DioCatalogRepository(_makeDio(adapter));
 
-      final movies = await repo.listMoviesFor();
+      final movies = await repo.listCatalog();
 
       expect(movies, isEmpty);
     });
@@ -143,7 +144,7 @@ void main() {
       final repo = DioCatalogRepository(_makeDio(adapter));
 
       await expectLater(
-        repo.listMoviesFor(),
+        repo.listCatalog(),
         throwsA(
           isA<DioException>().having(
             (e) => e.response?.statusCode,
@@ -163,7 +164,7 @@ void main() {
       final repo = DioCatalogRepository(_makeDio(adapter));
 
       await expectLater(
-        repo.listMoviesFor(),
+        repo.listCatalog(),
         throwsA(
           isA<DioException>().having(
             (e) => e.response?.statusCode,
@@ -179,7 +180,7 @@ void main() {
       final repo = DioCatalogRepository(_makeDio(adapter));
 
       await expectLater(
-        repo.listMoviesFor(),
+        repo.listCatalog(),
         throwsA(
           isA<DioException>().having(
             (e) => e.response?.statusCode,
@@ -192,20 +193,20 @@ void main() {
   });
 
   group('DioCatalogRepository.searchMovies', () {
-    test('issues GET /movies/search with only the q query parameter',
+    test('issues GET /catalog/search with only the q query parameter',
         () async {
       final adapter = _FakeAdapter(
         (_) => _jsonResponse(200, {
-          'movies': [_movieJson(id: 'asterix', title: 'Astérix')],
+          'items': [_movieJson(id: 'asterix', title: 'Astérix')],
         }),
       );
       final repo = DioCatalogRepository(_makeDio(adapter));
 
-      final movies = await repo.searchMovies(query: 'astérix');
+      final movies = await repo.searchCatalog(query: 'astérix');
 
       expect(movies, hasLength(1));
       expect(movies.single.id, 'asterix');
-      expect(adapter.requests.single.path, '/movies/search');
+      expect(adapter.requests.single.path, '/catalog/search');
       expect(adapter.requests.single.method, 'GET');
       expect(adapter.requests.single.queryParameters, {'q': 'astérix'});
       expect(
@@ -217,11 +218,11 @@ void main() {
     test('passes the query verbatim — no trim, no lowercase, no accent strip',
         () async {
       final adapter = _FakeAdapter(
-        (_) => _jsonResponse(200, {'movies': <Map<String, dynamic>>[]}),
+        (_) => _jsonResponse(200, {'items': <Map<String, dynamic>>[]}),
       );
       final repo = DioCatalogRepository(_makeDio(adapter));
 
-      await repo.searchMovies(query: '  ASTÉRIX  ');
+      await repo.searchCatalog(query: '  ASTÉRIX  ');
 
       expect(
         adapter.requests.single.queryParameters['q'],
@@ -231,11 +232,11 @@ void main() {
 
     test('forwards an empty query without bail-out', () async {
       final adapter = _FakeAdapter(
-        (_) => _jsonResponse(200, {'movies': <Map<String, dynamic>>[]}),
+        (_) => _jsonResponse(200, {'items': <Map<String, dynamic>>[]}),
       );
       final repo = DioCatalogRepository(_makeDio(adapter));
 
-      final result = await repo.searchMovies(query: '');
+      final result = await repo.searchCatalog(query: '');
 
       expect(result, isEmpty);
       expect(adapter.requests, hasLength(1));
@@ -251,7 +252,7 @@ void main() {
       final repo = DioCatalogRepository(_makeDio(adapter));
 
       await expectLater(
-        repo.searchMovies(query: 'x'),
+        repo.searchCatalog(query: 'x'),
         throwsA(isA<DioException>()),
       );
     });

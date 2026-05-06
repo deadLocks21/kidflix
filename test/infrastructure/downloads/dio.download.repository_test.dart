@@ -12,6 +12,8 @@ void main() {
 
   setUp(() {
     tempDir = Directory.systemTemp.createTempSync('kidflix_dio_dl_');
+    Directory('${tempDir.path}/movies').createSync();
+    Directory('${tempDir.path}/episodes').createSync();
   });
 
   tearDown(() {
@@ -25,7 +27,7 @@ void main() {
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
       final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
 
-      final events = await repo.download('abc').toList();
+      final events = await repo.downloadMovie('abc').toList();
 
       expect(adapter.lastRequest!.method, 'GET');
       expect(adapter.lastRequest!.path, '/movies/abc/download');
@@ -40,13 +42,13 @@ void main() {
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
       final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
 
-      final events = await repo.download('abc').toList();
+      final events = await repo.downloadMovie('abc').toList();
 
       final statuses = events.map((e) => e.status).toList();
       expect(statuses.contains(DownloadStatus.readyToPlay), isTrue);
       expect(statuses.last, DownloadStatus.complete);
       expect(events.last.bytesReceived, totalBytes);
-      expect(File('${tempDir.path}/abc.mp4').existsSync(), isTrue);
+      expect(File('${tempDir.path}/movies/abc.mp4').existsSync(), isTrue);
     });
 
     test('two concurrent download() calls share the same network request', () async {
@@ -55,8 +57,8 @@ void main() {
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
       final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
 
-      final stream1 = repo.download('abc');
-      final stream2 = repo.download('abc');
+      final stream1 = repo.downloadMovie('abc');
+      final stream2 = repo.downloadMovie('abc');
 
       final results = await Future.wait([stream1.toList(), stream2.toList()]);
       expect(adapter.requestCount, 1);
@@ -72,7 +74,7 @@ void main() {
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
       final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
 
-      final events = await repo.download('abc').toList();
+      final events = await repo.downloadMovie('abc').toList();
 
       expect(events.last.status, DownloadStatus.failed);
       expect(events.last.errorMessage, isNotNull);
@@ -86,14 +88,14 @@ void main() {
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
       final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
 
-      final events = await repo.download('abc').toList();
+      final events = await repo.downloadMovie('abc').toList();
 
       expect(events.last.status, DownloadStatus.failed);
       expect(events.last.errorMessage, isNotNull);
     });
 
     test('sends Range header when .partial exists on resume', () async {
-      final partialFile = File('${tempDir.path}/abc.mp4.partial');
+      final partialFile = File('${tempDir.path}/movies/abc.mp4.partial');
       await partialFile.writeAsBytes(Uint8List(1024 * 1024));
 
       const totalBytes = 3 * 1024 * 1024;
@@ -101,7 +103,7 @@ void main() {
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
       final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
 
-      await repo.download('abc').toList();
+      await repo.downloadMovie('abc').toList();
 
       expect(adapter.lastRequest!.headers['range'], 'bytes=1048576-');
     });
@@ -113,21 +115,21 @@ void main() {
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
       final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
 
-      final result = await repo.findByMovieId('abc');
+      final result = await repo.findForMovie('abc');
 
       expect(result, isNull);
       expect(adapter.requestCount, 0);
     });
 
     test('returns complete for an existing .mp4 without HTTP', () async {
-      final file = File('${tempDir.path}/abc.mp4');
+      final file = File('${tempDir.path}/movies/abc.mp4');
       await file.writeAsBytes(Uint8List(50 * 1024 * 1024));
 
       final adapter = _FakeAdapter(totalBytes: 0);
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
       final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
 
-      final result = await repo.findByMovieId('abc');
+      final result = await repo.findForMovie('abc');
 
       expect(result, isNotNull);
       expect(result!.status, DownloadStatus.complete);
@@ -142,7 +144,7 @@ void main() {
       final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
 
       // No download started → cancel completes without error and emits no event.
-      await repo.cancel('unknown');
+      await repo.cancelMovie('unknown');
       expect(adapter.requestCount, 0);
     });
 
@@ -154,7 +156,7 @@ void main() {
 
       final events = <MovieDownload>[];
       final completer = Completer<void>();
-      repo.download('abc').listen(events.add, onDone: completer.complete);
+      repo.downloadMovie('abc').listen(events.add, onDone: completer.complete);
 
       // Wait for the first event to confirm the download has started.
       while (events.isEmpty) {
@@ -163,11 +165,11 @@ void main() {
       // Don't await cancel — the helper waits for the response stream to
       // finish since the FakeAdapter does not honor the cancel token, then
       // sees isCancelled() == true and emits cancelled.
-      unawaited(repo.cancel('abc'));
+      unawaited(repo.cancelMovie('abc'));
       await completer.future;
 
       expect(events.last.status, DownloadStatus.cancelled);
-      expect(File('${tempDir.path}/abc.mp4').existsSync(), isFalse);
+      expect(File('${tempDir.path}/movies/abc.mp4').existsSync(), isFalse);
 
       final deleteRequests = adapter.requests
           .where((r) => r.method == 'DELETE')
@@ -176,8 +178,8 @@ void main() {
     });
 
     test('delete() removes files without HTTP DELETE', () async {
-      final finalFile = File('${tempDir.path}/abc.mp4');
-      final partialFile = File('${tempDir.path}/abc.mp4.partial');
+      final finalFile = File('${tempDir.path}/movies/abc.mp4');
+      final partialFile = File('${tempDir.path}/movies/abc.mp4.partial');
       await finalFile.writeAsBytes(Uint8List(100));
       await partialFile.writeAsBytes(Uint8List(50));
 
@@ -185,7 +187,7 @@ void main() {
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
       final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
 
-      await repo.delete('abc');
+      await repo.deleteMovie('abc');
 
       expect(finalFile.existsSync(), isFalse);
       expect(partialFile.existsSync(), isFalse);
@@ -193,6 +195,52 @@ void main() {
           .where((r) => r.method == 'DELETE')
           .toList();
       expect(deleteRequests, isEmpty);
+    });
+  });
+
+  group('DioDownloadRepository.downloadEpisode', () {
+    test('targets /episodes/{id}/download and parks under episodes/', () async {
+      const totalBytes = 3 * 1024 * 1024;
+      final adapter = _FakeAdapter(totalBytes: totalBytes);
+      final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
+      final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
+
+      final events = await repo.downloadEpisode('ep1').toList();
+
+      expect(adapter.lastRequest!.method, 'GET');
+      expect(adapter.lastRequest!.path, '/episodes/ep1/download');
+      expect(events.last.status, DownloadStatus.complete);
+      expect(events.last.localPath, endsWith('ep1.mp4'));
+      // Episode artifact lives in episodes/ subdir, not movies/.
+      expect(File('${tempDir.path}/episodes/ep1.mp4').existsSync(), isTrue);
+      expect(File('${tempDir.path}/movies/ep1.mp4').existsSync(), isFalse);
+    });
+
+    test('movie and episode with same id coexist on disk', () async {
+      const totalBytes = 1 * 1024 * 1024;
+      final adapter = _FakeAdapter(totalBytes: totalBytes);
+      final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
+      final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
+
+      await repo.downloadMovie('alpha').toList();
+      await repo.downloadEpisode('alpha').toList();
+
+      expect(File('${tempDir.path}/movies/alpha.mp4').existsSync(), isTrue);
+      expect(File('${tempDir.path}/episodes/alpha.mp4').existsSync(), isTrue);
+    });
+
+    test('findForEpisode finds the local artifact', () async {
+      const totalBytes = 1 * 1024 * 1024;
+      final adapter = _FakeAdapter(totalBytes: totalBytes);
+      final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
+      final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
+
+      await repo.downloadEpisode('ep1').toList();
+      final found = await repo.findForEpisode('ep1');
+
+      expect(found, isNotNull);
+      expect(found!.episodeId, 'ep1');
+      expect(found.status, DownloadStatus.complete);
     });
   });
 }

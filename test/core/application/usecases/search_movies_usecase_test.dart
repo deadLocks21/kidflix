@@ -2,16 +2,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kidflix/core/application/dtos/profile.dto.dart';
 import 'package:kidflix/core/application/services/search_application.service.dart';
 import 'package:kidflix/core/application/usecases/search_movies.usecase.dart';
-import 'package:kidflix/core/domain/model/movie.dart';
+import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/services/catalog.repository.dart';
 
 class _FakeRepo implements CatalogRepository {
   @override
-  Future<List<Movie>> listMoviesFor() async => const [];
+  Future<List<Movie>> listCatalog() async => const [];
 
   @override
-  Future<List<Movie>> searchMovies({required String query}) async => [
+  Future<List<Movie>> searchCatalog({required String query}) async => [
     Movie(
       id: 'm1',
       title: 'M1',

@@ -2,13 +2,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kidflix/core/application/dtos/profile.dto.dart';
 import 'package:kidflix/core/application/services/catalog_application.service.dart';
 import 'package:kidflix/core/application/usecases/list_home_catalog.usecase.dart';
-import 'package:kidflix/core/domain/model/movie.dart';
+import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/services/catalog.repository.dart';
 
 class _FakeRepo implements CatalogRepository {
   @override
-  Future<List<Movie>> listMoviesFor() async {
+  Future<List<Movie>> listCatalog() async {
     return [
       Movie(
         id: 'm1',
@@ -25,7 +25,7 @@ class _FakeRepo implements CatalogRepository {
   }
 
   @override
-  Future<List<Movie>> searchMovies({required String query}) async => const [];
+  Future<List<Movie>> searchCatalog({required String query}) async => const [];
 }
 
 void main() {
@@ -42,7 +42,7 @@ void main() {
       ),
     );
     expect(rows, isNotEmpty);
-    final allIds = rows.expand((r) => r.movies.map((m) => m.id)).toSet();
+    final allIds = rows.expand((r) => r.items.map((m) => m.id)).toSet();
     expect(allIds, contains('m1'));
   });
 }

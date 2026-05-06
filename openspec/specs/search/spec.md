@@ -219,84 +219,90 @@ The system SHALL expose an Application-layer service
 `SearchApplicationService` with a method:
 
 ```dart
-Future<List<MovieDto>> searchFor({
+Future<List<CatalogItem>> searchFor({
   required String query,
   required ProfileDto profile,
 });
 ```
 
+The return type is widened from `Future<List<Movie>>` to
+`Future<List<CatalogItem>>` — search now returns a mixed list of
+movies and series matching the query.
+
 The service SHALL:
 
-1. Call `CatalogRepository.searchMovies(query: query)` (no longer
-   passes the active profile's age category — the hierarchical scope
-   is enforced server-side via `X-Profile-Id` in HTTP mode, and is
-   not enforced at all in in-memory mode).
-2. Sort the resulting `List<Movie>` alphabetically by `title`.
-3. Convert each `Movie` to a `MovieDto`.
-4. Return the resulting list.
+1. Call `CatalogRepository.searchCatalog(query: query)` to get the raw
+   matches (the repository now exposes `searchCatalog` instead of
+   `searchMovies` — see `catalog` capability).
+2. Sort the result alphabetically by `title` (the `CatalogItem` getter
+   exposes `title` for both `Movie` and `Series`).
+3. Return the sorted list.
 
-The service SHALL NOT pass `profile.ageCategory` (or any age value)
-to the repository. The `ProfileDto` parameter is preserved on the
-method signature because future ranking/highlighting decisions may
-consume profile metadata other than the age category, but the
-parameter is no longer used as an age filter.
+The `profile` parameter is preserved in the signature for API
+stability with the existing usecase / controller, but is unused by
+the service since age-scope filtering happens server-side.
 
-A usecase `SearchMoviesUseCase` SHALL wrap the service call, accepting
-a `String query` and a `ProfileDto profile`, returning
-`Future<List<MovieDto>>`. The homepage consumes the usecase via its
-Riverpod provider.
+The service SHALL NOT discriminate by `kind` — both movies and series
+matching the query are returned in a single mixed list. The UI search
+results screen SHALL render both kinds via the same `CatalogItemCard`
+widget (see `catalog` capability and `series-viewing` capability for
+the card switch logic).
 
-The service SHALL NOT expose `Movie` Domain entities to the UI.
+#### Scenario: searchFor returns mixed kinds
 
-#### Scenario: Service returns DTOs
+- **GIVEN** the repository's `searchCatalog(query: "pi")` returns
+  `[Movie("Pikachu"), Series("Pingu")]`
+- **WHEN** `searchFor(query: "pi", profile: anyProfile)` is called
+- **THEN** the returned list contains both items
+- **AND** they are sorted alphabetically by title (`Pikachu, Pingu`)
 
-- **WHEN** `searchFor(query, profile)` is called
-- **THEN** each element of the returned list is a `MovieDto`
-- **AND** no `Movie` Domain entity is exposed to the caller
+#### Scenario: searchFor returns empty when no match
 
-#### Scenario: Service does not pass ageCategory to the repository
+- **GIVEN** the repository's `searchCatalog(query: "xyz")` returns `[]`
+- **WHEN** `searchFor(query: "xyz", profile: anyProfile)` is called
+- **THEN** the returned list is empty
 
-- **GIVEN** a profile with `ageCategory == AgeCategory.enfant`
-- **WHEN** `searchFor("o", profile)` is called
-- **THEN** `CatalogRepository.searchMovies` is called with `query: "o"` only (no `upToAgeCategory` parameter)
-- **AND** the service does not inspect or forward `profile.ageCategory` to the repository
+#### Scenario: searchFor sorts by title alphabetically
+
+- **GIVEN** the repository returns
+  `[Series("Zelda"), Movie("Astérix"), Series("Pingu")]`
+- **WHEN** `searchFor(...)` is called
+- **THEN** the returned list is `[Movie("Astérix"), Series("Pingu"),
+  Series("Zelda")]` (alpha order across both kinds)
 
 ---
 
 ### Requirement: Results are rendered as a vertical list of tiles
 
-Search results SHALL be rendered as a `ListView` of vertical tiles.
-Each tile SHALL display:
+The search results screen SHALL render every result via the same
+`CatalogItemCard` widget used on the homepage rows (see `catalog`
+capability). The widget switches on the sealed `CatalogItem` to
+distinguish `Movie` and `Series`:
 
-- A poster thumbnail on the left (ratio 2:3, width ~60 dp), loaded via
-  `CachedNetworkImage` with a neutral grey fallback when
-  `posterUrl == null` or when the fetch fails.
-- The movie `title` on the top right, one line, ellipsis when too long.
-- A single caption line underneath the title with the format
-  `"YYYY · Xh YY"` or `"YYYY · XX min"` (same rules as the homepage
-  movie card, reusing `formatDurationHuman`). When `year` is null, only
-  the duration is displayed.
-- A chevron affordance on the far right.
+- A `Movie` result renders the existing card with caption `"{year} ·
+  {humanizedDuration}"`.
+- A `Series` result renders a card with caption `"{year} ·
+  {seasonsCount} saison(s)"`.
 
-Tapping a tile SHALL open the `MovieDetailModal` for that movie (reusing
-the existing `showMovieDetailModal` helper — no change to the modal
-itself). The Play button inside the modal remains disabled.
+Tapping a result SHALL open the corresponding detail modal (the same
+modal entry point `showCatalogItemDetail(context, item)` for both
+kinds).
 
-#### Scenario: Tile shows poster, title, caption
+#### Scenario: Tapping a series search result opens the series modal
 
-- **GIVEN** a search result movie with `title = "Totoro"`, `year = 1988`, `duration = 86 min`, `posterUrl` set
-- **WHEN** the tile is rendered
-- **THEN** the poster is visible on the left
-- **AND** the title `"Totoro"` is visible on the right
-- **AND** the caption `"1988 · 1h26"` is visible under the title
+- **GIVEN** the search results show a Pingu card
+- **WHEN** the user taps the card
+- **THEN** the series detail modal for Pingu opens (via
+  `showCatalogItemDetail(context, pinguSeries)`)
+- **AND** the modal triggers `seriesRepositoryProvider.findById("pingu")`
+  on open
 
-#### Scenario: Tapping a result opens the detail modal
+#### Scenario: Tapping a movie search result opens the movie modal
 
-- **GIVEN** a visible search result tile
-- **WHEN** the user taps the tile
-- **THEN** the `MovieDetailModal` appears for that movie
-
----
+- **GIVEN** the search results show a Nemo card
+- **WHEN** the user taps the card
+- **THEN** the movie detail modal for Nemo opens
+- **AND** the modal does NOT trigger any series-related call
 
 ### Requirement: Empty, no-results, loading, and error states are distinct
 

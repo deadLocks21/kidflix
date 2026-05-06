@@ -26,7 +26,7 @@ const _movie = MovieDto(
 const _row = CatalogRowDto(
   label: 'Récemment ajoutés',
   type: 'recentlyAdded',
-  movies: [_movie],
+  items: [_movie],
 );
 
 void main() {

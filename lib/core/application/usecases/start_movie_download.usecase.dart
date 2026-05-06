@@ -13,7 +13,7 @@ class StartMovieDownloadUseCase {
 
   Stream<MovieDownloadDto> execute(String movieId) {
     return _repository
-        .download(movieId)
+        .downloadMovie(movieId)
         .map(MovieDownloadDto.fromDomain);
   }
 }

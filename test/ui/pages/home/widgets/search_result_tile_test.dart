@@ -18,7 +18,7 @@ void main() {
         ageCategory: 'enfant',
       );
       await tester.pumpWidget(
-        _hostOf(SearchResultTile(movie: movie, onTap: () {})),
+        _hostOf(SearchResultTile(item: movie, onTap: () {})),
       );
       expect(find.text('Totoro'), findsOneWidget);
       expect(find.text('1988 · 1h26'), findsOneWidget);
@@ -32,7 +32,7 @@ void main() {
         ageCategory: 'enfant',
       );
       await tester.pumpWidget(
-        _hostOf(SearchResultTile(movie: movie, onTap: () {})),
+        _hostOf(SearchResultTile(item: movie, onTap: () {})),
       );
       expect(find.text('42 min'), findsOneWidget);
     });
@@ -47,7 +47,7 @@ void main() {
         ageCategory: 'enfant',
       );
       await tester.pumpWidget(
-        _hostOf(SearchResultTile(movie: movie, onTap: () => taps += 1)),
+        _hostOf(SearchResultTile(item: movie, onTap: () => taps += 1)),
       );
       await tester.tap(find.byType(InkWell));
       await tester.pump();
@@ -62,7 +62,7 @@ void main() {
         ageCategory: 'enfant',
       );
       await tester.pumpWidget(
-        _hostOf(SearchResultTile(movie: movie, onTap: () {})),
+        _hostOf(SearchResultTile(item: movie, onTap: () {})),
       );
       expect(find.byIcon(Icons.chevron_right), findsOneWidget);
     });
