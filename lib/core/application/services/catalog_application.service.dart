@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:kidflix/core/application/dtos/catalog_item.dto.dart';
 import 'package:kidflix/core/application/dtos/catalog_row.dto.dart';
 import 'package:kidflix/core/application/dtos/continue_watching_item.dto.dart';
@@ -33,19 +35,10 @@ class CatalogApplicationService {
   }) : _continueWatching = continueWatching;
 
   static const int _recentlyAddedCap = 20;
-  static const int _sagaThreshold = 2;
-
-  static const List<CatalogRowType> _rowOrder = [
-    CatalogRowType.continueWatching,
-    CatalogRowType.recentlyAdded,
-    CatalogRowType.favorites,
-    CatalogRowType.saga,
-    CatalogRowType.genre,
-    CatalogRowType.neverWatched,
-    CatalogRowType.downloaded,
-  ];
+  static const int _dynamicMinItems = 4;
 
   Future<List<CatalogRowDto>> buildHomeRowsFor(ProfileDto profile) async {
+    final rng = Random();
     final itemsFuture = _repository.listCatalog();
     final cwFuture = _continueWatching == null
         ? Future<List<ContinueWatchingItemDto>>.value(const [])
@@ -59,36 +52,37 @@ class CatalogApplicationService {
     // recently-added row mixes both via _buildRecentlyAddedRowFromAll.
     final movies = items.whereType<Movie>().toList(growable: false);
 
-    final rowDtos = <CatalogRowDto>[];
-    for (final type in _rowOrder) {
-      switch (type) {
-        case CatalogRowType.continueWatching:
-          final dto = _buildContinueWatchingRowDto(cwEntries);
-          if (dto.items.isNotEmpty) rowDtos.add(dto);
-        case CatalogRowType.recentlyAdded:
-          final domain = _buildRecentlyAddedRowFromAll(items);
-          if (domain.items.isNotEmpty) rowDtos.add(_toDto(domain));
-        case CatalogRowType.saga:
-          for (final r in _buildSagaRows(movies)) {
-            if (r.items.isNotEmpty) rowDtos.add(_toDto(r));
-          }
-        case CatalogRowType.genre:
-          for (final r in _buildGenreRows(movies)) {
-            if (r.items.isNotEmpty) rowDtos.add(_toDto(r));
-          }
-        case CatalogRowType.favorites:
-          final r = _buildFavoritesRow(movies);
-          if (r.items.isNotEmpty) rowDtos.add(_toDto(r));
-        case CatalogRowType.neverWatched:
-          final r = _buildNeverWatchedRow(movies);
-          if (r.items.isNotEmpty) rowDtos.add(_toDto(r));
-        case CatalogRowType.downloaded:
-          final r = _buildDownloadedRow(movies);
-          if (r.items.isNotEmpty) rowDtos.add(_toDto(r));
-      }
-    }
+    final fixed = <CatalogRowDto>[];
+    final cwDto = _buildContinueWatchingRowDto(cwEntries);
+    if (cwDto.items.isNotEmpty) fixed.add(cwDto);
+    final recently = _buildRecentlyAddedRowFromAll(items);
+    if (recently.items.isNotEmpty) fixed.add(_toDto(recently));
+    final favorites = _buildFavoritesRow(movies, rng);
+    if (favorites.items.isNotEmpty) fixed.add(_toDto(favorites));
+    final downloaded = _buildDownloadedRow(movies, rng);
+    if (downloaded.items.isNotEmpty) fixed.add(_toDto(downloaded));
 
-    return rowDtos;
+    final dynamicRows = <CatalogRow>[
+      ..._buildSagaRows(movies, rng),
+      ..._buildGenreRows(movies, rng),
+    ];
+    final neverWatched = _buildNeverWatchedRow(movies, rng);
+    if (neverWatched.items.isNotEmpty) dynamicRows.add(neverWatched);
+    final filteredDynamic = dynamicRows
+        .where((r) => r.items.length >= _dynamicMinItems)
+        .toList()
+      ..shuffle(rng);
+
+    return [
+      ...fixed,
+      ...filteredDynamic.map(_toDto),
+    ];
+  }
+
+  List<T> _shuffled<T>(Iterable<T> items, Random rng) {
+    final list = [...items];
+    list.shuffle(rng);
+    return list;
   }
 
   /// Build the Continue Watching row directly into a DTO since the CW
@@ -128,7 +122,7 @@ class CatalogApplicationService {
     );
   }
 
-  List<CatalogRow> _buildSagaRows(List<Movie> movies) {
+  List<CatalogRow> _buildSagaRows(List<Movie> movies, Random rng) {
     final bySaga = <String, List<Movie>>{};
     final labelById = <String, String>{};
     for (final m in movies) {
@@ -139,29 +133,18 @@ class CatalogApplicationService {
     }
     final rows = <CatalogRow>[];
     for (final entry in bySaga.entries) {
-      if (entry.value.length < _sagaThreshold) continue;
-      final sorted = [...entry.value]..sort((a, b) {
-        final yearCompare = (a.year ?? 0).compareTo(b.year ?? 0);
-        if (yearCompare != 0) return yearCompare;
-        return a.title.compareTo(b.title);
-      });
       rows.add(
         CatalogRow(
           label: labelById[entry.key]!,
           type: CatalogRowType.saga,
-          items: <CatalogItem>[...sorted],
+          items: <CatalogItem>[..._shuffled(entry.value, rng)],
         ),
       );
     }
-    rows.sort((a, b) {
-      final sizeCompare = b.items.length.compareTo(a.items.length);
-      if (sizeCompare != 0) return sizeCompare;
-      return a.label.compareTo(b.label);
-    });
     return rows;
   }
 
-  List<CatalogRow> _buildGenreRows(List<Movie> movies) {
+  List<CatalogRow> _buildGenreRows(List<Movie> movies, Random rng) {
     final byGenre = <String, List<Movie>>{};
     for (final m in movies) {
       final primary = m.primaryGenre;
@@ -170,24 +153,22 @@ class CatalogApplicationService {
     }
     final rows = <CatalogRow>[];
     for (final entry in byGenre.entries) {
-      final sorted = [...entry.value]
-        ..sort((a, b) => a.title.compareTo(b.title));
       rows.add(
         CatalogRow(
           label: entry.key,
           type: CatalogRowType.genre,
-          items: <CatalogItem>[...sorted],
+          items: <CatalogItem>[..._shuffled(entry.value, rng)],
         ),
       );
     }
-    rows.sort((a, b) => a.label.compareTo(b.label));
     return rows;
   }
 
   // TODO(MVP): remplacer par le vrai repository lorsque la capability
   // favorites existera (row alimentée par FavoritesRepository).
-  CatalogRow _buildFavoritesRow(List<Movie> movies) {
-    final slice = movies.length >= 5 ? movies.sublist(2, 5) : movies;
+  CatalogRow _buildFavoritesRow(List<Movie> movies, Random rng) {
+    final shuffled = _shuffled(movies, rng);
+    final slice = shuffled.length >= 3 ? shuffled.sublist(0, 3) : shuffled;
     return CatalogRow(
       label: 'Favoris',
       type: CatalogRowType.favorites,
@@ -197,19 +178,20 @@ class CatalogApplicationService {
 
   // TODO(MVP): remplacer par le vrai repository lorsque la capability
   // watch-progress existera (complément inverse de continueWatching).
-  CatalogRow _buildNeverWatchedRow(List<Movie> movies) {
-    final slice = movies.length >= 7 ? movies.sublist(4, 7) : movies;
+  CatalogRow _buildNeverWatchedRow(List<Movie> movies, Random rng) {
+    final shuffled = _shuffled(movies, rng);
     return CatalogRow(
       label: 'Jamais vus',
       type: CatalogRowType.neverWatched,
-      items: <CatalogItem>[...slice],
+      items: <CatalogItem>[...shuffled],
     );
   }
 
   // TODO(MVP): remplacer par le vrai repository lorsque la capability
   // downloads existera (row alimentée par DownloadsRepository / état local).
-  CatalogRow _buildDownloadedRow(List<Movie> movies) {
-    final slice = movies.length >= 4 ? movies.sublist(1, 4) : movies;
+  CatalogRow _buildDownloadedRow(List<Movie> movies, Random rng) {
+    final shuffled = _shuffled(movies, rng);
+    final slice = shuffled.length >= 3 ? shuffled.sublist(0, 3) : shuffled;
     return CatalogRow(
       label: 'Téléchargés',
       type: CatalogRowType.downloaded,
