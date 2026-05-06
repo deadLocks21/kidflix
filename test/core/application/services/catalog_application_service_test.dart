@@ -49,6 +49,27 @@ class _NoopProgressRepo implements WatchProgressRepository {
   Future<List<WatchProgress>> listForProfile(String profileId) async => const [];
 }
 
+class _CannedProgressRepo extends _NoopProgressRepo {
+  final List<WatchProgress> _entries;
+  _CannedProgressRepo(this._entries);
+  @override
+  Future<List<WatchProgress>> listForProfile(String profileId) async =>
+      List.unmodifiable(_entries);
+}
+
+MovieProgress _movieProgress(
+  String movieId, {
+  bool completed = true,
+  int positionSeconds = 0,
+}) =>
+    MovieProgress(
+      profileId: 'p1',
+      movieId: movieId,
+      positionSeconds: positionSeconds,
+      completed: completed,
+      updatedAt: DateTime(2026, 5, 1),
+    );
+
 class _NoopSeriesRepo implements SeriesRepository {
   @override
   Future<Series> findById(String seriesId) async =>
@@ -625,6 +646,59 @@ void main() {
         final row = rows.firstWhere((r) => r.type == 'continueWatching');
         final wrapper = row.items.first as ContinueWatchingCardDto;
         expect(wrapper.progress, 0.0);
+      });
+    });
+
+    group('Jamais vus row', () {
+      test('excludes movies with any recorded progress for the profile',
+          () async {
+        final movies = [for (var i = 0; i < 6; i++) _m(id: 'n$i')];
+        final service = CatalogApplicationService(
+          _FakeRepo(movies),
+          watchProgress: _CannedProgressRepo([
+            _movieProgress('n0'),
+            _movieProgress('n3'),
+          ]),
+        );
+        final rows =
+            await service.buildHomeRowsFor(_profile(AgeCategory.enfant));
+        final neverWatched =
+            rows.firstWhere((r) => r.type == 'neverWatched');
+        expect(
+          neverWatched.items.map((i) => i.id).toSet(),
+          {'n1', 'n2', 'n4', 'n5'},
+        );
+      });
+
+      test('partial progress (not completed) also excludes the movie',
+          () async {
+        final movies = [for (var i = 0; i < 5; i++) _m(id: 'n$i')];
+        final service = CatalogApplicationService(
+          _FakeRepo(movies),
+          watchProgress: _CannedProgressRepo([
+            _movieProgress('n2', completed: false, positionSeconds: 30),
+          ]),
+        );
+        final rows =
+            await service.buildHomeRowsFor(_profile(AgeCategory.enfant));
+        final neverWatched =
+            rows.firstWhere((r) => r.type == 'neverWatched');
+        expect(neverWatched.items.any((i) => i.id == 'n2'), isFalse);
+        expect(neverWatched.items, hasLength(4));
+      });
+
+      test('row is hidden when fewer than 4 unseen movies remain', () async {
+        final movies = [for (var i = 0; i < 5; i++) _m(id: 'n$i')];
+        final service = CatalogApplicationService(
+          _FakeRepo(movies),
+          watchProgress: _CannedProgressRepo([
+            _movieProgress('n0'),
+            _movieProgress('n1'),
+          ]),
+        );
+        final rows =
+            await service.buildHomeRowsFor(_profile(AgeCategory.enfant));
+        expect(rows.where((r) => r.type == 'neverWatched'), isEmpty);
       });
     });
 

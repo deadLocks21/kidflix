@@ -10,13 +10,15 @@ part 'catalog.service_provider.g.dart';
 @Riverpod(keepAlive: true)
 CatalogApplicationService catalogService(Ref ref) {
   final repository = ref.watch(catalogRepositoryProvider);
+  final watchProgress = ref.watch(watchProgressRepositoryProvider);
   final continueWatching = ResolveContinueWatchingUseCase(
-    progressRepo: ref.watch(watchProgressRepositoryProvider),
+    progressRepo: watchProgress,
     catalogRepo: repository,
     seriesRepo: ref.watch(seriesRepositoryProvider),
   );
   return CatalogApplicationService(
     repository,
     continueWatching: continueWatching,
+    watchProgress: watchProgress,
   );
 }

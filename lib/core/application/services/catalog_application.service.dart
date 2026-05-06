@@ -11,7 +11,9 @@ import 'package:kidflix/core/application/usecases/resolve_continue_watching.usec
 import 'package:kidflix/core/domain/model/catalog_row.dart';
 import 'package:kidflix/core/domain/model/download_entry.dart';
 import 'package:kidflix/core/domain/model/media.dart';
+import 'package:kidflix/core/domain/model/watch_progress.dart';
 import 'package:kidflix/core/domain/services/catalog.repository.dart';
+import 'package:kidflix/core/domain/services/watch_progress.repository.dart';
 
 /// Assembles the homepage's ordered list of [CatalogRow] instances for the
 /// active profile.
@@ -30,11 +32,14 @@ import 'package:kidflix/core/domain/services/catalog.repository.dart';
 class CatalogApplicationService {
   final CatalogRepository _repository;
   final ResolveContinueWatchingUseCase? _continueWatching;
+  final WatchProgressRepository? _watchProgress;
 
   const CatalogApplicationService(
     this._repository, {
     ResolveContinueWatchingUseCase? continueWatching,
-  }) : _continueWatching = continueWatching;
+    WatchProgressRepository? watchProgress,
+  })  : _continueWatching = continueWatching,
+        _watchProgress = watchProgress;
 
   static const int _recentlyAddedCap = 20;
   static const int _dynamicMinItems = 4;
@@ -55,9 +60,16 @@ class CatalogApplicationService {
     final cwFuture = _continueWatching == null
         ? Future<List<ContinueWatchingItemDto>>.value(const [])
         : _continueWatching.execute(profile.id);
-    final results = await Future.wait([itemsFuture, cwFuture]);
+    final wpFuture = _watchProgress?.listForProfile(profile.id) ??
+        Future<List<WatchProgress>>.value(const []);
+    final results = await Future.wait([itemsFuture, cwFuture, wpFuture]);
     final items = results[0] as List<CatalogItem>;
     final cwEntries = results[1] as List<ContinueWatchingItemDto>;
+    final progresses = results[2] as List<WatchProgress>;
+    final watchedMovieIds = <String>{
+      for (final p in progresses)
+        if (p is MovieProgress) p.movieId,
+    };
 
     // Saga / genre / favorites / never-watched rows are film-only at
     // MVP (cf. add-series-viewing/design.md D-5). The recently-added
@@ -79,7 +91,7 @@ class CatalogApplicationService {
       ..._buildSagaRows(movies, rng),
       ..._buildGenreRows(movies, rng),
     ];
-    final neverWatched = _buildNeverWatchedRow(movies, rng);
+    final neverWatched = _buildNeverWatchedRow(movies, watchedMovieIds, rng);
     if (neverWatched.items.isNotEmpty) dynamicRows.add(neverWatched);
     final filteredDynamic = dynamicRows
         .where((r) => r.items.length >= _dynamicMinItems)
@@ -223,10 +235,13 @@ class CatalogApplicationService {
     );
   }
 
-  // TODO(MVP): remplacer par le vrai repository lorsque la capability
-  // watch-progress existera (complément inverse de continueWatching).
-  CatalogRow _buildNeverWatchedRow(List<Movie> movies, Random rng) {
-    final shuffled = _shuffled(movies, rng);
+  CatalogRow _buildNeverWatchedRow(
+    List<Movie> movies,
+    Set<String> watchedMovieIds,
+    Random rng,
+  ) {
+    final unseen = movies.where((m) => !watchedMovieIds.contains(m.id));
+    final shuffled = _shuffled(unseen, rng);
     return CatalogRow(
       label: 'Jamais vus',
       type: CatalogRowType.neverWatched,
