@@ -126,13 +126,16 @@ Future<void> _runDownload({
 
     final Response<ResponseBody> response;
     try {
+      // Always send a Range header (even `bytes=0-`): when the server replies
+      // 206 it must include `Content-Range: bytes <a>-<b>/<total>`, which is
+      // our only source of truth for the total size when the body is sent
+      // with `Transfer-Encoding: chunked` (no `Content-Length`). Servers that
+      // don't honor Range will fall through to a 200 with the full body.
       response = await dio.get<ResponseBody>(
         url,
         options: Options(
           responseType: ResponseType.stream,
-          headers: initialBytes > 0
-              ? {HttpHeaders.rangeHeader: 'bytes=$initialBytes-'}
-              : null,
+          headers: {HttpHeaders.rangeHeader: 'bytes=$initialBytes-'},
         ),
         cancelToken: cancelToken,
       );
@@ -153,9 +156,7 @@ Future<void> _runDownload({
       response.headers.value('content-range'),
     );
     final serverAcceptedRange =
-        statusCode == 206 &&
-        initialBytes > 0 &&
-        actualRangeStart == initialBytes;
+        statusCode == 206 && actualRangeStart == initialBytes;
 
     var bytesReceived = serverAcceptedRange ? initialBytes : 0;
     if (!serverAcceptedRange && await partialFile.exists()) {

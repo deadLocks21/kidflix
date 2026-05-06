@@ -39,6 +39,7 @@ class DownloadProgressButton extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: progress,
                 minHeight: 4,
+                backgroundColor: Colors.white,
               ),
             ),
           ),
