@@ -229,6 +229,7 @@ class ListDownloadsUseCase {
       displayTitle: title,
       displayPosterUrl: poster,
       parentSeriesTitle: parentTitle,
+      parentSeriesId: hostSeries?.id,
     );
   }
 

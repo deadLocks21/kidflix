@@ -35,6 +35,11 @@ class DownloadEntry {
   /// movies and for unresolvable episodes.
   final String? parentSeriesTitle;
 
+  /// For episodes: the parent series id, used to dedupe several
+  /// episodes of the same series down to a single series card on the
+  /// home row. Null for movies and for unresolvable episodes.
+  final String? parentSeriesId;
+
   const DownloadEntry({
     required this.mediaId,
     required this.mediaKind,
@@ -46,6 +51,7 @@ class DownloadEntry {
     this.triggeredByProfileId,
     this.displayPosterUrl,
     this.parentSeriesTitle,
+    this.parentSeriesId,
   });
 
   bool get isEpisode => mediaKind == DownloadMediaKind.episode;

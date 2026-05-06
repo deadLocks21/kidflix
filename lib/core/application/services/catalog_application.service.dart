@@ -8,6 +8,7 @@ import 'package:kidflix/core/application/dtos/profile.dto.dart';
 import 'package:kidflix/core/application/dtos/series.dto.dart';
 import 'package:kidflix/core/application/usecases/resolve_continue_watching.usecase.dart';
 import 'package:kidflix/core/domain/model/catalog_row.dart';
+import 'package:kidflix/core/domain/model/download_entry.dart';
 import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/services/catalog.repository.dart';
 
@@ -37,7 +38,10 @@ class CatalogApplicationService {
   static const int _recentlyAddedCap = 20;
   static const int _dynamicMinItems = 4;
 
-  Future<List<CatalogRowDto>> buildHomeRowsFor(ProfileDto profile) async {
+  Future<List<CatalogRowDto>> buildHomeRowsFor(
+    ProfileDto profile, {
+    List<DownloadEntry> downloads = const [],
+  }) async {
     final rng = Random();
     final itemsFuture = _repository.listCatalog();
     final cwFuture = _continueWatching == null
@@ -47,9 +51,10 @@ class CatalogApplicationService {
     final items = results[0] as List<CatalogItem>;
     final cwEntries = results[1] as List<ContinueWatchingItemDto>;
 
-    // Saga / genre / favorites / never-watched / downloaded rows are
-    // film-only at MVP (cf. add-series-viewing/design.md D-5). The
-    // recently-added row mixes both via _buildRecentlyAddedRowFromAll.
+    // Saga / genre / favorites / never-watched rows are film-only at
+    // MVP (cf. add-series-viewing/design.md D-5). The recently-added
+    // and downloaded rows mix both: recently-added via
+    // _buildRecentlyAddedRowFromAll, downloaded via the inventory.
     final movies = items.whereType<Movie>().toList(growable: false);
 
     final fixed = <CatalogRowDto>[];
@@ -59,8 +64,8 @@ class CatalogApplicationService {
     if (recently.items.isNotEmpty) fixed.add(_toDto(recently));
     final favorites = _buildFavoritesRow(movies, rng);
     if (favorites.items.isNotEmpty) fixed.add(_toDto(favorites));
-    final downloaded = _buildDownloadedRow(movies, rng);
-    if (downloaded.items.isNotEmpty) fixed.add(_toDto(downloaded));
+    final downloadedDto = _buildDownloadedRowDto(downloads, items, profile.id);
+    if (downloadedDto.items.isNotEmpty) fixed.add(downloadedDto);
 
     final dynamicRows = <CatalogRow>[
       ..._buildSagaRows(movies, rng),
@@ -187,15 +192,53 @@ class CatalogApplicationService {
     );
   }
 
-  // TODO(MVP): remplacer par le vrai repository lorsque la capability
-  // downloads existera (row alimentée par DownloadsRepository / état local).
-  CatalogRow _buildDownloadedRow(List<Movie> movies, Random rng) {
-    final shuffled = _shuffled(movies, rng);
-    final slice = shuffled.length >= 3 ? shuffled.sublist(0, 3) : shuffled;
-    return CatalogRow(
+  /// Build the Téléchargés row from the active profile's actual
+  /// downloaded inventory. Movie entries map 1:1 to a [MovieDto];
+  /// episode entries are deduplicated by parent series and projected
+  /// to a [SeriesDto]. Entries whose catalog metadata is missing
+  /// (e.g. removed from the catalog after download) are skipped.
+  /// Order follows the inventory's `lastPlayedAt`-desc sort done by
+  /// [ListDownloadsUseCase].
+  ///
+  /// Profile filtering: an entry is shown when its
+  /// `triggeredByProfileId` matches [activeProfileId], OR when it is
+  /// null. Null means the manifest was created without a known
+  /// triggerer (e.g. via the home "Télécharger" button, which doesn't
+  /// capture the active profile yet) — those entries are treated as
+  /// shared and visible to every profile.
+  CatalogRowDto _buildDownloadedRowDto(
+    List<DownloadEntry> downloads,
+    List<CatalogItem> items,
+    String activeProfileId,
+  ) {
+    final byId = <String, CatalogItem>{
+      for (final it in items) it.id: it,
+    };
+    final seenSeriesIds = <String>{};
+    final projected = <CatalogItemDto>[];
+    for (final entry in downloads) {
+      final trigger = entry.triggeredByProfileId;
+      if (trigger != null && trigger != activeProfileId) continue;
+      switch (entry.mediaKind) {
+        case DownloadMediaKind.movie:
+          final candidate = byId[entry.mediaId];
+          if (candidate is Movie) {
+            projected.add(MovieDto.fromDomain(candidate));
+          }
+        case DownloadMediaKind.episode:
+          final seriesId = entry.parentSeriesId;
+          if (seriesId == null) continue;
+          if (!seenSeriesIds.add(seriesId)) continue;
+          final candidate = byId[seriesId];
+          if (candidate is Series) {
+            projected.add(SeriesDto.fromDomain(candidate));
+          }
+      }
+    }
+    return CatalogRowDto(
       label: 'Téléchargés',
-      type: CatalogRowType.downloaded,
-      items: <CatalogItem>[...slice],
+      type: CatalogRowType.downloaded.name,
+      items: List.unmodifiable(projected),
     );
   }
 

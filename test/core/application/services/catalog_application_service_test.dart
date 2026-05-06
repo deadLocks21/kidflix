@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kidflix/core/application/dtos/profile.dto.dart';
 import 'package:kidflix/core/application/services/catalog_application.service.dart';
+import 'package:kidflix/core/domain/model/download_entry.dart';
+import 'package:kidflix/core/domain/model/download_kind.dart';
 import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/services/catalog.repository.dart';
@@ -71,6 +73,34 @@ Movie _m({
     sagaLabel: sagaLabel,
   );
 }
+
+DownloadEntry _movieDownload({
+  required String mediaId,
+  required String? triggeredBy,
+}) =>
+    DownloadEntry(
+      mediaId: mediaId,
+      mediaKind: DownloadMediaKind.movie,
+      kind: DownloadKind.download,
+      bytesOnDisk: 100,
+      displayTitle: mediaId,
+      triggeredByProfileId: triggeredBy,
+    );
+
+DownloadEntry _episodeDownload({
+  required String mediaId,
+  required String parentSeriesId,
+  required String? triggeredBy,
+}) =>
+    DownloadEntry(
+      mediaId: mediaId,
+      mediaKind: DownloadMediaKind.episode,
+      kind: DownloadKind.download,
+      bytesOnDisk: 100,
+      displayTitle: mediaId,
+      triggeredByProfileId: triggeredBy,
+      parentSeriesId: parentSeriesId,
+    );
 
 ProfileDto _profile(AgeCategory category) => ProfileDto(
   id: 'p1',
@@ -253,6 +283,103 @@ void main() {
         genreRows.single.items.map((i) => i.id).toSet(),
         {'m0', 'm1', 'm2', 'm3'},
       );
+    });
+
+    group('Téléchargés row', () {
+      test('is absent when no downloads provided', () async {
+        final service = CatalogApplicationService(
+          _FakeRepo([_m(id: 'm1')]),
+        );
+        final rows = await service.buildHomeRowsFor(
+          _profile(AgeCategory.enfant),
+        );
+        expect(rows.where((r) => r.type == 'downloaded'), isEmpty);
+      });
+
+      test(
+        'shows entries triggered by active profile + entries with no '
+        'known triggerer; skips items triggered by other profiles',
+        () async {
+          final service = CatalogApplicationService(
+            _FakeRepo([_m(id: 'm1'), _m(id: 'm2'), _m(id: 'm3')]),
+          );
+          final downloads = [
+            _movieDownload(mediaId: 'm1', triggeredBy: 'p1'),
+            _movieDownload(mediaId: 'm2', triggeredBy: 'p2'),
+            _movieDownload(mediaId: 'm3', triggeredBy: null),
+          ];
+          final rows = await service.buildHomeRowsFor(
+            _profile(AgeCategory.enfant),
+            downloads: downloads,
+          );
+          final dl = rows.firstWhere((r) => r.type == 'downloaded');
+          expect(dl.items.map((i) => i.id).toList(), ['m1', 'm3']);
+        },
+      );
+
+      test('deduplicates episodes of the same series into one series card',
+          () async {
+        final service = CatalogApplicationService(
+          _FakeRepo([_s(id: 'pingu')]),
+        );
+        final downloads = [
+          _episodeDownload(
+            mediaId: 'pingu-s01e01',
+            parentSeriesId: 'pingu',
+            triggeredBy: 'p1',
+          ),
+          _episodeDownload(
+            mediaId: 'pingu-s01e02',
+            parentSeriesId: 'pingu',
+            triggeredBy: 'p1',
+          ),
+        ];
+        final rows = await service.buildHomeRowsFor(
+          _profile(AgeCategory.enfant),
+          downloads: downloads,
+        );
+        final dl = rows.firstWhere((r) => r.type == 'downloaded');
+        expect(dl.items.map((i) => i.id).toList(), ['pingu']);
+      });
+
+      test('skips entries whose catalog metadata is missing', () async {
+        final service = CatalogApplicationService(
+          _FakeRepo([_m(id: 'm1')]),
+        );
+        final downloads = [
+          _movieDownload(mediaId: 'm1', triggeredBy: 'p1'),
+          _movieDownload(mediaId: 'orphan', triggeredBy: 'p1'),
+          _episodeDownload(
+            mediaId: 'ghost-ep',
+            parentSeriesId: 'ghost-series',
+            triggeredBy: 'p1',
+          ),
+        ];
+        final rows = await service.buildHomeRowsFor(
+          _profile(AgeCategory.enfant),
+          downloads: downloads,
+        );
+        final dl = rows.firstWhere((r) => r.type == 'downloaded');
+        expect(dl.items.map((i) => i.id).toList(), ['m1']);
+      });
+
+      test('preserves order of the downloads list (lastPlayedAt-desc)',
+          () async {
+        final service = CatalogApplicationService(
+          _FakeRepo([_m(id: 'm1'), _m(id: 'm2'), _m(id: 'm3')]),
+        );
+        final downloads = [
+          _movieDownload(mediaId: 'm3', triggeredBy: 'p1'),
+          _movieDownload(mediaId: 'm1', triggeredBy: 'p1'),
+          _movieDownload(mediaId: 'm2', triggeredBy: 'p1'),
+        ];
+        final rows = await service.buildHomeRowsFor(
+          _profile(AgeCategory.enfant),
+          downloads: downloads,
+        );
+        final dl = rows.firstWhere((r) => r.type == 'downloaded');
+        expect(dl.items.map((i) => i.id).toList(), ['m3', 'm1', 'm2']);
+      });
     });
 
     test('Saga row excludes series even when they share a sagaId', () async {

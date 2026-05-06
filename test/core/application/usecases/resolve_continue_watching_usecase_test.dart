@@ -142,6 +142,26 @@ void main() {
       expect(m.completed, isFalse);
     });
 
+    test('completed movie is excluded from Continue Watching', () async {
+      final movie = _movie();
+      final progress = MovieProgress(
+        profileId: 'p1',
+        movieId: 'nemo',
+        positionSeconds: 0,
+        completed: true,
+        updatedAt: DateTime(2026, 5, 6),
+      );
+      final uc = ResolveContinueWatchingUseCase(
+        progressRepo: _FakeProgress([progress]),
+        catalogRepo: _FakeCatalog([movie]),
+        seriesRepo: _FakeSeries({}),
+      );
+
+      final result = await uc.execute('p1');
+
+      expect(result, isEmpty);
+    });
+
     test('in-progress episode produces an inProgress EpisodeContinueDto',
         () async {
       final s1e3 = _ep(id: 's1e3', seasonNumber: 1, episodeNumber: 3);

@@ -1,6 +1,7 @@
 import 'package:kidflix/core/application/dtos/catalog_row.dto.dart';
 import 'package:kidflix/core/application/dtos/profile.dto.dart';
 import 'package:kidflix/core/application/services/catalog_application.service.dart';
+import 'package:kidflix/core/domain/model/download_entry.dart';
 
 /// Builds the ordered list of homepage rows for a given [ProfileDto].
 ///
@@ -11,7 +12,10 @@ class ListHomeCatalogUseCase {
 
   const ListHomeCatalogUseCase(this._service);
 
-  Future<List<CatalogRowDto>> execute(ProfileDto profile) {
-    return _service.buildHomeRowsFor(profile);
+  Future<List<CatalogRowDto>> execute(
+    ProfileDto profile, {
+    List<DownloadEntry> downloads = const [],
+  }) {
+    return _service.buildHomeRowsFor(profile, downloads: downloads);
   }
 }

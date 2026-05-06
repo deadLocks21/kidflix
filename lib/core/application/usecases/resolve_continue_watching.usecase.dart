@@ -58,6 +58,10 @@ class ResolveContinueWatchingUseCase {
     for (final progress in sorted) {
       switch (progress) {
         case MovieProgress():
+          if (progress.completed) {
+            // Nothing to continue once a movie is finished.
+            continue;
+          }
           final movie = moviesById[progress.movieId];
           if (movie == null) {
             // Soft-deleted movie absent from /catalog: skip.

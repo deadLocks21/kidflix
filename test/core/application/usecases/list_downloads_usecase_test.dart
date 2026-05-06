@@ -119,6 +119,7 @@ void main() {
     expect(inv.cache.length, equals(1));
     expect(inv.cache.first.displayTitle, equals('Pingu skateur'));
     expect(inv.cache.first.parentSeriesTitle, equals('Pingu'));
+    expect(inv.cache.first.parentSeriesId, equals('pingu'));
   });
 }
 
