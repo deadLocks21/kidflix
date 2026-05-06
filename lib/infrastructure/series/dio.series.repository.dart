@@ -23,4 +23,13 @@ class DioSeriesRepository implements SeriesRepository {
     final response = await _dio.get<Map<String, dynamic>>('/series/$seriesId');
     return RemoteSeriesDetailDto.fromJson(response.data!).toDomain();
   }
+
+  @override
+  Future<Series> findByIdForProfile(String seriesId, String profileId) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/series/$seriesId',
+      options: Options(headers: {'X-Profile-Id': profileId}),
+    );
+    return RemoteSeriesDetailDto.fromJson(response.data!).toDomain();
+  }
 }

@@ -38,21 +38,33 @@ class ManagementListPage extends ConsumerWidget {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
-            child: ListView.builder(
+            child: ListView(
               padding: const EdgeInsets.all(16),
-              itemCount: profiles.length,
-              itemBuilder: (context, i) {
-                final dto = profiles[i];
-                return ProfileManagementTile(
-                  key: ValueKey(dto.id),
-                  profile: dto,
-                  onEdit: () =>
-                      context.push('/profiles/manage/${dto.id}/edit'),
-                  onDelete: () => _confirmAndDelete(context, ref, dto),
-                  onChangeMainPin: () =>
-                      context.push(AppRoutes.manageMainPin),
-                );
-              },
+              children: [
+                ...profiles.map(
+                  (dto) => ProfileManagementTile(
+                    key: ValueKey(dto.id),
+                    profile: dto,
+                    onEdit: () =>
+                        context.push('/profiles/manage/${dto.id}/edit'),
+                    onDelete: () => _confirmAndDelete(context, ref, dto),
+                    onChangeMainPin: () =>
+                        context.push(AppRoutes.manageMainPin),
+                  ),
+                ),
+                const Divider(height: 32),
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.cloud_download_outlined),
+                    title: const Text('Téléchargements'),
+                    subtitle: const Text(
+                      'Gérer les vidéos téléchargées et le cache',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => context.push(AppRoutes.downloads),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

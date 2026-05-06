@@ -2,10 +2,15 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:kidflix/core/domain/model/download_inventory_record.dart';
+import 'package:kidflix/core/domain/model/download_kind.dart';
 import 'package:kidflix/core/domain/model/episode_download.dart';
 import 'package:kidflix/core/domain/model/movie_download.dart';
 import 'package:kidflix/core/domain/services/download.repository.dart';
+import 'package:kidflix/infrastructure/downloads/download_inventory_helper.dart'
+    as inv;
 import 'package:kidflix/infrastructure/downloads/http_download_stream.dart';
+import 'package:kidflix/infrastructure/downloads/manifest_store.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// HTTP implementation of [DownloadRepository] backed by Dio.
@@ -25,16 +30,25 @@ import 'package:path_provider/path_provider.dart';
 /// Errors (4xx / 5xx / network) are surfaced as [DownloadStatus.failed]
 /// with the dio-supplied message ; no metier-level Domain exception
 /// mapping. The `cancel*` and `delete*` operations are filesystem-only.
+///
+/// Inventory & manifest mutations delegate to the helpers in
+/// [download_inventory_helper.dart] — the manifest is shared across
+/// implementations via a singleton injected at construction time.
 class DioDownloadRepository implements DownloadRepository {
   final Dio _dio;
+  final DownloadManifestStore _manifest;
   final Directory? _downloadsDirOverride;
   final Map<String, _ActiveMovie> _activeMovies = {};
   final Map<String, _ActiveEpisode> _activeEpisodes = {};
   Directory? _cachedRootDir;
 
-  DioDownloadRepository({required Dio dio, Directory? downloadsDirectory})
-    : _dio = dio,
-      _downloadsDirOverride = downloadsDirectory;
+  DioDownloadRepository({
+    required Dio dio,
+    required DownloadManifestStore manifest,
+    Directory? downloadsDirectory,
+  })  : _dio = dio,
+        _manifest = manifest,
+        _downloadsDirOverride = downloadsDirectory;
 
   // ── Movie pipeline ────────────────────────────────────────────────
 
@@ -45,7 +59,15 @@ class DioDownloadRepository implements DownloadRepository {
       return active.currentSnapshot;
     }
     final dir = await _resolveMoviesDir();
-    return inspectDownloadOnDisk(movieId: movieId, downloadsDir: dir);
+    final raw =
+        await inspectDownloadOnDisk(movieId: movieId, downloadsDir: dir);
+    if (raw == null) return null;
+    final kind = await inv.resolveKind(
+      manifest: _manifest,
+      mediaId: movieId,
+      isEpisode: false,
+    );
+    return _withKind(raw, kind);
   }
 
   @override
@@ -76,6 +98,7 @@ class DioDownloadRepository implements DownloadRepository {
     if (await finalFile.exists()) await finalFile.delete();
     final partialFile = File('${dir.path}/$movieId.mp4.partial');
     if (await partialFile.exists()) await partialFile.delete();
+    await _manifest.remove(mediaId: movieId, isEpisode: false);
   }
 
   // ── Episode pipeline ──────────────────────────────────────────────
@@ -91,9 +114,13 @@ class DioDownloadRepository implements DownloadRepository {
       movieId: episodeId,
       downloadsDir: dir,
     );
-    return movieEquivalent == null
-        ? null
-        : _episodeFromMovieDownload(movieEquivalent);
+    if (movieEquivalent == null) return null;
+    final kind = await inv.resolveKind(
+      manifest: _manifest,
+      mediaId: episodeId,
+      isEpisode: true,
+    );
+    return _episodeFromMovieDownload(_withKind(movieEquivalent, kind));
   }
 
   @override
@@ -124,6 +151,76 @@ class DioDownloadRepository implements DownloadRepository {
     if (await finalFile.exists()) await finalFile.delete();
     final partialFile = File('${dir.path}/$episodeId.mp4.partial');
     if (await partialFile.exists()) await partialFile.delete();
+    await _manifest.remove(mediaId: episodeId, isEpisode: true);
+  }
+
+  // ── Inventory & manifest surface ──────────────────────────────────
+
+  @override
+  Future<List<DownloadInventoryRecord>> listAll() async {
+    final root = await _resolveRootDir();
+    return inv.listAllDownloads(rootDir: root, manifest: _manifest);
+  }
+
+  @override
+  Future<int> totalBytesOnDisk() async {
+    final root = await _resolveRootDir();
+    return inv.totalBytesOnDisk(root);
+  }
+
+  @override
+  Future<void> setMovieKind(String movieId, DownloadKind kind) async {
+    final dir = await _resolveMoviesDir();
+    await inv.setKind(
+      manifest: _manifest,
+      mediaId: movieId,
+      isEpisode: false,
+      kind: kind,
+      mediaFileForCreate: File('${dir.path}/$movieId.mp4'),
+    );
+  }
+
+  @override
+  Future<void> setEpisodeKind(String episodeId, DownloadKind kind) async {
+    final dir = await _resolveEpisodesDir();
+    await inv.setKind(
+      manifest: _manifest,
+      mediaId: episodeId,
+      isEpisode: true,
+      kind: kind,
+      mediaFileForCreate: File('${dir.path}/$episodeId.mp4'),
+    );
+  }
+
+  @override
+  Future<void> markPlayed({
+    required String mediaId,
+    required bool isEpisode,
+  }) async {
+    await inv.markPlayed(
+      manifest: _manifest,
+      mediaId: mediaId,
+      isEpisode: isEpisode,
+      now: DateTime.now(),
+    );
+  }
+
+  @override
+  Future<void> cacheMediaMetadata({
+    required String mediaId,
+    required bool isEpisode,
+    required String title,
+    String? posterUrl,
+    String? parentSeriesTitle,
+  }) async {
+    await inv.cacheMetadata(
+      manifest: _manifest,
+      mediaId: mediaId,
+      isEpisode: isEpisode,
+      title: title,
+      posterUrl: posterUrl,
+      parentSeriesTitle: parentSeriesTitle,
+    );
   }
 
   // ── Internals ─────────────────────────────────────────────────────
@@ -159,6 +256,11 @@ class DioDownloadRepository implements DownloadRepository {
   Future<void> _runMovieDownload(String movieId, _ActiveMovie active) async {
     try {
       final dir = await _resolveMoviesDir();
+      final kind = await inv.resolveKind(
+        manifest: _manifest,
+        mediaId: movieId,
+        isEpisode: false,
+      );
       final source = streamHttpDownload(
         dio: _dio,
         url: '/movies/$movieId/download',
@@ -167,7 +269,16 @@ class DioDownloadRepository implements DownloadRepository {
         cancelToken: active.cancelToken,
         isCancelled: () => active.cancelled,
       );
-      await for (final event in source) {
+      await for (final raw in source) {
+        final event = _withKind(raw, kind);
+        if (event.status == DownloadStatus.complete) {
+          await inv.markCompleted(
+            manifest: _manifest,
+            mediaId: movieId,
+            isEpisode: false,
+            now: DateTime.now(),
+          );
+        }
         active.currentSnapshot = event;
         active.controller.add(event);
       }
@@ -183,6 +294,11 @@ class DioDownloadRepository implements DownloadRepository {
   ) async {
     try {
       final dir = await _resolveEpisodesDir();
+      final kind = await inv.resolveKind(
+        manifest: _manifest,
+        mediaId: episodeId,
+        isEpisode: true,
+      );
       final source = streamHttpDownload(
         dio: _dio,
         url: '/episodes/$episodeId/download',
@@ -191,8 +307,17 @@ class DioDownloadRepository implements DownloadRepository {
         cancelToken: active.cancelToken,
         isCancelled: () => active.cancelled,
       );
-      await for (final event in source) {
-        final episodeEvent = _episodeFromMovieDownload(event);
+      await for (final raw in source) {
+        final movieView = _withKind(raw, kind);
+        if (movieView.status == DownloadStatus.complete) {
+          await inv.markCompleted(
+            manifest: _manifest,
+            mediaId: episodeId,
+            isEpisode: true,
+            now: DateTime.now(),
+          );
+        }
+        final episodeEvent = _episodeFromMovieDownload(movieView);
         active.currentSnapshot = episodeEvent;
         active.controller.add(episodeEvent);
       }
@@ -203,14 +328,26 @@ class DioDownloadRepository implements DownloadRepository {
   }
 
   EpisodeDownload _episodeFromMovieDownload(MovieDownload m) => EpisodeDownload(
-    episodeId: m.movieId,
-    status: m.status,
-    bytesReceived: m.bytesReceived,
-    bytesTotal: m.bytesTotal,
-    localPath: m.localPath,
-    errorMessage: m.errorMessage,
-    updatedAt: m.updatedAt,
-  );
+        episodeId: m.movieId,
+        status: m.status,
+        bytesReceived: m.bytesReceived,
+        bytesTotal: m.bytesTotal,
+        localPath: m.localPath,
+        errorMessage: m.errorMessage,
+        updatedAt: m.updatedAt,
+        kind: m.kind,
+      );
+
+  MovieDownload _withKind(MovieDownload m, DownloadKind kind) => MovieDownload(
+        movieId: m.movieId,
+        status: m.status,
+        bytesReceived: m.bytesReceived,
+        bytesTotal: m.bytesTotal,
+        localPath: m.localPath,
+        errorMessage: m.errorMessage,
+        updatedAt: m.updatedAt,
+        kind: kind,
+      );
 }
 
 class _ActiveMovie {

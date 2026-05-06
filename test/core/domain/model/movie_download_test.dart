@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kidflix/core/domain/model/download_kind.dart';
 import 'package:kidflix/core/domain/model/movie_download.dart';
 
 void main() {
@@ -51,6 +52,34 @@ void main() {
       expect(withStatus(DownloadStatus.complete).isPlayable, isTrue);
       expect(withStatus(DownloadStatus.failed).isPlayable, isFalse);
       expect(withStatus(DownloadStatus.cancelled).isPlayable, isFalse);
+    });
+
+    test('kind defaults to DownloadKind.cache', () {
+      final snapshot = MovieDownload(
+        movieId: 'abc',
+        status: DownloadStatus.downloading,
+        bytesReceived: 100,
+        updatedAt: now,
+      );
+      expect(snapshot.kind, equals(DownloadKind.cache));
+    });
+
+    test('kind does NOT participate in equality', () {
+      final asCache = MovieDownload(
+        movieId: 'abc',
+        status: DownloadStatus.downloading,
+        bytesReceived: 100,
+        updatedAt: now,
+      );
+      final asDownload = MovieDownload(
+        movieId: 'abc',
+        status: DownloadStatus.downloading,
+        bytesReceived: 100,
+        updatedAt: now,
+        kind: DownloadKind.download,
+      );
+      expect(asCache, equals(asDownload));
+      expect(asCache.hashCode, equals(asDownload.hashCode));
     });
   });
 }

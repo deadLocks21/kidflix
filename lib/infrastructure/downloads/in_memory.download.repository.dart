@@ -2,48 +2,52 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:kidflix/core/domain/model/download_inventory_record.dart';
+import 'package:kidflix/core/domain/model/download_kind.dart';
 import 'package:kidflix/core/domain/model/episode_download.dart';
 import 'package:kidflix/core/domain/model/movie_download.dart';
 import 'package:kidflix/core/domain/services/download.repository.dart';
+import 'package:kidflix/infrastructure/downloads/download_inventory_helper.dart'
+    as inv;
 import 'package:kidflix/infrastructure/downloads/http_download_stream.dart';
+import 'package:kidflix/infrastructure/downloads/manifest_store.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// In-memory [DownloadRepository] for offline / dev mode (no
 /// `--dart-define=API_BASE_URL`).
 ///
-/// Delegates the HTTP streaming loop to [streamHttpDownload] and the
-/// on-disk inspection to [inspectDownloadOnDisk]. The private [Dio]
-/// instance has no `AuthInterceptor` registered — this is a structural
-/// guarantee that no `Authorization: Bearer <jwt>` is ever sent to the
-/// third-party `archive.org` URL.
+/// Delegates the HTTP streaming loop to [streamHttpDownload], the
+/// on-disk inspection to [inspectDownloadOnDisk], and the manifest /
+/// inventory operations to [inv.listAllDownloads], [inv.totalBytesOnDisk],
+/// [inv.setKind], [inv.markPlayed], [inv.markCompleted], [inv.resolveKind].
+/// The private [Dio] instance has no `AuthInterceptor` registered — this
+/// is a structural guarantee that no `Authorization: Bearer <jwt>` is
+/// ever sent to the third-party `archive.org` URL.
 ///
 /// MVP shortcut: every `movieId` / `episodeId` downloads from the same
 /// hard-coded URL ([stubUrl], Big Buck Bunny). When the HTTP backend
 /// lands, the `DioDownloadRepository` will be used instead — the
 /// contract and local-file behavior stay identical.
-///
-/// File layout under `${documents}/downloads/`:
-/// - `movies/${movieId}.mp4.partial` during download (resumable via Range).
-/// - `movies/${movieId}.mp4` after successful completion.
-/// - `episodes/${episodeId}.mp4.partial` / `.mp4` for the episode pipeline.
 class InMemoryDownloadRepository implements DownloadRepository {
   /// MVP: URL stub unique pour tous les downloads. Remplacée par les
   /// endpoints backend en phase 2.
-  ///
-  /// Source : `archive.org` (Big Buck Bunny, Creative Commons). ~62 MB,
-  /// MP4 H.264 720p ~10 min, `Accept-Ranges: bytes`.
   static const String stubUrl =
       'https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4';
 
   final Dio _dio;
   final Directory? _downloadsDirOverride;
+  final DownloadManifestStore _manifest;
   final Map<String, _ActiveMovie> _activeMovies = {};
   final Map<String, _ActiveEpisode> _activeEpisodes = {};
   Directory? _cachedRootDir;
 
-  InMemoryDownloadRepository({Dio? dio, Directory? downloadsDirectory})
-    : _dio = dio ?? Dio(),
-      _downloadsDirOverride = downloadsDirectory;
+  InMemoryDownloadRepository({
+    required DownloadManifestStore manifest,
+    Dio? dio,
+    Directory? downloadsDirectory,
+  })  : _dio = dio ?? Dio(),
+        _manifest = manifest,
+        _downloadsDirOverride = downloadsDirectory;
 
   // ── Movie pipeline ────────────────────────────────────────────────
 
@@ -54,7 +58,15 @@ class InMemoryDownloadRepository implements DownloadRepository {
       return active.currentSnapshot;
     }
     final dir = await _resolveMoviesDir();
-    return inspectDownloadOnDisk(movieId: movieId, downloadsDir: dir);
+    final raw =
+        await inspectDownloadOnDisk(movieId: movieId, downloadsDir: dir);
+    if (raw == null) return null;
+    final kind = await inv.resolveKind(
+      manifest: _manifest,
+      mediaId: movieId,
+      isEpisode: false,
+    );
+    return _withKind(raw, kind);
   }
 
   @override
@@ -85,6 +97,7 @@ class InMemoryDownloadRepository implements DownloadRepository {
     if (await finalFile.exists()) await finalFile.delete();
     final partialFile = File('${dir.path}/$movieId.mp4.partial');
     if (await partialFile.exists()) await partialFile.delete();
+    await _manifest.remove(mediaId: movieId, isEpisode: false);
   }
 
   // ── Episode pipeline ──────────────────────────────────────────────
@@ -100,9 +113,13 @@ class InMemoryDownloadRepository implements DownloadRepository {
       movieId: episodeId,
       downloadsDir: dir,
     );
-    return movieEquivalent == null
-        ? null
-        : _episodeFromMovieDownload(movieEquivalent);
+    if (movieEquivalent == null) return null;
+    final kind = await inv.resolveKind(
+      manifest: _manifest,
+      mediaId: episodeId,
+      isEpisode: true,
+    );
+    return _episodeFromMovieDownload(_withKind(movieEquivalent, kind));
   }
 
   @override
@@ -133,6 +150,76 @@ class InMemoryDownloadRepository implements DownloadRepository {
     if (await finalFile.exists()) await finalFile.delete();
     final partialFile = File('${dir.path}/$episodeId.mp4.partial');
     if (await partialFile.exists()) await partialFile.delete();
+    await _manifest.remove(mediaId: episodeId, isEpisode: true);
+  }
+
+  // ── Inventory & manifest surface ──────────────────────────────────
+
+  @override
+  Future<List<DownloadInventoryRecord>> listAll() async {
+    final root = await _resolveRootDir();
+    return inv.listAllDownloads(rootDir: root, manifest: _manifest);
+  }
+
+  @override
+  Future<int> totalBytesOnDisk() async {
+    final root = await _resolveRootDir();
+    return inv.totalBytesOnDisk(root);
+  }
+
+  @override
+  Future<void> setMovieKind(String movieId, DownloadKind kind) async {
+    final dir = await _resolveMoviesDir();
+    await inv.setKind(
+      manifest: _manifest,
+      mediaId: movieId,
+      isEpisode: false,
+      kind: kind,
+      mediaFileForCreate: File('${dir.path}/$movieId.mp4'),
+    );
+  }
+
+  @override
+  Future<void> setEpisodeKind(String episodeId, DownloadKind kind) async {
+    final dir = await _resolveEpisodesDir();
+    await inv.setKind(
+      manifest: _manifest,
+      mediaId: episodeId,
+      isEpisode: true,
+      kind: kind,
+      mediaFileForCreate: File('${dir.path}/$episodeId.mp4'),
+    );
+  }
+
+  @override
+  Future<void> markPlayed({
+    required String mediaId,
+    required bool isEpisode,
+  }) async {
+    await inv.markPlayed(
+      manifest: _manifest,
+      mediaId: mediaId,
+      isEpisode: isEpisode,
+      now: DateTime.now(),
+    );
+  }
+
+  @override
+  Future<void> cacheMediaMetadata({
+    required String mediaId,
+    required bool isEpisode,
+    required String title,
+    String? posterUrl,
+    String? parentSeriesTitle,
+  }) async {
+    await inv.cacheMetadata(
+      manifest: _manifest,
+      mediaId: mediaId,
+      isEpisode: isEpisode,
+      title: title,
+      posterUrl: posterUrl,
+      parentSeriesTitle: parentSeriesTitle,
+    );
   }
 
   // ── Internals ─────────────────────────────────────────────────────
@@ -168,6 +255,13 @@ class InMemoryDownloadRepository implements DownloadRepository {
   Future<void> _runMovieDownload(String movieId, _ActiveMovie active) async {
     try {
       final dir = await _resolveMoviesDir();
+      // Hydrate kind once at session start. Mid-stream flips don't
+      // re-emit (cf. spec) so a snapshot of the current kind is enough.
+      final kind = await inv.resolveKind(
+        manifest: _manifest,
+        mediaId: movieId,
+        isEpisode: false,
+      );
       final source = streamHttpDownload(
         dio: _dio,
         url: stubUrl,
@@ -176,7 +270,16 @@ class InMemoryDownloadRepository implements DownloadRepository {
         cancelToken: active.cancelToken,
         isCancelled: () => active.cancelled,
       );
-      await for (final event in source) {
+      await for (final raw in source) {
+        final event = _withKind(raw, kind);
+        if (event.status == DownloadStatus.complete) {
+          await inv.markCompleted(
+            manifest: _manifest,
+            mediaId: movieId,
+            isEpisode: false,
+            now: DateTime.now(),
+          );
+        }
         active.currentSnapshot = event;
         active.controller.add(event);
       }
@@ -192,6 +295,11 @@ class InMemoryDownloadRepository implements DownloadRepository {
   ) async {
     try {
       final dir = await _resolveEpisodesDir();
+      final kind = await inv.resolveKind(
+        manifest: _manifest,
+        mediaId: episodeId,
+        isEpisode: true,
+      );
       final source = streamHttpDownload(
         dio: _dio,
         url: stubUrl,
@@ -200,8 +308,17 @@ class InMemoryDownloadRepository implements DownloadRepository {
         cancelToken: active.cancelToken,
         isCancelled: () => active.cancelled,
       );
-      await for (final event in source) {
-        final episodeEvent = _episodeFromMovieDownload(event);
+      await for (final raw in source) {
+        final movieView = _withKind(raw, kind);
+        if (movieView.status == DownloadStatus.complete) {
+          await inv.markCompleted(
+            manifest: _manifest,
+            mediaId: episodeId,
+            isEpisode: true,
+            now: DateTime.now(),
+          );
+        }
+        final episodeEvent = _episodeFromMovieDownload(movieView);
         active.currentSnapshot = episodeEvent;
         active.controller.add(episodeEvent);
       }
@@ -215,14 +332,26 @@ class InMemoryDownloadRepository implements DownloadRepository {
   /// are typed on [MovieDownload]. We re-key the snapshot into an
   /// [EpisodeDownload] here. Pure projection — no behavior change.
   EpisodeDownload _episodeFromMovieDownload(MovieDownload m) => EpisodeDownload(
-    episodeId: m.movieId,
-    status: m.status,
-    bytesReceived: m.bytesReceived,
-    bytesTotal: m.bytesTotal,
-    localPath: m.localPath,
-    errorMessage: m.errorMessage,
-    updatedAt: m.updatedAt,
-  );
+        episodeId: m.movieId,
+        status: m.status,
+        bytesReceived: m.bytesReceived,
+        bytesTotal: m.bytesTotal,
+        localPath: m.localPath,
+        errorMessage: m.errorMessage,
+        updatedAt: m.updatedAt,
+        kind: m.kind,
+      );
+
+  MovieDownload _withKind(MovieDownload m, DownloadKind kind) => MovieDownload(
+        movieId: m.movieId,
+        status: m.status,
+        bytesReceived: m.bytesReceived,
+        bytesTotal: m.bytesTotal,
+        localPath: m.localPath,
+        errorMessage: m.errorMessage,
+        updatedAt: m.updatedAt,
+        kind: kind,
+      );
 }
 
 class _ActiveMovie {

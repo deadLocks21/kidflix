@@ -24,4 +24,10 @@ abstract interface class SeriesRepository {
   /// `Exception` in in-memory mode) — callers SHALL NOT match on a
   /// Domain exception. The future never completes with `null`.
   Future<Series> findById(String seriesId);
+
+  /// Same as [findById] but issues the request on behalf of [profileId]
+  /// rather than the currently-active profile. Used by the downloads
+  /// manager to find series whose age category exceeds the parent's,
+  /// when a kid downloaded an episode of that series.
+  Future<Series> findByIdForProfile(String seriesId, String profileId);
 }

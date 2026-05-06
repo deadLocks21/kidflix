@@ -24,6 +24,10 @@ class _FakeRepo implements CatalogRepository {
       addedAt: DateTime(2026, 1, 1),
     ),
   ];
+
+  @override
+  Future<List<CatalogItem>> listCatalogForProfile(String profileId) async =>
+      const [];
 }
 
 void main() {

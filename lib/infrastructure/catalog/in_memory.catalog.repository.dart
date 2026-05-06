@@ -65,6 +65,10 @@ class InMemoryCatalogRepository implements CatalogRepository {
   }
 
   @override
+  Future<List<CatalogItem>> listCatalogForProfile(String profileId) =>
+      listCatalog();
+
+  @override
   Future<List<CatalogItem>> searchCatalog({required String query}) async {
     final needle = normalizeForSearch(query);
     bool matches(CatalogItem item) {

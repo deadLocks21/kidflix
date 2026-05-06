@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kidflix/core/application/session_state.dart';
+import 'package:kidflix/infrastructure/providers/download_management.usecases_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/ui/pages/home/home.page.dart';
 import 'package:kidflix/ui/pages/otp_verify/otp_verify.page.dart';
 import 'package:kidflix/ui/pages/phone_entry/phone_entry.page.dart';
+import 'package:kidflix/ui/pages/downloads/downloads_page.dart';
 import 'package:kidflix/ui/pages/profile_management/change_main_pin.page.dart';
 import 'package:kidflix/ui/pages/profile_management/management_list.page.dart';
 import 'package:kidflix/ui/pages/profile_management/management_pin.page.dart';
@@ -29,6 +33,7 @@ abstract final class AppRoutes {
   static const manageMainPin = '/profiles/manage/main/pin';
   static const player = '/player/:movieId';
   static const playerEpisode = '/player/episode/:episodeId';
+  static const downloads = '/profiles/manage/downloads';
 }
 
 String _targetRouteFor(SessionState state) => switch (state) {
@@ -45,6 +50,7 @@ bool _isManageSubRoute(String path) =>
     path == AppRoutes.manage ||
     path == AppRoutes.manageNew ||
     path == AppRoutes.manageMainPin ||
+    path == AppRoutes.downloads ||
     (path.startsWith('/profiles/manage/') && path.endsWith('/edit'));
 
 bool _isPlayerRoute(String path) => path.startsWith('/player/');
@@ -53,8 +59,22 @@ bool _isPlayerRoute(String path) => path.startsWith('/player/');
 GoRouter appRouter(Ref ref) {
   final refresh = ValueNotifier<int>(0);
   ref.onDispose(refresh.dispose);
-  ref.listen<SessionState>(sessionControllerProvider, (_, _) {
+  // Single-shot per app lifetime: at the first transition into an
+  // Authenticated/ProfileSelected/ManagingProfiles state, fire the
+  // cache cleanup pass. Subsequent state changes (logout, profile
+  // switch) do not retrigger. `unawaited(...)` keeps boot non-blocking.
+  var didRunStartupCleanup = false;
+  ref.listen<SessionState>(sessionControllerProvider, (_, next) {
     refresh.value++;
+    if (!didRunStartupCleanup &&
+        (next is Authenticated ||
+            next is ProfileSelected ||
+            next is ManagingProfiles)) {
+      didRunStartupCleanup = true;
+      unawaited(
+        ref.read(runStartupCacheCleanupUseCaseProvider).execute(),
+      );
+    }
   });
   return GoRouter(
     initialLocation: AppRoutes.phone,
@@ -102,6 +122,10 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: AppRoutes.manageMainPin,
         builder: (_, _) => const ChangeMainPinPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.downloads,
+        builder: (_, _) => const DownloadsPage(),
       ),
       GoRoute(
         path: AppRoutes.player,

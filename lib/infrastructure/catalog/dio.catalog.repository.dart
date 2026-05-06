@@ -45,6 +45,18 @@ class DioCatalogRepository implements CatalogRepository {
     return _parseItems(response.data!);
   }
 
+  @override
+  Future<List<CatalogItem>> listCatalogForProfile(String profileId) async {
+    // Pre-set the X-Profile-Id header on this call. The AuthInterceptor
+    // detects the override and forwards as-is instead of replacing with
+    // currentProfileId — see auth.interceptor.dart.
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/catalog',
+      options: Options(headers: {'X-Profile-Id': profileId}),
+    );
+    return _parseItems(response.data!);
+  }
+
   List<CatalogItem> _parseItems(Map<String, dynamic> body) {
     final raw = (body['items'] as List).cast<Map<String, dynamic>>();
     return raw.map(catalogItemFromJson).toList(growable: false);

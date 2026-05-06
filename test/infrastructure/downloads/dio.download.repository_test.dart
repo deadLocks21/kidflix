@@ -6,6 +6,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kidflix/core/domain/model/movie_download.dart';
 import 'package:kidflix/infrastructure/downloads/dio.download.repository.dart';
+import 'package:kidflix/infrastructure/downloads/manifest_store.dart';
+
+DownloadManifestStore _newManifest(Directory dir) =>
+    JsonFileDownloadManifestStore(resolveDownloadsDir: () async => dir);
 
 void main() {
   late Directory tempDir;
@@ -25,7 +29,11 @@ void main() {
       const totalBytes = 3 * 1024 * 1024;
       final adapter = _FakeAdapter(totalBytes: totalBytes);
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
-      final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
+      final repo = DioDownloadRepository(
+        dio: dio,
+        manifest: _newManifest(tempDir),
+        downloadsDirectory: tempDir,
+      );
 
       final events = await repo.downloadMovie('abc').toList();
 
@@ -40,7 +48,11 @@ void main() {
       const totalBytes = 3 * 1024 * 1024;
       final adapter = _FakeAdapter(totalBytes: totalBytes);
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
-      final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
+      final repo = DioDownloadRepository(
+        dio: dio,
+        manifest: _newManifest(tempDir),
+        downloadsDirectory: tempDir,
+      );
 
       final events = await repo.downloadMovie('abc').toList();
 
@@ -55,7 +67,11 @@ void main() {
       const totalBytes = 3 * 1024 * 1024;
       final adapter = _FakeAdapter(totalBytes: totalBytes);
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
-      final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
+      final repo = DioDownloadRepository(
+        dio: dio,
+        manifest: _newManifest(tempDir),
+        downloadsDirectory: tempDir,
+      );
 
       final stream1 = repo.downloadMovie('abc');
       final stream2 = repo.downloadMovie('abc');
@@ -72,7 +88,11 @@ void main() {
         statusCodeOverride: 403,
       );
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
-      final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
+      final repo = DioDownloadRepository(
+        dio: dio,
+        manifest: _newManifest(tempDir),
+        downloadsDirectory: tempDir,
+      );
 
       final events = await repo.downloadMovie('abc').toList();
 
@@ -86,7 +106,11 @@ void main() {
         statusCodeOverride: 500,
       );
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
-      final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
+      final repo = DioDownloadRepository(
+        dio: dio,
+        manifest: _newManifest(tempDir),
+        downloadsDirectory: tempDir,
+      );
 
       final events = await repo.downloadMovie('abc').toList();
 
@@ -101,7 +125,11 @@ void main() {
       const totalBytes = 3 * 1024 * 1024;
       final adapter = _FakeAdapter(totalBytes: totalBytes, honorRange: true);
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
-      final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
+      final repo = DioDownloadRepository(
+        dio: dio,
+        manifest: _newManifest(tempDir),
+        downloadsDirectory: tempDir,
+      );
 
       await repo.downloadMovie('abc').toList();
 
@@ -113,7 +141,11 @@ void main() {
     test('returns null on a fresh install without HTTP', () async {
       final adapter = _FakeAdapter(totalBytes: 0);
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
-      final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
+      final repo = DioDownloadRepository(
+        dio: dio,
+        manifest: _newManifest(tempDir),
+        downloadsDirectory: tempDir,
+      );
 
       final result = await repo.findForMovie('abc');
 
@@ -127,7 +159,11 @@ void main() {
 
       final adapter = _FakeAdapter(totalBytes: 0);
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
-      final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
+      final repo = DioDownloadRepository(
+        dio: dio,
+        manifest: _newManifest(tempDir),
+        downloadsDirectory: tempDir,
+      );
 
       final result = await repo.findForMovie('abc');
 
@@ -141,7 +177,11 @@ void main() {
     test('cancel() on a non-active download is a no-op', () async {
       final adapter = _FakeAdapter(totalBytes: 0);
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
-      final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
+      final repo = DioDownloadRepository(
+        dio: dio,
+        manifest: _newManifest(tempDir),
+        downloadsDirectory: tempDir,
+      );
 
       // No download started → cancel completes without error and emits no event.
       await repo.cancelMovie('unknown');
@@ -152,7 +192,11 @@ void main() {
       const totalBytes = 3 * 1024 * 1024;
       final adapter = _FakeAdapter(totalBytes: totalBytes, chunkDelay: const Duration(milliseconds: 1));
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
-      final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
+      final repo = DioDownloadRepository(
+        dio: dio,
+        manifest: _newManifest(tempDir),
+        downloadsDirectory: tempDir,
+      );
 
       final events = <MovieDownload>[];
       final completer = Completer<void>();
@@ -185,7 +229,11 @@ void main() {
 
       final adapter = _FakeAdapter(totalBytes: 0);
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
-      final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
+      final repo = DioDownloadRepository(
+        dio: dio,
+        manifest: _newManifest(tempDir),
+        downloadsDirectory: tempDir,
+      );
 
       await repo.deleteMovie('abc');
 
@@ -203,7 +251,11 @@ void main() {
       const totalBytes = 3 * 1024 * 1024;
       final adapter = _FakeAdapter(totalBytes: totalBytes);
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
-      final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
+      final repo = DioDownloadRepository(
+        dio: dio,
+        manifest: _newManifest(tempDir),
+        downloadsDirectory: tempDir,
+      );
 
       final events = await repo.downloadEpisode('ep1').toList();
 
@@ -220,7 +272,11 @@ void main() {
       const totalBytes = 1 * 1024 * 1024;
       final adapter = _FakeAdapter(totalBytes: totalBytes);
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
-      final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
+      final repo = DioDownloadRepository(
+        dio: dio,
+        manifest: _newManifest(tempDir),
+        downloadsDirectory: tempDir,
+      );
 
       await repo.downloadMovie('alpha').toList();
       await repo.downloadEpisode('alpha').toList();
@@ -233,7 +289,11 @@ void main() {
       const totalBytes = 1 * 1024 * 1024;
       final adapter = _FakeAdapter(totalBytes: totalBytes);
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
-      final repo = DioDownloadRepository(dio: dio, downloadsDirectory: tempDir);
+      final repo = DioDownloadRepository(
+        dio: dio,
+        manifest: _newManifest(tempDir),
+        downloadsDirectory: tempDir,
+      );
 
       await repo.downloadEpisode('ep1').toList();
       final found = await repo.findForEpisode('ep1');

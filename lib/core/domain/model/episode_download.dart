@@ -1,3 +1,4 @@
+import 'package:kidflix/core/domain/model/download_kind.dart';
 import 'package:kidflix/core/domain/model/movie_download.dart';
 
 /// Immutable snapshot of an episode download.
@@ -23,6 +24,13 @@ class EpisodeDownload {
   final String? errorMessage;
   final DateTime updatedAt;
 
+  /// Hydrated from the manifest at the start of the streaming session.
+  /// Default [DownloadKind.cache] when no manifest entry exists.
+  ///
+  /// Does NOT participate in equality — a flip cache↔download via
+  /// `setEpisodeKind` does not retrigger emission on an active stream.
+  final DownloadKind kind;
+
   const EpisodeDownload({
     required this.episodeId,
     required this.status,
@@ -31,6 +39,7 @@ class EpisodeDownload {
     this.bytesTotal,
     this.localPath,
     this.errorMessage,
+    this.kind = DownloadKind.cache,
   });
 
   /// `true` when [status] allows the player to open [localPath].

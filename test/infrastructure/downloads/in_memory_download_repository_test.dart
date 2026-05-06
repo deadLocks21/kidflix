@@ -4,8 +4,11 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kidflix/core/domain/model/download_kind.dart';
 import 'package:kidflix/core/domain/model/movie_download.dart';
+import 'package:kidflix/infrastructure/downloads/download_manifest_entry.dart';
 import 'package:kidflix/infrastructure/downloads/in_memory.download.repository.dart';
+import 'package:kidflix/infrastructure/downloads/manifest_store.dart';
 
 void main() {
   late Directory tempDir;
@@ -190,6 +193,207 @@ void main() {
       expect(File('${tempDir.path}/episodes/alpha.mp4').existsSync(), isTrue);
     });
   });
+
+  group('InMemoryDownloadRepository — inventory & manifest', () {
+    test('listAll returns empty when no files', () async {
+      final repo = _buildRepo(adapter: _FakeAdapter(totalBytes: 0), dir: tempDir);
+      expect(await repo.listAll(), isEmpty);
+    });
+
+    test('totalBytesOnDisk returns 0 when no files', () async {
+      final repo = _buildRepo(adapter: _FakeAdapter(totalBytes: 0), dir: tempDir);
+      expect(await repo.totalBytesOnDisk(), equals(0));
+    });
+
+    test('listAll surfaces movies and episodes with default kind=cache when no manifest entry',
+        () async {
+      // Seed two .mp4 files manually (no manifest entry).
+      File('${tempDir.path}/movies/abc.mp4').writeAsBytesSync(
+        List.filled(100, 0),
+      );
+      File('${tempDir.path}/episodes/ep-1.mp4').writeAsBytesSync(
+        List.filled(50, 0),
+      );
+
+      final repo = _buildRepo(adapter: _FakeAdapter(totalBytes: 0), dir: tempDir);
+      final all = await repo.listAll();
+
+      expect(all.length, equals(2));
+      final movie = all.firstWhere((r) => r.mediaId == 'abc');
+      expect(movie.isEpisode, isFalse);
+      expect(movie.kind, equals(DownloadKind.cache));
+      expect(movie.bytesOnDisk, equals(100));
+      expect(movie.lastPlayedAt, isNotNull); // file mtime fallback
+
+      final episode = all.firstWhere((r) => r.mediaId == 'ep-1');
+      expect(episode.isEpisode, isTrue);
+      expect(episode.kind, equals(DownloadKind.cache));
+    });
+
+    test('listAll combines .mp4 + .partial size for the same id', () async {
+      File('${tempDir.path}/movies/abc.mp4').writeAsBytesSync(
+        List.filled(60, 0),
+      );
+      File('${tempDir.path}/movies/abc.mp4.partial').writeAsBytesSync(
+        List.filled(15, 0),
+      );
+
+      final repo = _buildRepo(adapter: _FakeAdapter(totalBytes: 0), dir: tempDir);
+      final all = await repo.listAll();
+      expect(all.length, equals(1));
+      expect(all.first.bytesOnDisk, equals(75));
+    });
+
+    test('totalBytesOnDisk sums files across both subdirs', () async {
+      File('${tempDir.path}/movies/abc.mp4').writeAsBytesSync(
+        List.filled(60, 0),
+      );
+      File('${tempDir.path}/movies/abc.mp4.partial').writeAsBytesSync(
+        List.filled(15, 0),
+      );
+      File('${tempDir.path}/episodes/ep-1.mp4').writeAsBytesSync(
+        List.filled(25, 0),
+      );
+
+      final repo = _buildRepo(adapter: _FakeAdapter(totalBytes: 0), dir: tempDir);
+      expect(await repo.totalBytesOnDisk(), equals(100));
+    });
+
+    test('setMovieKind promotes to download and persists in manifest', () async {
+      File('${tempDir.path}/movies/abc.mp4').writeAsBytesSync(
+        List.filled(100, 0),
+      );
+      final repo = _buildRepo(adapter: _FakeAdapter(totalBytes: 0), dir: tempDir);
+
+      await repo.setMovieKind('abc', DownloadKind.download);
+      final all = await repo.listAll();
+      expect(all.first.kind, equals(DownloadKind.download));
+    });
+
+    test('setMovieKind is idempotent', () async {
+      File('${tempDir.path}/movies/abc.mp4').writeAsBytesSync(
+        List.filled(100, 0),
+      );
+      final repo = _buildRepo(adapter: _FakeAdapter(totalBytes: 0), dir: tempDir);
+
+      await repo.setMovieKind('abc', DownloadKind.download);
+      // Second call must not throw and not change state.
+      await repo.setMovieKind('abc', DownloadKind.download);
+      final all = await repo.listAll();
+      expect(all.first.kind, equals(DownloadKind.download));
+    });
+
+    test('setEpisodeKind preserves other manifest fields', () async {
+      File('${tempDir.path}/episodes/ep-1.mp4').writeAsBytesSync(
+        List.filled(100, 0),
+      );
+      final manifest = JsonFileDownloadManifestStore(
+        resolveDownloadsDir: () async => tempDir,
+      );
+      await manifest.upsert(
+        mediaId: 'ep-1',
+        isEpisode: true,
+        entry: DownloadManifestEntry(
+          kind: DownloadKind.cache,
+          completedAt: DateTime.utc(2026, 4, 1),
+          lastPlayedAt: DateTime.utc(2026, 5, 1),
+          triggeredByProfileId: 'marie',
+        ),
+      );
+      final dio = Dio()..httpClientAdapter = _FakeAdapter(totalBytes: 0);
+      final repo = InMemoryDownloadRepository(
+        dio: dio,
+        manifest: manifest,
+        downloadsDirectory: tempDir,
+      );
+
+      await repo.setEpisodeKind('ep-1', DownloadKind.download);
+      final entry = await manifest.findFor(mediaId: 'ep-1', isEpisode: true);
+      expect(entry!.kind, equals(DownloadKind.download));
+      expect(entry.completedAt, equals(DateTime.utc(2026, 4, 1)));
+      expect(entry.lastPlayedAt, equals(DateTime.utc(2026, 5, 1)));
+      expect(entry.triggeredByProfileId, equals('marie'));
+    });
+
+    test('markPlayed bumps lastPlayedAt and creates entry when absent',
+        () async {
+      final repo = _buildRepo(adapter: _FakeAdapter(totalBytes: 0), dir: tempDir);
+
+      await repo.markPlayed(mediaId: 'abc', isEpisode: false);
+
+      final manifest = JsonFileDownloadManifestStore(
+        resolveDownloadsDir: () async => tempDir,
+      );
+      final entry =
+          await manifest.findFor(mediaId: 'abc', isEpisode: false);
+      expect(entry, isNotNull);
+      expect(entry!.kind, equals(DownloadKind.cache));
+      expect(entry.lastPlayedAt, isNotNull);
+    });
+
+    test('deleteMovie removes manifest entry too', () async {
+      File('${tempDir.path}/movies/abc.mp4').writeAsBytesSync(
+        List.filled(100, 0),
+      );
+      final repo = _buildRepo(adapter: _FakeAdapter(totalBytes: 0), dir: tempDir);
+      await repo.setMovieKind('abc', DownloadKind.download);
+
+      await repo.deleteMovie('abc');
+
+      expect(File('${tempDir.path}/movies/abc.mp4').existsSync(), isFalse);
+      final manifest = JsonFileDownloadManifestStore(
+        resolveDownloadsDir: () async => tempDir,
+      );
+      expect(
+        await manifest.findFor(mediaId: 'abc', isEpisode: false),
+        isNull,
+      );
+    });
+
+    test('downloadMovie hydrates kind on emitted snapshots', () async {
+      // Pre-promote a manifest entry so the next download stream picks
+      // it up.
+      final manifest = JsonFileDownloadManifestStore(
+        resolveDownloadsDir: () async => tempDir,
+      );
+      await manifest.upsert(
+        mediaId: 'abc',
+        isEpisode: false,
+        entry: DownloadManifestEntry(kind: DownloadKind.download),
+      );
+
+      final dio = Dio()..httpClientAdapter = _FakeAdapter(totalBytes: 3 * 1024 * 1024);
+      final repo = InMemoryDownloadRepository(
+        dio: dio,
+        manifest: manifest,
+        downloadsDirectory: tempDir,
+      );
+
+      final events = await repo.downloadMovie('abc').toList();
+      expect(events, isNotEmpty);
+      for (final e in events) {
+        expect(e.kind, equals(DownloadKind.download));
+      }
+    });
+
+    test('downloadMovie writes completedAt to manifest on complete',
+        () async {
+      final adapter = _FakeAdapter(totalBytes: 3 * 1024 * 1024);
+      final repo = _buildRepo(adapter: adapter, dir: tempDir);
+
+      await repo.downloadMovie('abc').toList();
+
+      final manifest = JsonFileDownloadManifestStore(
+        resolveDownloadsDir: () async => tempDir,
+      );
+      final entry =
+          await manifest.findFor(mediaId: 'abc', isEpisode: false);
+      expect(entry, isNotNull);
+      expect(entry!.completedAt, isNotNull);
+      // Default kind preserved (cache, since nothing promoted it).
+      expect(entry.kind, equals(DownloadKind.cache));
+    });
+  });
 }
 
 InMemoryDownloadRepository _buildRepo({
@@ -198,7 +402,14 @@ InMemoryDownloadRepository _buildRepo({
 }) {
   final dio = Dio();
   dio.httpClientAdapter = adapter;
-  return InMemoryDownloadRepository(dio: dio, downloadsDirectory: dir);
+  final manifest = JsonFileDownloadManifestStore(
+    resolveDownloadsDir: () async => dir,
+  );
+  return InMemoryDownloadRepository(
+    dio: dio,
+    manifest: manifest,
+    downloadsDirectory: dir,
+  );
 }
 
 /// Simulates an HTTP server that returns [totalBytes] worth of zeros in

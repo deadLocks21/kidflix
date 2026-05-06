@@ -24,6 +24,10 @@ class _RecordingRepo implements CatalogRepository {
     callCount += 1;
     return results;
   }
+
+  @override
+  Future<List<CatalogItem>> listCatalogForProfile(String profileId) async =>
+      throw UnimplementedError();
 }
 
 Movie _m(String id, String title, {AgeCategory age = AgeCategory.enfant}) {

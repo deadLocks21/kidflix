@@ -64,6 +64,9 @@ class _FakeCatalog implements CatalogRepository {
   Future<List<CatalogItem>> listCatalog() async => _items;
   @override
   Future<List<CatalogItem>> searchCatalog({required String query}) async => [];
+  @override
+  Future<List<CatalogItem>> listCatalogForProfile(String profileId) =>
+      listCatalog();
 }
 
 class _FakeSeries implements SeriesRepository {
@@ -77,6 +80,10 @@ class _FakeSeries implements SeriesRepository {
     if (hit == null) throw StateError('not found: $seriesId');
     return hit;
   }
+
+  @override
+  Future<Series> findByIdForProfile(String seriesId, String profileId) =>
+      findById(seriesId);
 }
 
 class _FakeProgress implements WatchProgressRepository {

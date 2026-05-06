@@ -2,6 +2,7 @@ import 'package:kidflix/core/domain/services/download.repository.dart';
 import 'package:kidflix/infrastructure/downloads/dio.download.repository.dart';
 import 'package:kidflix/infrastructure/downloads/in_memory.download.repository.dart';
 import 'package:kidflix/infrastructure/providers/dio.provider.dart';
+import 'package:kidflix/infrastructure/providers/download_manifest_store.provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'download.repository_provider.g.dart';
@@ -25,9 +26,13 @@ part 'download.repository_provider.g.dart';
 /// evaluated at compile time, not at runtime.
 @Riverpod(keepAlive: true)
 DownloadRepository downloadRepository(Ref ref) {
+  final manifest = ref.watch(downloadManifestStoreProvider);
   const baseUrl = String.fromEnvironment('API_BASE_URL');
   if (baseUrl.isEmpty) {
-    return InMemoryDownloadRepository();
+    return InMemoryDownloadRepository(manifest: manifest);
   }
-  return DioDownloadRepository(dio: ref.watch(dioProvider));
+  return DioDownloadRepository(
+    dio: ref.watch(dioProvider),
+    manifest: manifest,
+  );
 }

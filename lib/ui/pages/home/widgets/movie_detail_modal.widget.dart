@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
+import 'package:kidflix/infrastructure/providers/download.repository_provider.dart';
 import 'package:kidflix/shared/duration_format.dart';
+import 'package:kidflix/ui/pages/home/widgets/download_intent_button.widget.dart';
 
 /// Width threshold to choose between dialog and bottom-sheet presentation.
 const double _adaptiveBreakpointDp = 600;
@@ -95,7 +100,22 @@ class MovieDetailContent extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(_metaLine(movie), style: theme.textTheme.bodyMedium),
                 const SizedBox(height: 16),
-                _PlayButton(movieId: movie.id),
+                Row(
+                  children: [
+                    _PlayButton(
+                      movieId: movie.id,
+                      title: movie.title,
+                      posterUrl: movie.posterUrl,
+                    ),
+                    const SizedBox(width: 8),
+                    DownloadIntentButton(
+                      mediaId: movie.id,
+                      isEpisode: false,
+                      title: movie.title,
+                      posterUrl: movie.posterUrl,
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 24),
                 Text(movie.synopsis, style: theme.textTheme.bodyMedium),
                 if (movie.genres.isNotEmpty) ...[
@@ -184,17 +204,34 @@ class _Backdrop extends StatelessWidget {
   }
 }
 
-class _PlayButton extends StatelessWidget {
+class _PlayButton extends ConsumerWidget {
   final String movieId;
+  final String title;
+  final String? posterUrl;
 
-  const _PlayButton({required this.movieId});
+  const _PlayButton({
+    required this.movieId,
+    required this.title,
+    this.posterUrl,
+  });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return FilledButton.icon(
       icon: const Icon(Icons.play_arrow),
       label: const Text('Lire'),
       onPressed: () {
+        // Pre-cache display metadata so the manager can resolve this
+        // movie even if the parent profile cannot see it via /catalog.
+        // Best-effort, fire-and-forget.
+        unawaited(
+          ref.read(downloadRepositoryProvider).cacheMediaMetadata(
+                mediaId: movieId,
+                isEpisode: false,
+                title: title,
+                posterUrl: posterUrl,
+              ),
+        );
         Navigator.of(context).pop();
         context.go('/player/$movieId');
       },

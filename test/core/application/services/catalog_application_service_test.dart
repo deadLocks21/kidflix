@@ -16,6 +16,10 @@ class _FakeRepo implements CatalogRepository {
   @override
   Future<List<CatalogItem>> searchCatalog({required String query}) async =>
       const [];
+
+  @override
+  Future<List<CatalogItem>> listCatalogForProfile(String profileId) async =>
+      const [];
 }
 
 Series _s({

@@ -56,9 +56,18 @@ class AuthInterceptor extends Interceptor {
         options.path == '/profiles' &&
         options.method.toUpperCase() == 'GET';
     if (!isProfilesBootstrap) {
-      final profileId = _currentProfileId();
-      if (profileId != null) {
-        options.headers['X-Profile-Id'] = profileId;
+      // A caller MAY pre-set `X-Profile-Id` via per-call `Options.headers`
+      // to query the backend on behalf of a profile other than the
+      // currently-active one (e.g. the downloads manager unioning
+      // catalog calls across every family profile to find titles for
+      // items downloaded by any kid). The interceptor preserves such an
+      // explicit override and only injects from `_currentProfileId()`
+      // when no override is present.
+      if (!options.headers.containsKey('X-Profile-Id')) {
+        final profileId = _currentProfileId();
+        if (profileId != null) {
+          options.headers['X-Profile-Id'] = profileId;
+        }
       }
     }
     handler.next(options);

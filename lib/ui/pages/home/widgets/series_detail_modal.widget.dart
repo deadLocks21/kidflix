@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,10 +7,13 @@ import 'package:go_router/go_router.dart';
 import 'package:kidflix/core/application/session_state.dart';
 import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/watch_progress.dart';
+import 'package:kidflix/infrastructure/providers/download.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/series.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/infrastructure/providers/watch_progress.repository_provider.dart';
 import 'package:kidflix/shared/duration_format.dart';
+import 'package:kidflix/ui/pages/home/widgets/download_intent_button.widget.dart';
+import 'package:kidflix/ui/pages/home/widgets/season_download_button.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/series/play_label.dart';
 
 const double _adaptiveBreakpointDp = 600;
@@ -292,6 +297,7 @@ class _SeasonList extends StatelessWidget {
         for (final s in ordered)
           _SeasonSection(
             season: s,
+            seriesTitle: series.title,
             latestProgress: latestProgress,
             initiallyExpanded: s.seasonNumber == defaultSeasonNumber,
           ),
@@ -317,11 +323,13 @@ class _SeasonList extends StatelessWidget {
 
 class _SeasonSection extends StatelessWidget {
   final Season season;
+  final String seriesTitle;
   final EpisodeProgress? latestProgress;
   final bool initiallyExpanded;
 
   const _SeasonSection({
     required this.season,
+    required this.seriesTitle,
     required this.initiallyExpanded,
     this.latestProgress,
   });
@@ -333,7 +341,18 @@ class _SeasonSection extends StatelessWidget {
         : 'Saison ${season.seasonNumber}';
     return ExpansionTile(
       initiallyExpanded: initiallyExpanded,
-      title: Text(label),
+      title: Row(
+        children: [
+          Expanded(child: Text(label)),
+          if (season.episodes.isNotEmpty)
+            SeasonDownloadButton(
+              seriesId: season.episodes.first.seriesId,
+              seasonNumber: season.seasonNumber,
+              episodeIds:
+                  season.episodes.map((e) => e.id).toList(growable: false),
+            ),
+        ],
+      ),
       subtitle: Text(
         season.episodes.length <= 1
             ? '${season.episodes.length} épisode'
@@ -343,6 +362,7 @@ class _SeasonSection extends StatelessWidget {
         for (final ep in season.episodes)
           _EpisodeTile(
             episode: ep,
+            parentSeriesTitle: seriesTitle,
             isCurrent: latestProgress?.episodeId == ep.id,
           ),
       ],
@@ -350,16 +370,21 @@ class _SeasonSection extends StatelessWidget {
   }
 }
 
-class _EpisodeTile extends StatelessWidget {
+class _EpisodeTile extends ConsumerWidget {
   final Episode episode;
+  final String parentSeriesTitle;
   final bool isCurrent;
 
-  const _EpisodeTile({required this.episode, this.isCurrent = false});
+  const _EpisodeTile({
+    required this.episode,
+    required this.parentSeriesTitle,
+    this.isCurrent = false,
+  });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final ref = episode.seasonNumber == 0
+    final epRef = episode.seasonNumber == 0
         ? 'S0E${episode.episodeNumber}'
         : 'E${episode.episodeNumber}';
     return ListTile(
@@ -372,7 +397,7 @@ class _EpisodeTile extends StatelessWidget {
         ),
       ),
       title: Text(
-        '$ref · ${episode.title}',
+        '$epRef · ${episode.title}',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: isCurrent
@@ -388,7 +413,25 @@ class _EpisodeTile extends StatelessWidget {
           color: theme.colorScheme.onSurfaceVariant,
         ),
       ),
+      trailing: DownloadIntentButton(
+        mediaId: episode.id,
+        isEpisode: true,
+        title: '$epRef · ${episode.title}',
+        posterUrl: episode.thumbUrl,
+        parentSeriesTitle: parentSeriesTitle,
+      ),
       onTap: () {
+        // Pre-cache so the manager resolves this episode regardless
+        // of the parent's /catalog visibility.
+        unawaited(
+          ref.read(downloadRepositoryProvider).cacheMediaMetadata(
+                mediaId: episode.id,
+                isEpisode: true,
+                title: '$epRef · ${episode.title}',
+                posterUrl: episode.thumbUrl,
+                parentSeriesTitle: parentSeriesTitle,
+              ),
+        );
         Navigator.of(context).pop();
         context.go('/player/episode/${episode.id}');
       },

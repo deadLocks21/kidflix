@@ -1,14 +1,25 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kidflix/core/application/dtos/movie_download.dto.dart';
 import 'package:kidflix/core/application/usecases/start_episode_download.usecase.dart';
+import 'package:kidflix/core/domain/model/download_inventory_record.dart';
+import 'package:kidflix/core/domain/model/download_kind.dart';
 import 'package:kidflix/core/domain/model/episode_download.dart';
 import 'package:kidflix/core/domain/model/movie_download.dart';
 import 'package:kidflix/core/domain/services/download.repository.dart';
+import 'package:kidflix/infrastructure/downloads/manifest_store.dart';
 
 void main() {
   test('maps every domain event to its DTO in order', () async {
     final fake = _FakeRepo();
-    final useCase = StartEpisodeDownloadUseCase(fake);
+    final tempDir = Directory.systemTemp.createTempSync('kidflix-usecase-');
+    final useCase = StartEpisodeDownloadUseCase(
+      repository: fake,
+      manifest: JsonFileDownloadManifestStore(
+        resolveDownloadsDir: () async => tempDir,
+      ),
+    );
     final events = await useCase.execute('ep-1').toList();
 
     expect(events, hasLength(3));
@@ -64,4 +75,27 @@ class _FakeRepo implements DownloadRepository {
   Future<void> cancelMovie(String movieId) async {}
   @override
   Future<void> deleteMovie(String movieId) async {}
+
+  @override
+  Future<List<DownloadInventoryRecord>> listAll() async => const [];
+  @override
+  Future<int> totalBytesOnDisk() async => 0;
+  @override
+  Future<void> setMovieKind(String movieId, DownloadKind kind) async {}
+  @override
+  Future<void> setEpisodeKind(String episodeId, DownloadKind kind) async {}
+  @override
+  Future<void> markPlayed({
+    required String mediaId,
+    required bool isEpisode,
+  }) async {}
+
+  @override
+  Future<void> cacheMediaMetadata({
+    required String mediaId,
+    required bool isEpisode,
+    required String title,
+    String? posterUrl,
+    String? parentSeriesTitle,
+  }) async {}
 }

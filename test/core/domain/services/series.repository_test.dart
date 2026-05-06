@@ -16,6 +16,10 @@ class _FakeSeriesRepository implements SeriesRepository {
     if (hit == null) throw StateError('not found: $seriesId');
     return hit;
   }
+
+  @override
+  Future<Series> findByIdForProfile(String seriesId, String profileId) =>
+      findById(seriesId);
 }
 
 Series _series(String id) => Series(

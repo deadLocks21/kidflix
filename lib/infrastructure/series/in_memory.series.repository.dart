@@ -33,6 +33,10 @@ class InMemorySeriesRepository implements SeriesRepository {
     return hit.single;
   }
 
+  @override
+  Future<Series> findByIdForProfile(String seriesId, String profileId) =>
+      findById(seriesId);
+
   static List<Series> _seed() {
     final addedRef = DateTime(2026, 5, 4);
     DateTime added(int daysAgo) => addedRef.subtract(Duration(days: daysAgo));

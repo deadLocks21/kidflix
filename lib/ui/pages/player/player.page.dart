@@ -271,13 +271,17 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     switch (widget.media) {
       case PlayerMovieRef(:final movieId):
         final useCase = ref.read(startMovieDownloadUseCaseProvider);
-        _movieDownloadSub = useCase.execute(movieId).listen(
+        _movieDownloadSub = useCase
+            .execute(movieId, activeProfileId: _profileId)
+            .listen(
           (dto) => _onDownloadEvent(_viewFromMovie(dto)),
           onError: _onDownloadError,
         );
       case PlayerEpisodeRef(:final episodeId):
         final useCase = ref.read(startEpisodeDownloadUseCaseProvider);
-        _episodeDownloadSub = useCase.execute(episodeId).listen(
+        _episodeDownloadSub = useCase
+            .execute(episodeId, activeProfileId: _profileId)
+            .listen(
           (dto) => _onDownloadEvent(_viewFromEpisode(dto)),
           onError: _onDownloadError,
         );

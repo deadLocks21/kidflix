@@ -1,3 +1,5 @@
+import 'package:kidflix/core/domain/model/download_kind.dart';
+
 /// Progression states a movie download goes through, from never-started to
 /// terminal success or failure.
 ///
@@ -34,6 +36,13 @@ class MovieDownload {
   final String? errorMessage;
   final DateTime updatedAt;
 
+  /// Hydrated from the manifest at the start of the streaming session.
+  /// Default [DownloadKind.cache] when no manifest entry exists.
+  ///
+  /// Does NOT participate in equality — a flip cache↔download via
+  /// `setMovieKind` does not retrigger emission on an active stream.
+  final DownloadKind kind;
+
   const MovieDownload({
     required this.movieId,
     required this.status,
@@ -42,6 +51,7 @@ class MovieDownload {
     this.bytesTotal,
     this.localPath,
     this.errorMessage,
+    this.kind = DownloadKind.cache,
   });
 
   /// `true` when [status] allows the player to open [localPath] — either

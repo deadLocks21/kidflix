@@ -34,4 +34,22 @@ abstract interface class CatalogRepository {
   /// service's responsibility. The repository does NOT enforce a
   /// minimum query length — that is the UI/controller's responsibility.
   Future<List<CatalogItem>> searchCatalog({required String query});
+
+  /// Returns the catalog items visible to a SPECIFIC profile, identified
+  /// by [profileId], regardless of who the currently-active profile is.
+  ///
+  /// Used by the downloads manager which needs to resolve metadata for
+  /// items downloaded by ANY family profile. Calling
+  /// `listCatalog()` from the parent profile would only see items at the
+  /// parent's exact age category (per `API.md` § Catalogue), missing the
+  /// kid-targeted downloads. Iterating over every profile and unioning
+  /// the results bridges that gap without backend changes.
+  ///
+  /// Implementations:
+  /// * HTTP — issues `GET /catalog` with `X-Profile-Id: $profileId`
+  ///   pre-set on the per-call `Options.headers`, which the
+  ///   `AuthInterceptor` preserves.
+  /// * In-memory — equivalent to [listCatalog] (no profile filter
+  ///   applied at this layer in the in-memory implementation).
+  Future<List<CatalogItem>> listCatalogForProfile(String profileId);
 }
