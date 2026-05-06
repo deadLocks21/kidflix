@@ -39,11 +39,18 @@ class CatalogApplicationService {
   static const int _recentlyAddedCap = 20;
   static const int _dynamicMinItems = 4;
 
+  /// [shuffleSeed] keeps the row/items shuffle stable across rebuilds.
+  /// Production wiring passes a session-scoped seed (cf.
+  /// `homeShuffleSeedProvider`) so invalidations triggered by unrelated
+  /// providers (e.g. `downloadInventoryProvider` after a new download)
+  /// don't reshuffle the entire homepage. Tests omit it for the legacy
+  /// non-deterministic behaviour.
   Future<List<CatalogRowDto>> buildHomeRowsFor(
     ProfileDto profile, {
     List<DownloadEntry> downloads = const [],
+    int? shuffleSeed,
   }) async {
-    final rng = Random();
+    final rng = shuffleSeed != null ? Random(shuffleSeed) : Random();
     final itemsFuture = _repository.listCatalog();
     final cwFuture = _continueWatching == null
         ? Future<List<ContinueWatchingItemDto>>.value(const [])

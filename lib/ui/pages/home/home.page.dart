@@ -112,17 +112,22 @@ class _HomeBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return rows.when(
-      loading: () => const CatalogSkeleton(),
-      error: (_, _) => const _ErrorState(),
-      data: (list) => list.isEmpty
+    // When the provider refreshes (e.g. invalidated after a download
+    // starts), we keep showing the previous list rather than flashing
+    // back to the skeleton — otherwise the ListView gets torn down and
+    // the user loses their scroll position.
+    if (rows.hasValue) {
+      final list = rows.value!;
+      return list.isEmpty
           ? const _EmptyState()
           : _CatalogList(
               rows: list,
               onMovieTap: onMovieTap,
               onSeriesTap: onSeriesTap,
-            ),
-    );
+            );
+    }
+    if (rows.hasError) return const _ErrorState();
+    return const CatalogSkeleton();
   }
 }
 

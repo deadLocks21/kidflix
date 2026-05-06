@@ -313,6 +313,7 @@ class _InFlightButtonState extends ConsumerState<_InFlightButton> {
   Timer? _timer;
   int _bytesReceived = 0;
   int? _bytesTotal;
+  bool _cancelling = false;
 
   @override
   void initState() {
@@ -350,11 +351,32 @@ class _InFlightButtonState extends ConsumerState<_InFlightButton> {
     });
   }
 
+  Future<void> _onCancel() async {
+    if (_cancelling) return;
+    setState(() => _cancelling = true);
+    try {
+      // Full reset: cancel the in-flight transfer AND wipe the partial
+      // file + manifest entry, so the item disappears from the manager.
+      // The user can re-tap "Télécharger" to start over.
+      final repo = ref.read(downloadRepositoryProvider);
+      if (widget.isEpisode) {
+        await repo.deleteEpisode(widget.mediaId);
+      } else {
+        await repo.deleteMovie(widget.mediaId);
+      }
+      ref.invalidate(downloadInventoryProvider);
+      ref.invalidate(storageSummaryProvider);
+    } finally {
+      if (mounted) setState(() => _cancelling = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return DownloadProgressButton(
       bytesReceived: _bytesReceived,
       bytesTotal: _bytesTotal,
+      onCancel: _cancelling ? null : _onCancel,
     );
   }
 }

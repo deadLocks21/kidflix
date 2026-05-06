@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:kidflix/core/application/dtos/catalog_row.dto.dart';
 import 'package:kidflix/core/application/dtos/profile.dto.dart';
 import 'package:kidflix/core/application/session_state.dart';
@@ -14,6 +16,14 @@ ListHomeCatalogUseCase listHomeCatalogUseCase(Ref ref) {
   return ListHomeCatalogUseCase(ref.watch(catalogServiceProvider));
 }
 
+/// Session-stable seed for the home shuffle. `keepAlive` so it survives
+/// across `homeCatalogRows` rebuilds — without this, every invalidation
+/// (e.g. `downloadInventoryProvider` after starting a download) would
+/// reshuffle every row, making the home appear to "reset" on a tap.
+/// Refreshes only on full app restart.
+@Riverpod(keepAlive: true)
+int homeShuffleSeed(Ref ref) => Random().nextInt(1 << 32);
+
 /// Builds the list of homepage rows for the active profile. Re-computes
 /// automatically when the session transitions to a different profile,
 /// and when the download inventory changes (new download, mark as
@@ -29,6 +39,11 @@ Future<List<CatalogRowDto>> homeCatalogRows(Ref ref) async {
   }
   final profile = ProfileDto.fromDomain(state.profile);
   final inventory = await ref.watch(downloadInventoryProvider.future);
+  final seed = ref.watch(homeShuffleSeedProvider);
   final useCase = ref.watch(listHomeCatalogUseCaseProvider);
-  return useCase.execute(profile, downloads: inventory.downloads);
+  return useCase.execute(
+    profile,
+    downloads: inventory.downloads,
+    shuffleSeed: seed,
+  );
 }

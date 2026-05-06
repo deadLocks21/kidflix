@@ -15,7 +15,12 @@ class ListHomeCatalogUseCase {
   Future<List<CatalogRowDto>> execute(
     ProfileDto profile, {
     List<DownloadEntry> downloads = const [],
+    int? shuffleSeed,
   }) {
-    return _service.buildHomeRowsFor(profile, downloads: downloads);
+    return _service.buildHomeRowsFor(
+      profile,
+      downloads: downloads,
+      shuffleSeed: shuffleSeed,
+    );
   }
 }
