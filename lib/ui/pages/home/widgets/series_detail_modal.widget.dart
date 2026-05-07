@@ -13,6 +13,7 @@ import 'package:kidflix/infrastructure/providers/session.controller_provider.dar
 import 'package:kidflix/infrastructure/providers/watch_progress.repository_provider.dart';
 import 'package:kidflix/shared/duration_format.dart';
 import 'package:kidflix/ui/pages/home/widgets/download_intent_button.widget.dart';
+import 'package:kidflix/ui/pages/home/widgets/resume_progress_bar.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/season_download_button.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/series/play_label.dart';
 
@@ -101,6 +102,7 @@ class _SeriesDetailContentState extends ConsumerState<SeriesDetailContent> {
         session is ProfileSelected ? session.profile.id : null;
     final series = await seriesRepo.findById(widget.catalogSeries.id);
     EpisodeProgress? latest;
+    var progressByEpisodeId = const <String, EpisodeProgress>{};
     if (profileId != null) {
       final progresses = await progressRepo.listForProfile(profileId);
       final ownIds = {
@@ -112,8 +114,13 @@ class _SeriesDetailContentState extends ConsumerState<SeriesDetailContent> {
           .toList()
         ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       if (ownEpisodes.isNotEmpty) latest = ownEpisodes.first;
+      progressByEpisodeId = {for (final p in ownEpisodes) p.episodeId: p};
     }
-    return _SeriesContext(series: series, latestProgress: latest);
+    return _SeriesContext(
+      series: series,
+      latestProgress: latest,
+      progressByEpisodeId: progressByEpisodeId,
+    );
   }
 
   void _retry() {
@@ -200,6 +207,7 @@ class _SeriesDetailContentState extends ConsumerState<SeriesDetailContent> {
                         _SeasonList(
                           series: ctx.series,
                           latestProgress: ctx.latestProgress,
+                          progressByEpisodeId: ctx.progressByEpisodeId,
                         ),
                       ],
                     );
@@ -217,8 +225,13 @@ class _SeriesDetailContentState extends ConsumerState<SeriesDetailContent> {
 class _SeriesContext {
   final Series series;
   final EpisodeProgress? latestProgress;
+  final Map<String, EpisodeProgress> progressByEpisodeId;
 
-  const _SeriesContext({required this.series, this.latestProgress});
+  const _SeriesContext({
+    required this.series,
+    this.latestProgress,
+    this.progressByEpisodeId = const {},
+  });
 }
 
 class _PlayButton extends ConsumerWidget {
@@ -279,8 +292,13 @@ class _MetaLine extends StatelessWidget {
 class _SeasonList extends StatelessWidget {
   final Series series;
   final EpisodeProgress? latestProgress;
+  final Map<String, EpisodeProgress> progressByEpisodeId;
 
-  const _SeasonList({required this.series, this.latestProgress});
+  const _SeasonList({
+    required this.series,
+    this.latestProgress,
+    this.progressByEpisodeId = const {},
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -298,7 +316,7 @@ class _SeasonList extends StatelessWidget {
           _SeasonSection(
             season: s,
             seriesTitle: series.title,
-            latestProgress: latestProgress,
+            progressByEpisodeId: progressByEpisodeId,
             initiallyExpanded: s.seasonNumber == defaultSeasonNumber,
           ),
       ],
@@ -324,14 +342,14 @@ class _SeasonList extends StatelessWidget {
 class _SeasonSection extends StatelessWidget {
   final Season season;
   final String seriesTitle;
-  final EpisodeProgress? latestProgress;
+  final Map<String, EpisodeProgress> progressByEpisodeId;
   final bool initiallyExpanded;
 
   const _SeasonSection({
     required this.season,
     required this.seriesTitle,
     required this.initiallyExpanded,
-    this.latestProgress,
+    this.progressByEpisodeId = const {},
   });
 
   @override
@@ -363,7 +381,7 @@ class _SeasonSection extends StatelessWidget {
           _EpisodeTile(
             episode: ep,
             parentSeriesTitle: seriesTitle,
-            isCurrent: latestProgress?.episodeId == ep.id,
+            progress: progressByEpisodeId[ep.id],
           ),
       ],
     );
@@ -373,12 +391,12 @@ class _SeasonSection extends StatelessWidget {
 class _EpisodeTile extends ConsumerWidget {
   final Episode episode;
   final String parentSeriesTitle;
-  final bool isCurrent;
+  final EpisodeProgress? progress;
 
   const _EpisodeTile({
     required this.episode,
     required this.parentSeriesTitle,
-    this.isCurrent = false,
+    this.progress,
   });
 
   @override
@@ -387,23 +405,45 @@ class _EpisodeTile extends ConsumerWidget {
     final epRef = episode.seasonNumber == 0
         ? 'S0E${episode.episodeNumber}'
         : 'E${episode.episodeNumber}';
+    final isWatched = progress?.completed ?? false;
+    final totalSeconds = episode.duration.inSeconds;
+    final inProgress = progress != null &&
+        !progress!.completed &&
+        progress!.positionSeconds > 0 &&
+        totalSeconds > 0;
     return ListTile(
       leading: SizedBox(
         width: 80,
         height: 45,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(4),
-          child: _EpisodeThumb(url: episode.thumbUrl),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Opacity(
+                opacity: isWatched ? 0.5 : 1.0,
+                child: _EpisodeThumb(url: episode.thumbUrl),
+              ),
+              if (inProgress)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: ResumeProgressBar(
+                    progress: progress!.positionSeconds / totalSeconds,
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
       title: Text(
         '$epRef · ${episode.title}',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: isCurrent
+        style: isWatched
             ? theme.textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.primary,
+                color: theme.colorScheme.onSurfaceVariant,
               )
             : null,
       ),
