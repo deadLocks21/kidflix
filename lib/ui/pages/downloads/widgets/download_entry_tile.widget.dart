@@ -6,6 +6,7 @@ import 'package:kidflix/core/domain/model/download_entry.dart';
 import 'package:kidflix/infrastructure/providers/download.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/download_management.usecases_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
+import 'package:kidflix/shared/tmdb_image.dart';
 import 'package:kidflix/ui/pages/downloads/widgets/storage_summary_header.widget.dart';
 
 /// One row in the manager's downloads or cache section.
@@ -52,8 +53,12 @@ class _DownloadEntryTileState extends ConsumerState<DownloadEntryTile> {
                 borderRadius: BorderRadius.circular(4),
                 child: entry.displayPosterUrl != null
                     ? CachedNetworkImage(
-                        imageUrl: entry.displayPosterUrl!,
+                        imageUrl: tmdbResize(entry.displayPosterUrl!, 'w185'),
                         fit: BoxFit.cover,
+                        filterQuality: FilterQuality.medium,
+                        memCacheWidth:
+                            (56 * MediaQuery.devicePixelRatioOf(context))
+                                .round(),
                         placeholder: (_, _) => Container(color: Colors.grey[300]),
                         errorWidget: (_, _, _) =>
                             Container(color: Colors.grey[400]),

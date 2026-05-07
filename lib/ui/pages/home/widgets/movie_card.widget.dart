@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/shared/duration_format.dart';
+import 'package:kidflix/shared/tmdb_image.dart';
 import 'package:kidflix/ui/pages/home/widgets/resume_progress_bar.widget.dart';
 
 /// Compact movie tile rendered inside a horizontal [ListView].
@@ -102,9 +103,12 @@ class _Poster extends StatelessWidget {
     final fallback = _PosterFallback();
     final url = posterUrl;
     if (url == null || url.isEmpty) return fallback;
+    final dpr = MediaQuery.devicePixelRatioOf(context);
     return CachedNetworkImage(
-      imageUrl: url,
+      imageUrl: tmdbResize(url, 'w342'),
       fit: BoxFit.cover,
+      filterQuality: FilterQuality.medium,
+      memCacheWidth: (MovieCard.width * dpr).round(),
       placeholder: (_, _) => const _PosterPlaceholder(),
       errorWidget: (_, _, _) => fallback,
     );

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/infrastructure/providers/download.repository_provider.dart';
 import 'package:kidflix/shared/duration_format.dart';
+import 'package:kidflix/shared/tmdb_image.dart';
 import 'package:kidflix/ui/pages/home/widgets/download_intent_button.widget.dart';
 
 /// Width threshold to choose between dialog and bottom-sheet presentation.
@@ -194,11 +195,18 @@ class _Backdrop extends StatelessWidget {
     if (src == null || src.isEmpty) return fallback;
     return AspectRatio(
       aspectRatio: 16 / 9,
-      child: CachedNetworkImage(
-        imageUrl: src,
-        fit: BoxFit.cover,
-        placeholder: (_, _) => fallback,
-        errorWidget: (_, _, _) => fallback,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final dpr = MediaQuery.devicePixelRatioOf(context);
+          return CachedNetworkImage(
+            imageUrl: tmdbResize(src, 'w780'),
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.medium,
+            memCacheWidth: (constraints.maxWidth * dpr).round(),
+            placeholder: (_, _) => fallback,
+            errorWidget: (_, _, _) => fallback,
+          );
+        },
       ),
     );
   }

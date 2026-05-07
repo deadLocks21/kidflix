@@ -4,6 +4,7 @@ import 'package:kidflix/core/application/dtos/catalog_item.dto.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/core/application/dtos/series.dto.dart';
 import 'package:kidflix/shared/duration_format.dart';
+import 'package:kidflix/shared/tmdb_image.dart';
 
 /// Single-line result row rendered inside the search results list.
 ///
@@ -11,8 +12,8 @@ import 'package:kidflix/shared/duration_format.dart';
 /// on the runtime type ([MovieDto] shows the duration ; [SeriesDto] shows
 /// the saisons / épisodes count).
 class SearchResultTile extends StatelessWidget {
-  static const double _posterWidth = 60;
-  static const double _posterHeight = 90;
+  static const double posterWidth = 60;
+  static const double posterHeight = 90;
 
   final CatalogItemDto item;
   final VoidCallback onTap;
@@ -35,8 +36,8 @@ class SearchResultTile extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: SizedBox(
-                width: _posterWidth,
-                height: _posterHeight,
+                width: SearchResultTile.posterWidth,
+                height: SearchResultTile.posterHeight,
                 child: _Poster(posterUrl: item.posterUrl, item: item),
               ),
             ),
@@ -103,9 +104,12 @@ class _Poster extends StatelessWidget {
     final fallback = _PosterFallback(item: item);
     final url = posterUrl;
     if (url == null || url.isEmpty) return fallback;
+    final dpr = MediaQuery.devicePixelRatioOf(context);
     return CachedNetworkImage(
-      imageUrl: url,
+      imageUrl: tmdbResize(url, 'w185'),
       fit: BoxFit.cover,
+      filterQuality: FilterQuality.medium,
+      memCacheWidth: (SearchResultTile.posterWidth * dpr).round(),
       placeholder: (_, _) => const _PosterPlaceholder(),
       errorWidget: (_, _, _) => fallback,
     );

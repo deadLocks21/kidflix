@@ -12,6 +12,7 @@ import 'package:kidflix/infrastructure/providers/series.repository_provider.dart
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/infrastructure/providers/watch_progress.repository_provider.dart';
 import 'package:kidflix/shared/duration_format.dart';
+import 'package:kidflix/shared/tmdb_image.dart';
 import 'package:kidflix/ui/pages/home/widgets/download_intent_button.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/resume_progress_bar.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/season_download_button.widget.dart';
@@ -487,9 +488,13 @@ class _EpisodeThumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (url == null || url!.isEmpty) return _ThumbFallback();
+    final dpr = MediaQuery.devicePixelRatioOf(context);
     return CachedNetworkImage(
-      imageUrl: url!,
+      imageUrl: tmdbResize(url!, 'w185'),
       fit: BoxFit.cover,
+      filterQuality: FilterQuality.medium,
+      memCacheWidth: (80 * dpr).round(),
+      memCacheHeight: (45 * dpr).round(),
       placeholder: (_, _) => _ThumbFallback(),
       errorWidget: (_, _, _) => _ThumbFallback(),
     );
@@ -543,11 +548,18 @@ class _Backdrop extends StatelessWidget {
     }
     return AspectRatio(
       aspectRatio: 16 / 9,
-      child: CachedNetworkImage(
-        imageUrl: url!,
-        fit: BoxFit.cover,
-        placeholder: (_, _) => placeholder,
-        errorWidget: (_, _, _) => placeholder,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final dpr = MediaQuery.devicePixelRatioOf(context);
+          return CachedNetworkImage(
+            imageUrl: tmdbResize(url!, 'w780'),
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.medium,
+            memCacheWidth: (constraints.maxWidth * dpr).round(),
+            placeholder: (_, _) => placeholder,
+            errorWidget: (_, _, _) => placeholder,
+          );
+        },
       ),
     );
   }
