@@ -4,6 +4,7 @@ import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/watch_progress.dart';
 import 'package:kidflix/shared/duration_format.dart';
 import 'package:kidflix/ui/pages/home/widgets/resume_progress_bar.widget.dart';
+import 'package:kidflix/ui/theme/kidflix_palette.dart';
 
 /// Opens a dark-themed bottom sheet listing the series' episodes,
 /// grouped by season. Returns the selected episode id, or `null` if
@@ -156,7 +157,7 @@ class _EpisodeTile extends StatelessWidget {
         totalSeconds > 0;
 
     final titleColor = isCurrent
-        ? Theme.of(context).colorScheme.primary
+        ? KidflixPalette.red
         : (isWatched ? Colors.white60 : Colors.white);
 
     return ListTile(
@@ -176,7 +177,7 @@ class _EpisodeTile extends StatelessWidget {
                 Container(
                   decoration: BoxDecoration(
                     border: Border.all(
-                      color: Theme.of(context).colorScheme.primary,
+                      color: KidflixPalette.red,
                       width: 2,
                     ),
                     borderRadius: BorderRadius.circular(4),
