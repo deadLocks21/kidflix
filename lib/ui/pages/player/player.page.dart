@@ -834,37 +834,33 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     _observeDownload();
   }
 
-  List<Widget> _topButtonBar() {
-    final media = _currentMedia;
-    final hasSeries = media is PlayerEpisodeRef && _series != null;
-    return [
-      IconButton(
-        icon: const Icon(Icons.close, color: Colors.white),
-        tooltip: 'Fermer',
-        onPressed: _onClose,
-      ),
-      const SizedBox(width: 8),
-      Expanded(child: _titleText()),
-      if (hasSeries) ...[
-        PreviousEpisodeButton(
-          onTap: _previousEpisodeOrNull() == null
-              ? null
-              : () {
-                  final ep = _previousEpisodeOrNull();
-                  if (ep != null) _switchToEpisode(ep.id);
-                },
+  List<Widget> _topButtonBar() => [
+        IconButton(
+          icon: const Icon(Icons.close, color: Colors.white),
+          tooltip: 'Fermer',
+          onPressed: _onClose,
         ),
-        EpisodePickerButton(onTap: _onPickEpisodeTap),
-        NextEpisodeButton(
-          onTap: _nextEpisodeOrNull() == null
-              ? null
-              : () {
-                  final ep = _nextEpisodeOrNull();
-                  if (ep != null) _switchToEpisode(ep.id);
-                },
-        ),
-      ],
-    ];
+        const SizedBox(width: 8),
+        Expanded(child: _titleText()),
+      ];
+
+  /// `true` when the current playback should expose series-aware
+  /// controls (prev/next around play, picker near fullscreen).
+  bool get _seriesControlsEnabled =>
+      _currentMedia is PlayerEpisodeRef && _series != null && !_isLocked;
+
+  PreviousEpisodeButton _previousEpisodeButton() {
+    final ep = _previousEpisodeOrNull();
+    return PreviousEpisodeButton(
+      onTap: ep == null ? null : () => _switchToEpisode(ep.id),
+    );
+  }
+
+  NextEpisodeButton _nextEpisodeButton() {
+    final ep = _nextEpisodeOrNull();
+    return NextEpisodeButton(
+      onTap: ep == null ? null : () => _switchToEpisode(ep.id),
+    );
   }
 
   List<Widget> _lockedTopButtonBar() => [Expanded(child: _titleText())];
@@ -954,9 +950,13 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       seekBarPositionColor: primary,
       seekBarThumbColor: primary,
       bottomButtonBar: _seekBarOverButtons([
+        if (_seriesControlsEnabled) _previousEpisodeButton(),
         const MaterialPlayOrPauseButton(),
+        if (_seriesControlsEnabled) _nextEpisodeButton(),
         const MaterialPositionIndicator(),
         const Spacer(),
+        if (_seriesControlsEnabled)
+          EpisodePickerButton(onTap: _onPickEpisodeTap),
         const MaterialFullscreenButton(),
         LockButton(onTap: _onLockTap),
       ]),
@@ -1048,10 +1048,14 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       seekBarPositionColor: primary,
       seekBarThumbColor: primary,
       bottomButtonBar: _seekBarOverButtons([
+        if (_seriesControlsEnabled) _previousEpisodeButton(),
         const MaterialDesktopPlayOrPauseButton(),
+        if (_seriesControlsEnabled) _nextEpisodeButton(),
         const MaterialDesktopVolumeButton(),
         const MaterialDesktopPositionIndicator(),
         const Spacer(),
+        if (_seriesControlsEnabled)
+          EpisodePickerButton(onTap: _onPickEpisodeTap),
         const MaterialDesktopFullscreenButton(),
         LockButton(onTap: _onLockTap),
       ]),
