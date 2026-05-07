@@ -949,6 +949,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       seekBarBufferColor: Colors.transparent,
       seekBarPositionColor: primary,
       seekBarThumbColor: primary,
+      primaryButtonBar: const [
+        Spacer(flex: 1),
+        MaterialPlayOrPauseButton(iconSize: 84),
+        Spacer(flex: 1),
+      ],
       bottomButtonBar: _seekBarOverButtons([
         if (_seriesControlsEnabled) _previousEpisodeButton(),
         const MaterialPlayOrPauseButton(),
@@ -1047,6 +1052,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       seekBarBufferColor: Colors.transparent,
       seekBarPositionColor: primary,
       seekBarThumbColor: primary,
+      primaryButtonBar: const [
+        Spacer(flex: 1),
+        MaterialDesktopPlayOrPauseButton(iconSize: 84),
+        Spacer(flex: 1),
+      ],
       bottomButtonBar: _seekBarOverButtons([
         if (_seriesControlsEnabled) _previousEpisodeButton(),
         const MaterialDesktopPlayOrPauseButton(),
