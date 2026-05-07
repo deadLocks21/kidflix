@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kidflix/core/application/session_state.dart';
+import 'package:kidflix/core/application/usecases/pick_next_shuffle_episode.usecase.dart';
 import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/watch_progress.dart';
 import 'package:kidflix/infrastructure/providers/download.repository_provider.dart';
@@ -247,13 +248,39 @@ class _PlayButton extends ConsumerWidget {
     if (label == null) {
       return const SizedBox.shrink();
     }
-    return FilledButton.icon(
-      icon: const Icon(Icons.play_arrow_rounded),
-      label: Text(label.label),
-      onPressed: () {
-        Navigator.of(context).pop();
-        context.go('/player/episode/${label.target.id}');
-      },
+    final shufflePick = pickNextShuffleEpisode(
+      series: series,
+      alreadyPlayedIds: const {},
+    );
+    return Row(
+      children: [
+        Expanded(
+          child: FilledButton.icon(
+            icon: const Icon(Icons.play_arrow_rounded),
+            label: Text(label.label),
+            onPressed: () {
+              Navigator.of(context).pop();
+              context.go(
+                '/player/episode/${label.target.id}?series=${series.id}',
+              );
+            },
+          ),
+        ),
+        if (shufflePick != null) ...[
+          const SizedBox(width: 12),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.shuffle_rounded),
+            label: const Text('Aléatoire'),
+            onPressed: () {
+              Navigator.of(context).pop();
+              context.go(
+                '/player/episode/${shufflePick.id}'
+                '?series=${series.id}&mode=shuffle',
+              );
+            },
+          ),
+        ],
+      ],
     );
   }
 }
@@ -474,7 +501,9 @@ class _EpisodeTile extends ConsumerWidget {
               ),
         );
         Navigator.of(context).pop();
-        context.go('/player/episode/${episode.id}');
+        context.go(
+          '/player/episode/${episode.id}?series=${episode.seriesId}',
+        );
       },
     );
   }

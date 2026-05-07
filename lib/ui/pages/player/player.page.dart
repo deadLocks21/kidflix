@@ -7,8 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kidflix/core/application/dtos/episode_download.dto.dart';
 import 'package:kidflix/core/application/dtos/movie_download.dto.dart';
+import 'package:kidflix/core/application/dtos/series_playback_context.dart';
 import 'package:kidflix/core/application/session_state.dart';
+import 'package:kidflix/core/application/usecases/pick_next_shuffle_episode.usecase.dart';
+import 'package:kidflix/core/application/usecases/resolve_continue_watching.usecase.dart';
 import 'package:kidflix/core/application/usecases/save_watch_progress.usecase.dart';
+import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/model/watch_progress.dart';
 import 'package:kidflix/core/domain/services/kids_lock.service.dart';
@@ -26,6 +30,8 @@ import 'package:kidflix/ui/pages/player/player_engine.dart';
 import 'package:kidflix/ui/pages/player/player_media_ref.dart';
 import 'package:kidflix/ui/pages/player/widgets/buffered_seek_bar.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/download_status_badge.widget.dart';
+import 'package:kidflix/ui/pages/player/widgets/episode_nav_buttons.widget.dart';
+import 'package:kidflix/ui/pages/player/widgets/episode_picker_sheet.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/lock_button.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/player_download_gate.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/player_error_state.widget.dart';
@@ -37,6 +43,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 const Duration _progressSaveInterval = Duration(seconds: 10);
 const Duration _seekDetectionThreshold = Duration(seconds: 2);
+const Duration _autoAdvanceLeadTime = Duration(seconds: 2);
 const int _resumeMinSeconds = 10;
 const double _completionThreshold = 0.9;
 
@@ -101,10 +108,14 @@ class PlayerPage extends ConsumerStatefulWidget {
   PlayerPage.episode({
     Key? key,
     required String episodeId,
+    SeriesPlaybackContext? seriesContext,
     PlayerEngineFactory engineFactory = defaultPlayerEngineFactory,
   }) : this(
           key: key,
-          media: PlayerMediaRef.episode(episodeId),
+          media: PlayerMediaRef.episode(
+            episodeId,
+            seriesContext: seriesContext,
+          ),
           engineFactory: engineFactory,
         );
 
@@ -113,6 +124,20 @@ class PlayerPage extends ConsumerStatefulWidget {
 }
 
 class _PlayerPageState extends ConsumerState<PlayerPage> {
+  /// The media currently playing. Initialised from `widget.media` and
+  /// mutated by [_switchToEpisode] for in-place episode hops, so the
+  /// engine can be torn down and rebuilt without remounting the page.
+  late PlayerMediaRef _currentMedia;
+
+  /// Full series tree, loaded once at bootstrap when [_currentMedia]
+  /// carries a [SeriesPlaybackContext]. Reused across episode switches.
+  Series? _series;
+
+  /// Episodes already played in the current shuffle session (in-memory
+  /// only — fermer le player les perd). Includes the currently playing
+  /// episode once playback starts.
+  final Set<String> _shuffleHistory = {};
+
   PlayerEngine? _engine;
   StreamSubscription<MovieDownloadDto>? _movieDownloadSub;
   StreamSubscription<EpisodeDownloadDto>? _episodeDownloadSub;
@@ -129,6 +154,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   bool _completedSaved = false;
   bool _saving = false;
   bool _disposed = false;
+  bool _switching = false;
+  bool _autoAdvanceFired = false;
 
   /// Cached at bootstrap so dispose() can invoke it without touching
   /// [ref] (Riverpod disallows ref access after the widget is marked
@@ -155,6 +182,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   @override
   void initState() {
     super.initState();
+    _currentMedia = widget.media;
     _kidsLock = ref.read(kidsLockServiceProvider);
     _pinService = ref.read(profilePinServiceProvider);
     _applyMobileSystemUi();
@@ -208,7 +236,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
           session.session.profiles.where((p) => p.isMain).firstOrNull;
     }
 
-    await _resolveMediaTitle();
+    await _loadEpisodeContext();
+    if (_disposed) return;
+    if (_currentMedia case PlayerEpisodeRef(:final episodeId)) {
+      _shuffleHistory.add(episodeId);
+    }
     final existing = await _findExistingDownload();
     if (_disposed) return;
 
@@ -221,7 +253,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   }
 
   Future<_DownloadView?> _findExistingDownload() async {
-    return switch (widget.media) {
+    return switch (_currentMedia) {
       PlayerMovieRef(:final movieId) => await ref
           .read(findMovieDownloadUseCaseProvider)
           .execute(movieId)
@@ -233,53 +265,76 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     };
   }
 
-  Future<void> _resolveMediaTitle() async {
+  Future<void> _loadEpisodeContext() async {
     final state = ref.read(sessionControllerProvider);
     if (state is! ProfileSelected) return;
-    switch (widget.media) {
+    switch (_currentMedia) {
       case PlayerMovieRef(:final movieId):
         final repo = ref.read(catalogRepositoryProvider);
         final pool = await repo.listCatalog();
         final movie = pool.where((m) => m.id == movieId).firstOrNull;
         if (_disposed) return;
         setState(() => _mediaTitle = movie?.title ?? '');
-      case PlayerEpisodeRef(:final episodeId):
-        // Title format: "{Series title} — S{n}E{m} {Episode title}".
-        // Look up the episode by walking the series catalog.
-        final catalog =
-            await ref.read(catalogRepositoryProvider).listCatalog();
-        final seriesIds = catalog
-            .where((i) => i.runtimeType.toString() == 'Series')
-            .map((s) => s.id);
-        // Fallback simpler: find via SeriesRepository — we don't know
-        // the series id. Walk the catalog until we find one that
-        // contains this episode after a findById.
-        final seriesRepo = ref.read(seriesRepositoryProvider);
-        for (final id in seriesIds) {
+      case PlayerEpisodeRef(:final episodeId, :final seriesContext):
+        // Fast path: when the route already carried a seriesId (modal,
+        // continue-watching, in-player switch), fetch that series only
+        // once and reuse it across switches.
+        Series? series = _series;
+        if (series == null && seriesContext != null) {
           try {
-            final full = await seriesRepo.findById(id);
-            for (final s in full.seasons) {
-              for (final e in s.episodes) {
-                if (e.id == episodeId) {
-                  if (_disposed) return;
-                  setState(() => _mediaTitle =
-                      '${full.title} — S${e.seasonNumber}E${e.episodeNumber} · ${e.title}');
-                  return;
-                }
-              }
-            }
+            series = await ref
+                .read(seriesRepositoryProvider)
+                .findById(seriesContext.seriesId);
           } catch (_) {
-            // ignore per-series failures
+            series = null;
+          }
+          if (_disposed) return;
+        }
+        if (series == null) {
+          // Legacy/fallback: no context → walk the series catalog.
+          final catalog =
+              await ref.read(catalogRepositoryProvider).listCatalog();
+          final seriesRepo = ref.read(seriesRepositoryProvider);
+          for (final item in catalog.whereType<Series>()) {
+            try {
+              final full = await seriesRepo.findById(item.id);
+              if (full.seasons
+                  .any((s) => s.episodes.any((e) => e.id == episodeId))) {
+                series = full;
+                break;
+              }
+            } catch (_) {
+              // ignore per-series failures
+            }
           }
         }
-        // Final fallback: just the episode id.
         if (_disposed) return;
-        setState(() => _mediaTitle = '');
+        if (series == null) {
+          setState(() => _mediaTitle = '');
+          return;
+        }
+        Episode? episode;
+        for (final s in series.seasons) {
+          for (final e in s.episodes) {
+            if (e.id == episodeId) {
+              episode = e;
+              break;
+            }
+          }
+          if (episode != null) break;
+        }
+        if (_disposed) return;
+        setState(() {
+          _series = series;
+          _mediaTitle = episode == null
+              ? series!.title
+              : '${series!.title} — S${episode.seasonNumber}E${episode.episodeNumber} · ${episode.title}';
+        });
     }
   }
 
   void _observeDownload() {
-    switch (widget.media) {
+    switch (_currentMedia) {
       case PlayerMovieRef(:final movieId):
         final useCase = ref.read(startMovieDownloadUseCaseProvider);
         _movieDownloadSub = useCase
@@ -352,6 +407,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         unawaited(_saveProgressNow());
       }
       _checkCompletion();
+      _checkAutoAdvance();
     });
     _durationSub = engine.durationStream.listen((d) {
       if (_disposed) return;
@@ -367,7 +423,6 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         _stopPeriodicSave();
       }
     });
-
     await engine.open(localPath, initialPosition: initialPosition);
     if (_disposed) return;
     await engine.play();
@@ -377,7 +432,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     final session = ref.read(sessionControllerProvider);
     if (session is! ProfileSelected) return Duration.zero;
     final progressRepo = ref.read(watchProgressRepositoryProvider);
-    final progress = switch (widget.media) {
+    final progress = switch (_currentMedia) {
       PlayerMovieRef(:final movieId) => await progressRepo.findForMovie(
           profileId: session.profile.id,
           movieId: movieId,
@@ -423,26 +478,66 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     if (useCase == null || profileId == null) return;
     _saving = true;
     try {
-      switch (widget.media) {
+      final positionSeconds = _safePositionSecondsForSave();
+      switch (_currentMedia) {
         case PlayerMovieRef(:final movieId):
           await useCase.execute(
             profileId: profileId,
             movieId: movieId,
-            positionSeconds: _position.inSeconds,
+            positionSeconds: positionSeconds,
             completed: _completedSaved,
           );
         case PlayerEpisodeRef():
-          await _saveEpisodeProgress(_position.inSeconds, _completedSaved);
+          await _saveEpisodeProgress(positionSeconds, _completedSaved);
       }
     } finally {
       _saving = false;
     }
   }
 
+  /// Server bounds `position_seconds` by `episodes.duration_seconds`
+  /// (or `movies.duration_seconds`) — any overshoot → `400
+  /// invalid_request`. The authoritative bound is the duration
+  /// **stored on the Episode/Movie domain entity** (read from NFO at
+  /// catalog ingestion), NOT media_kit's runtime duration: the file
+  /// can run a few seconds longer than the NFO claims.
+  ///
+  /// Order of preference:
+  /// 1. Episode.duration from the cached [_series] (when series-aware).
+  /// 2. media_kit's [_duration].
+  /// 3. raw `_position` if neither is known.
+  ///
+  /// One-second safety margin shaved off the cap. completed=true at
+  /// 90 % already short-circuits resume, so position accuracy is moot
+  /// at the tail.
+  int _safePositionSecondsForSave() {
+    final pos = _position.inSeconds;
+    if (pos < 0) return 0;
+    final domainCapSeconds = _currentEpisodeDurationSeconds();
+    final engineCapSeconds = _duration?.inSeconds;
+    int? cap;
+    if (domainCapSeconds != null && domainCapSeconds > 0) {
+      cap = domainCapSeconds - 1;
+    } else if (engineCapSeconds != null && engineCapSeconds > 0) {
+      cap = engineCapSeconds - 1;
+    }
+    if (cap == null) return pos;
+    if (cap < 0) return 0;
+    return pos > cap ? cap : pos;
+  }
+
+  int? _currentEpisodeDurationSeconds() {
+    final media = _currentMedia;
+    final series = _series;
+    if (media is! PlayerEpisodeRef || series == null) return null;
+    final ep = _findEpisode(series, media.episodeId);
+    return ep?.duration.inSeconds;
+  }
+
   Future<void> _saveEpisodeProgress(int positionSeconds, bool completed) async {
     final profileId = _profileId;
     if (profileId == null) return;
-    final mediaRef = widget.media;
+    final mediaRef = _currentMedia;
     if (mediaRef is! PlayerEpisodeRef) return;
     final repo = ref.read(watchProgressRepositoryProvider);
     await repo.save(
@@ -500,20 +595,71 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       final useCase = _saveUseCase;
       final profileId = _profileId;
       if (useCase == null || profileId == null) return;
-      switch (widget.media) {
+      final positionSeconds = _safePositionSecondsForSave();
+      switch (_currentMedia) {
         case PlayerMovieRef(:final movieId):
           unawaited(
             useCase.execute(
               profileId: profileId,
               movieId: movieId,
-              positionSeconds: _position.inSeconds,
+              positionSeconds: positionSeconds,
               completed: true,
             ),
           );
         case PlayerEpisodeRef():
-          unawaited(_saveEpisodeProgress(_position.inSeconds, true));
+          unawaited(_saveEpisodeProgress(positionSeconds, true));
       }
     }
+  }
+
+  /// Position-driven auto-advance: when there are 2 s or less left to
+  /// play, fire the switch to the next episode. media_kit's `completed`
+  /// event proved unreliable on local mp4 progressive downloads — the
+  /// position approach is robust because it only relies on the position
+  /// stream we already consume.
+  ///
+  /// [_autoAdvanceFired] guards against repeat triggers from successive
+  /// position ticks before the actual switch tears down the stream.
+  void _checkAutoAdvance() {
+    if (_autoAdvanceFired || _switching) return;
+    final d = _duration;
+    if (d == null || d.inSeconds == 0) return;
+    if (d - _position <= _autoAdvanceLeadTime) {
+      _autoAdvanceFired = true;
+      unawaited(_maybeAutoAdvance());
+    }
+  }
+
+  /// Picks the next target according to the playback mode and triggers
+  /// an in-place switch. No-op for movies, episodes without a series
+  /// context, or end of a linear rotation.
+  Future<void> _maybeAutoAdvance() async {
+    if (_switching) return;
+    final media = _currentMedia;
+    final series = _series;
+    if (media is! PlayerEpisodeRef || series == null) return;
+    final mode = media.seriesContext?.mode ?? SeriesPlaybackMode.linear;
+    final current = _findEpisode(series, media.episodeId);
+    Episode? target;
+    switch (mode) {
+      case SeriesPlaybackMode.linear:
+        if (current != null) {
+          target = findNextEpisode(series, after: current);
+        }
+      case SeriesPlaybackMode.shuffle:
+        target = pickNextShuffleEpisode(
+          series: series,
+          alreadyPlayedIds: _shuffleHistory,
+          currentEpisodeId: media.episodeId,
+        );
+        if (target != null && target.id == media.episodeId) {
+          // Rotation exhausted and only the current is available — no
+          // forward move possible.
+          target = null;
+        }
+    }
+    if (target == null) return;
+    await _switchToEpisode(target.id);
   }
 
   void _onClose() {
@@ -542,7 +688,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   }
 
   void _onCancelDownload() {
-    switch (widget.media) {
+    switch (_currentMedia) {
       case PlayerMovieRef(:final movieId):
         final cancel = ref.read(cancelMovieDownloadUseCaseProvider);
         unawaited(cancel.execute(movieId));
@@ -551,6 +697,131 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         unawaited(cancel.execute(episodeId));
     }
     _onClose();
+  }
+
+  /// Locates [episodeId] inside [series]. Returns `null` if not found.
+  Episode? _findEpisode(Series series, String episodeId) {
+    for (final s in series.seasons) {
+      for (final e in s.episodes) {
+        if (e.id == episodeId) return e;
+      }
+    }
+    return null;
+  }
+
+  /// Tears down the current playback (saving progress first), then
+  /// rebootstraps with [newEpisodeId] in place. Reuses the cached
+  /// [_series] and the ambient [SeriesPlaybackContext].
+  Future<void> _switchToEpisode(String newEpisodeId) async {
+    if (_switching || _disposed) return;
+    final media = _currentMedia;
+    if (media is! PlayerEpisodeRef) return;
+    if (media.episodeId == newEpisodeId) return;
+    _switching = true;
+    try {
+      await _saveProgressNow();
+      _periodicSaveTimer?.cancel();
+      _periodicSaveTimer = null;
+      await _movieDownloadSub?.cancel();
+      _movieDownloadSub = null;
+      await _episodeDownloadSub?.cancel();
+      _episodeDownloadSub = null;
+      await _positionSub?.cancel();
+      _positionSub = null;
+      await _durationSub?.cancel();
+      _durationSub = null;
+      await _playingSub?.cancel();
+      _playingSub = null;
+      await _engine?.dispose();
+      _engine = null;
+      WakelockPlus.disable();
+      if (_disposed) return;
+      setState(() {
+        _currentMedia = PlayerMediaRef.episode(
+          newEpisodeId,
+          seriesContext: media.seriesContext,
+        );
+        _lastDownload = null;
+        _mediaTitle = null;
+        _position = Duration.zero;
+        _lastObservedPosition = null;
+        _duration = null;
+        _readyEmitted = false;
+        _completedSaved = false;
+        _saving = false;
+        _autoAdvanceFired = false;
+      });
+      _downloadedFractionNotifier.value = null;
+      _shuffleHistory.add(newEpisodeId);
+      await _bootstrap();
+    } finally {
+      _switching = false;
+    }
+  }
+
+  /// Resolves the previous episode in the current series, or `null`
+  /// when none exists or the player isn't series-aware.
+  Episode? _previousEpisodeOrNull() {
+    final media = _currentMedia;
+    final series = _series;
+    if (media is! PlayerEpisodeRef || series == null) return null;
+    final current = _findEpisode(series, media.episodeId);
+    if (current == null) return null;
+    return findPreviousEpisode(series, before: current);
+  }
+
+  /// Resolves the next episode for the current playback mode (linear or
+  /// shuffle), or `null` when none is available.
+  Episode? _nextEpisodeOrNull() {
+    final media = _currentMedia;
+    final series = _series;
+    if (media is! PlayerEpisodeRef || series == null) return null;
+    final mode = media.seriesContext?.mode ?? SeriesPlaybackMode.linear;
+    if (mode == SeriesPlaybackMode.shuffle) {
+      final picked = pickNextShuffleEpisode(
+        series: series,
+        alreadyPlayedIds: _shuffleHistory,
+        currentEpisodeId: media.episodeId,
+      );
+      if (picked == null || picked.id == media.episodeId) return null;
+      return picked;
+    }
+    final current = _findEpisode(series, media.episodeId);
+    if (current == null) return null;
+    return findNextEpisode(series, after: current);
+  }
+
+  Future<void> _onPickEpisodeTap() async {
+    final media = _currentMedia;
+    final series = _series;
+    if (media is! PlayerEpisodeRef || series == null) return;
+    final profileId = _profileId;
+    var byId = <String, EpisodeProgress>{};
+    if (profileId != null) {
+      try {
+        final entries = await ref
+            .read(watchProgressRepositoryProvider)
+            .listForProfile(profileId);
+        final ownIds = {
+          for (final s in series.seasons) for (final e in s.episodes) e.id,
+        };
+        byId = {
+          for (final p in entries.whereType<EpisodeProgress>())
+            if (ownIds.contains(p.episodeId)) p.episodeId: p,
+        };
+      } catch (_) {
+        byId = {};
+      }
+    }
+    if (_disposed || !mounted) return;
+    final picked = await showEpisodePickerSheet(
+      context,
+      series: series,
+      currentEpisodeId: media.episodeId,
+      progressByEpisodeId: byId,
+    );
+    if (picked == null) return;
+    await _switchToEpisode(picked);
   }
 
   void _onRetryDownload() {
@@ -563,15 +834,38 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     _observeDownload();
   }
 
-  List<Widget> _topButtonBar() => [
-        IconButton(
-          icon: const Icon(Icons.close, color: Colors.white),
-          tooltip: 'Fermer',
-          onPressed: _onClose,
+  List<Widget> _topButtonBar() {
+    final media = _currentMedia;
+    final hasSeries = media is PlayerEpisodeRef && _series != null;
+    return [
+      IconButton(
+        icon: const Icon(Icons.close, color: Colors.white),
+        tooltip: 'Fermer',
+        onPressed: _onClose,
+      ),
+      const SizedBox(width: 8),
+      Expanded(child: _titleText()),
+      if (hasSeries) ...[
+        PreviousEpisodeButton(
+          onTap: _previousEpisodeOrNull() == null
+              ? null
+              : () {
+                  final ep = _previousEpisodeOrNull();
+                  if (ep != null) _switchToEpisode(ep.id);
+                },
         ),
-        const SizedBox(width: 8),
-        Expanded(child: _titleText()),
-      ];
+        EpisodePickerButton(onTap: _onPickEpisodeTap),
+        NextEpisodeButton(
+          onTap: _nextEpisodeOrNull() == null
+              ? null
+              : () {
+                  final ep = _nextEpisodeOrNull();
+                  if (ep != null) _switchToEpisode(ep.id);
+                },
+        ),
+      ],
+    ];
+  }
 
   List<Widget> _lockedTopButtonBar() => [Expanded(child: _titleText())];
 

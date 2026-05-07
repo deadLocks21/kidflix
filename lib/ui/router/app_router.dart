@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
+import 'package:kidflix/core/application/dtos/series_playback_context.dart';
 import 'package:kidflix/core/application/session_state.dart';
 import 'package:kidflix/infrastructure/providers/download_management.usecases_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
@@ -133,8 +134,24 @@ GoRouter appRouter(Ref ref) {
       ),
       GoRoute(
         path: AppRoutes.playerEpisode,
-        builder: (_, s) =>
-            PlayerPage.episode(episodeId: s.pathParameters['episodeId']!),
+        builder: (_, s) {
+          final qp = s.uri.queryParameters;
+          final seriesId = qp['series'];
+          SeriesPlaybackContext? seriesContext;
+          if (seriesId != null && seriesId.isNotEmpty) {
+            final mode = qp['mode'] == 'shuffle'
+                ? SeriesPlaybackMode.shuffle
+                : SeriesPlaybackMode.linear;
+            seriesContext = SeriesPlaybackContext(
+              seriesId: seriesId,
+              mode: mode,
+            );
+          }
+          return PlayerPage.episode(
+            episodeId: s.pathParameters['episodeId']!,
+            seriesContext: seriesContext,
+          );
+        },
       ),
     ],
   );

@@ -1,3 +1,5 @@
+import 'package:kidflix/core/application/dtos/series_playback_context.dart';
+
 /// Identifies the media the [PlayerPage] should play.
 ///
 /// Sealed: a runtime-discriminated union of either a movie or an
@@ -11,11 +13,15 @@ sealed class PlayerMediaRef {
 
   const PlayerMediaRef();
 
-  /// Constructs a movie reference.
   factory PlayerMediaRef.movie(String movieId) = PlayerMovieRef;
 
-  /// Constructs an episode reference.
-  factory PlayerMediaRef.episode(String episodeId) = PlayerEpisodeRef;
+  /// Constructs an episode reference. [seriesContext] is set when the
+  /// player should expose series-aware controls (prev / next / list /
+  /// shuffle auto-advance).
+  factory PlayerMediaRef.episode(
+    String episodeId, {
+    SeriesPlaybackContext? seriesContext,
+  }) = PlayerEpisodeRef;
 }
 
 class PlayerMovieRef extends PlayerMediaRef {
@@ -36,16 +42,19 @@ class PlayerMovieRef extends PlayerMediaRef {
 
 class PlayerEpisodeRef extends PlayerMediaRef {
   final String episodeId;
+  final SeriesPlaybackContext? seriesContext;
 
-  const PlayerEpisodeRef(this.episodeId);
+  const PlayerEpisodeRef(this.episodeId, {this.seriesContext});
 
   @override
   String get id => episodeId;
 
   @override
   bool operator ==(Object other) =>
-      other is PlayerEpisodeRef && other.episodeId == episodeId;
+      other is PlayerEpisodeRef &&
+      other.episodeId == episodeId &&
+      other.seriesContext == seriesContext;
 
   @override
-  int get hashCode => episodeId.hashCode;
+  int get hashCode => Object.hash(episodeId, seriesContext);
 }

@@ -176,7 +176,7 @@ ContinueWatchingResolution? resolveContinueWatchingForSeries({
     );
   }
 
-  final next = _findNextEpisode(series, after: currentEpisode);
+  final next = findNextEpisode(series, after: currentEpisode);
   if (next != null) {
     return ContinueWatchingResolution(
       state: ContinueWatchingState.nextAfterCompleted,
@@ -187,7 +187,7 @@ ContinueWatchingResolution? resolveContinueWatchingForSeries({
 
   // End of series — restart from the first episode of the lowest
   // non-Specials season.
-  final firstEp = _firstNonSpecialsEpisode(series);
+  final firstEp = firstNonSpecialsEpisode(series);
   if (firstEp == null) return null;
   return ContinueWatchingResolution(
     state: ContinueWatchingState.restart,
@@ -201,7 +201,7 @@ ContinueWatchingResolution? resolveContinueWatchingForSeries({
 /// Specials (season 0) are excluded from the rotation: completing the
 /// last episode of season 1 does NOT lead to season 0, but to season 2
 /// if it exists, otherwise [null] (end of series).
-Episode? _findNextEpisode(Series series, {required Episode after}) {
+Episode? findNextEpisode(Series series, {required Episode after}) {
   final seasons = series.seasons
       .where((s) => s.seasonNumber > 0)
       .toList()
@@ -213,14 +213,12 @@ Episode? _findNextEpisode(Series series, {required Episode after}) {
     return null;
   }
 
-  // Locate current season
   final currentSeasonIdx = seasons.indexWhere(
     (s) => s.seasonNumber == after.seasonNumber,
   );
   if (currentSeasonIdx == -1) return null;
   final currentSeason = seasons[currentSeasonIdx];
 
-  // Next episode in the same season
   final episodesSorted = [...currentSeason.episodes]
     ..sort((a, b) => a.episodeNumber.compareTo(b.episodeNumber));
   final epIdx = episodesSorted.indexWhere((e) => e.id == after.id);
@@ -228,7 +226,6 @@ Episode? _findNextEpisode(Series series, {required Episode after}) {
     return episodesSorted[epIdx + 1];
   }
 
-  // First episode of the next season
   if (currentSeasonIdx + 1 < seasons.length) {
     final nextSeason = seasons[currentSeasonIdx + 1];
     final nextEpsSorted = [...nextSeason.episodes]
@@ -239,19 +236,64 @@ Episode? _findNextEpisode(Series series, {required Episode after}) {
   return null;
 }
 
-/// First episode of the lowest non-Specials season (typically S1E1).
-Episode? _firstNonSpecialsEpisode(Series series) {
+/// Finds the previous episode in the series rotation before [before].
+///
+/// Symmetric to [findNextEpisode]: Specials (season 0) excluded; walks
+/// back within the season, then to the last episode of the previous
+/// season, returning `null` at the start of the rotation.
+Episode? findPreviousEpisode(Series series, {required Episode before}) {
   final seasons = series.seasons
       .where((s) => s.seasonNumber > 0)
       .toList()
     ..sort((a, b) => a.seasonNumber.compareTo(b.seasonNumber));
+
+  if (before.seasonNumber == 0) return null;
+
+  final currentSeasonIdx = seasons.indexWhere(
+    (s) => s.seasonNumber == before.seasonNumber,
+  );
+  if (currentSeasonIdx == -1) return null;
+  final currentSeason = seasons[currentSeasonIdx];
+
+  final episodesSorted = [...currentSeason.episodes]
+    ..sort((a, b) => a.episodeNumber.compareTo(b.episodeNumber));
+  final epIdx = episodesSorted.indexWhere((e) => e.id == before.id);
+  if (epIdx > 0) {
+    return episodesSorted[epIdx - 1];
+  }
+
+  if (currentSeasonIdx - 1 >= 0) {
+    final prevSeason = seasons[currentSeasonIdx - 1];
+    final prevEpsSorted = [...prevSeason.episodes]
+      ..sort((a, b) => a.episodeNumber.compareTo(b.episodeNumber));
+    if (prevEpsSorted.isNotEmpty) return prevEpsSorted.last;
+  }
+
+  return null;
+}
+
+/// Flattened list of episodes in the rotation order: seasons ≥ 1 sorted
+/// ascending by `seasonNumber`, episodes sorted by `episodeNumber`.
+/// Specials (season 0) are excluded, matching [findNextEpisode] /
+/// [findPreviousEpisode].
+List<Episode> flatRotationEpisodes(Series series) {
+  final seasons = series.seasons
+      .where((s) => s.seasonNumber > 0)
+      .toList()
+    ..sort((a, b) => a.seasonNumber.compareTo(b.seasonNumber));
+  final episodes = <Episode>[];
   for (final season in seasons) {
-    if (season.episodes.isEmpty) continue;
     final eps = [...season.episodes]
       ..sort((a, b) => a.episodeNumber.compareTo(b.episodeNumber));
-    return eps.first;
+    episodes.addAll(eps);
   }
-  return null;
+  return episodes;
+}
+
+/// First episode of the lowest non-Specials season (typically S1E1).
+Episode? firstNonSpecialsEpisode(Series series) {
+  final episodes = flatRotationEpisodes(series);
+  return episodes.isEmpty ? null : episodes.first;
 }
 
 /// Result of [resolveContinueWatchingForSeries]: the next episode the
