@@ -914,7 +914,12 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     return MaterialVideoControlsThemeData(
       visibleOnMount: true,
       speedUpOnLongPress: false,
-      seekOnDoubleTap: false,
+      // YouTube-style double-tap zones: -10 s on the left third, +30 s
+      // on the right third, middle third toggles play/pause.
+      seekOnDoubleTap: true,
+      seekOnDoubleTapEnabledWhileControlsVisible: true,
+      seekOnDoubleTapBackwardDuration: const Duration(seconds: 10),
+      seekOnDoubleTapForwardDuration: const Duration(seconds: 30),
       // media_kit's auto seek bar is disabled — we render the same
       // MaterialSeekBar inside [BufferedSeekBar] so we can stack a
       // download-fraction overlay on top while keeping the lib intact.
