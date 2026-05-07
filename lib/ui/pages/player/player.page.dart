@@ -44,6 +44,8 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 const Duration _progressSaveInterval = Duration(seconds: 10);
 const Duration _seekDetectionThreshold = Duration(seconds: 2);
 const Duration _autoAdvanceLeadTime = Duration(seconds: 2);
+const Duration _doubleTapBackwardDuration = Duration(seconds: 10);
+const Duration _doubleTapForwardDuration = Duration(seconds: 30);
 const int _resumeMinSeconds = 10;
 const double _completionThreshold = 0.9;
 
@@ -210,6 +212,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   bool get _isMobile =>
       defaultTargetPlatform == TargetPlatform.android ||
       defaultTargetPlatform == TargetPlatform.iOS;
+
+  bool get _isDesktop => !_isMobile;
 
   void _applyMobileSystemUi() {
     if (!_isMobile) return;
@@ -549,6 +553,22 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         updatedAt: DateTime.now(),
       ),
     );
+  }
+
+  /// Seeks [delta] forward (positive) or backward (negative) from the
+  /// current position. Clamps against [_maxSafePosition] (in-flight
+  /// download), the media duration on the upper bound, and zero on the
+  /// lower bound. No-op when the engine isn't ready.
+  Future<void> _seekRelative(Duration delta) async {
+    final engine = _engine;
+    if (engine == null) return;
+    var target = _position + delta;
+    if (target < Duration.zero) target = Duration.zero;
+    final maxSafe = _maxSafePosition();
+    if (maxSafe != null && target > maxSafe) target = maxSafe;
+    final d = _duration;
+    if (d != null && target > d) target = d;
+    await engine.seek(target);
   }
 
   /// Maximum position the user is allowed to seek to while a download
@@ -915,11 +935,13 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       visibleOnMount: true,
       speedUpOnLongPress: false,
       // YouTube-style double-tap zones: -10 s on the left third, +30 s
-      // on the right third, middle third toggles play/pause.
+      // on the right third, middle third toggles play/pause. Desktop
+      // has no equivalent in MaterialDesktopVideoControlsThemeData so
+      // it gets a custom GestureDetector overlay (cf. _buildBody).
       seekOnDoubleTap: true,
       seekOnDoubleTapEnabledWhileControlsVisible: true,
-      seekOnDoubleTapBackwardDuration: const Duration(seconds: 10),
-      seekOnDoubleTapForwardDuration: const Duration(seconds: 30),
+      seekOnDoubleTapBackwardDuration: _doubleTapBackwardDuration,
+      seekOnDoubleTapForwardDuration: _doubleTapForwardDuration,
       // media_kit's auto seek bar is disabled — we render the same
       // MaterialSeekBar inside [BufferedSeekBar] so we can stack a
       // download-fraction overlay on top while keeping the lib intact.
@@ -1106,6 +1128,37 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     );
   }
 
+  /// Three-zone tap layer rendered above the desktop controls. The
+  /// outer thirds catch onDoubleTap and seek; the middle third is
+  /// inert so the underlying video / chrome handles play/pause and
+  /// hover-to-show normally. `behavior: deferToChild` lets single
+  /// taps fall through to the chrome / surface beneath.
+  Widget _desktopDoubleTapOverlay() {
+    return Positioned.fill(
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onDoubleTap: () =>
+                  unawaited(_seekRelative(-_doubleTapBackwardDuration)),
+            ),
+          ),
+          const Expanded(
+            child: SizedBox.expand(),
+          ),
+          Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onDoubleTap: () =>
+                  unawaited(_seekRelative(_doubleTapForwardDuration)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBody() {
     final engine = _engine;
     if (engine != null) {
@@ -1125,6 +1178,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         fit: StackFit.expand,
         children: [
           controls,
+          if (_isDesktop && !_isLocked) _desktopDoubleTapOverlay(),
           ..._downloadOverlays(context),
         ],
       );
