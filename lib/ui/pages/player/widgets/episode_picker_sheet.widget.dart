@@ -35,7 +35,7 @@ Future<String?> showEpisodePickerSheet(
   );
 }
 
-class _EpisodePickerContent extends StatelessWidget {
+class _EpisodePickerContent extends StatefulWidget {
   final Series series;
   final String currentEpisodeId;
   final Map<String, EpisodeProgress> progressByEpisodeId;
@@ -47,13 +47,42 @@ class _EpisodePickerContent extends StatelessWidget {
   });
 
   @override
+  State<_EpisodePickerContent> createState() => _EpisodePickerContentState();
+}
+
+class _EpisodePickerContentState extends State<_EpisodePickerContent> {
+  final GlobalKey _currentTileKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    // Wait until the ExpansionTile's open animation has settled, then
+    // bring the current episode tile into view. Without the delay, the
+    // tile's RenderObject isn't laid out yet and ensureVisible no-ops.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await Future<void>.delayed(const Duration(milliseconds: 280));
+      if (!mounted) return;
+      final ctx = _currentTileKey.currentContext;
+      if (ctx == null) return;
+      await Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 250),
+        alignment: 0.3,
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final regular = series.seasons.where((s) => s.seasonNumber > 0).toList()
-      ..sort((a, b) => a.seasonNumber.compareTo(b.seasonNumber));
+    final regular =
+        widget.series.seasons.where((s) => s.seasonNumber > 0).toList()
+          ..sort((a, b) => a.seasonNumber.compareTo(b.seasonNumber));
     final specials =
-        series.seasons.where((s) => s.seasonNumber == 0).toList();
+        widget.series.seasons.where((s) => s.seasonNumber == 0).toList();
     final ordered = [...regular, ...specials];
-    final currentSeasonNumber = _seasonNumberOf(currentEpisodeId, ordered);
+    final currentSeasonNumber =
+        _seasonNumberOf(widget.currentEpisodeId, ordered);
 
     return Theme(
       data: ThemeData.dark(useMaterial3: true).copyWith(
@@ -66,7 +95,7 @@ class _EpisodePickerContent extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
             child: Text(
-              series.title,
+              widget.series.title,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
@@ -76,9 +105,10 @@ class _EpisodePickerContent extends StatelessWidget {
           for (final s in ordered)
             _SeasonSection(
               season: s,
-              currentEpisodeId: currentEpisodeId,
-              progressByEpisodeId: progressByEpisodeId,
+              currentEpisodeId: widget.currentEpisodeId,
+              progressByEpisodeId: widget.progressByEpisodeId,
               initiallyExpanded: s.seasonNumber == currentSeasonNumber,
+              currentTileKey: _currentTileKey,
             ),
         ],
       ),
@@ -98,12 +128,14 @@ class _SeasonSection extends StatelessWidget {
   final String currentEpisodeId;
   final Map<String, EpisodeProgress> progressByEpisodeId;
   final bool initiallyExpanded;
+  final Key? currentTileKey;
 
   const _SeasonSection({
     required this.season,
     required this.currentEpisodeId,
     required this.progressByEpisodeId,
     required this.initiallyExpanded,
+    this.currentTileKey,
   });
 
   @override
@@ -124,6 +156,7 @@ class _SeasonSection extends StatelessWidget {
       children: [
         for (final ep in season.episodes)
           _EpisodeTile(
+            key: ep.id == currentEpisodeId ? currentTileKey : null,
             episode: ep,
             progress: progressByEpisodeId[ep.id],
             isCurrent: ep.id == currentEpisodeId,
@@ -139,6 +172,7 @@ class _EpisodeTile extends StatelessWidget {
   final bool isCurrent;
 
   const _EpisodeTile({
+    super.key,
     required this.episode,
     required this.isCurrent,
     this.progress,
