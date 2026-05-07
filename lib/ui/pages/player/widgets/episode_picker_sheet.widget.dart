@@ -64,7 +64,12 @@ class _EpisodePickerContentState extends State<_EpisodePickerContent> {
       if (!mounted) return;
       final ctx = _currentTileKey.currentContext;
       if (ctx == null) return;
+      // currentContext is the tile's own BuildContext, not the State's
+      // — the unrelated-mounted lint here is a false positive. We guard
+      // tile lifetime with the null check above and the State's with
+      // [mounted].
       await Scrollable.ensureVisible(
+        // ignore: use_build_context_synchronously
         ctx,
         duration: const Duration(milliseconds: 250),
         alignment: 0.3,
