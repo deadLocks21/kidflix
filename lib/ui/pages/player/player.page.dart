@@ -24,6 +24,8 @@ import 'package:kidflix/infrastructure/providers/watch_progress.usecases_provide
 import 'package:kidflix/ui/pages/player/media_kit_player_engine.dart';
 import 'package:kidflix/ui/pages/player/player_engine.dart';
 import 'package:kidflix/ui/pages/player/player_media_ref.dart';
+import 'package:kidflix/ui/pages/player/widgets/buffered_seek_bar.widget.dart';
+import 'package:kidflix/ui/pages/player/widgets/download_status_badge.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/lock_button.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/player_download_gate.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/player_error_state.widget.dart';
@@ -142,6 +144,14 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
 
   Timer? _periodicSaveTimer;
 
+  /// Drives [BufferedSeekBar]'s overlay. Lives as a notifier (rather than
+  /// being recomputed from `_lastDownload` in `build`) because
+  /// media_kit's `MaterialVideoControlsTheme` has an inverted
+  /// `updateShouldNotify` — widgets nested inside the controls don't
+  /// rebuild on parent setState.
+  final ValueNotifier<double?> _downloadedFractionNotifier =
+      ValueNotifier<double?>(null);
+
   @override
   void initState() {
     super.initState();
@@ -160,6 +170,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     _positionSub?.cancel();
     _durationSub?.cancel();
     _playingSub?.cancel();
+    _downloadedFractionNotifier.dispose();
     unawaited(_saveProgressNow());
     unawaited(_engine?.dispose());
     unawaited(_kidsLock.stopLock());
@@ -291,6 +302,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   Future<void> _onDownloadEvent(_DownloadView dto) async {
     if (_disposed) return;
     setState(() => _lastDownload = dto);
+    _downloadedFractionNotifier.value = _downloadedFraction();
     if (!_readyEmitted &&
         (dto.status == DownloadStatusDto.readyToPlay ||
             dto.status == DownloadStatusDto.complete)) {
@@ -310,6 +322,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         errorMessage: error.toString(),
       );
     });
+    _downloadedFractionNotifier.value = _downloadedFraction();
   }
 
   Future<void> _onReadyToPlay(String localPath) async {
@@ -321,6 +334,14 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
 
     _positionSub = engine.positionStream.listen((p) {
       if (_disposed) return;
+      // Reactive seek guard: when the user scrubs past the downloaded
+      // portion, snap back to the safe boundary so mpv doesn't try to
+      // demux a not-yet-written region.
+      final maxSafe = _maxSafePosition();
+      if (maxSafe != null && p > maxSafe) {
+        unawaited(_engine?.seek(maxSafe));
+        return;
+      }
       final previous = _lastObservedPosition;
       setState(() => _position = p);
       _lastObservedPosition = p;
@@ -435,6 +456,41 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     );
   }
 
+  /// Maximum position the user is allowed to seek to while a download
+  /// is still in flight. Returns `null` when no clamp applies (download
+  /// finished, no active download, or duration unknown).
+  ///
+  /// Bytes-to-time is not strictly linear in mp4, so a 2 % safety margin
+  /// is shaved off. When the total size is unknown (chunked endpoints
+  /// without Content-Length), the clamp pins to the last observed
+  /// position — no forward seek allowed.
+  Duration? _maxSafePosition() {
+    final d = _duration;
+    final dl = _lastDownload;
+    if (d == null || dl == null) return null;
+    if (dl.status == DownloadStatusDto.complete) return null;
+    final total = dl.bytesTotal;
+    if (total == null || total == 0) {
+      return _lastObservedPosition ?? Duration.zero;
+    }
+    final ratio = (dl.bytesReceived / total) - 0.02;
+    if (ratio <= 0) return Duration.zero;
+    if (ratio >= 1) return d;
+    return d * ratio;
+  }
+
+  /// Fraction of the file currently on disk (0..1). Returns `null` when
+  /// the media is fully local — the wrapper then renders MaterialSeekBar
+  /// unchanged with no extra overlay.
+  double? _downloadedFraction() {
+    final dl = _lastDownload;
+    if (dl == null) return null;
+    if (dl.status == DownloadStatusDto.complete) return null;
+    final total = dl.bytesTotal;
+    if (total == null || total == 0) return 0.0;
+    return (dl.bytesReceived / total).clamp(0.0, 1.0);
+  }
+
   void _checkCompletion() {
     if (_completedSaved) return;
     final d = _duration;
@@ -542,10 +598,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         seekOnDoubleTap: false,
         displaySeekBar: false,
         seekGesture: false,
+        padding: EdgeInsets.zero,
         topButtonBarMargin: EdgeInsets.only(
           left: 16 + insets.left,
           right: 16 + insets.right,
-          top: 8,
+          top: 8 + insets.top,
         ),
         topButtonBar: _lockedTopButtonBar(),
         primaryButtonBar: const [],
@@ -563,14 +620,25 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         ],
       );
     }
+    final primary = Theme.of(context).colorScheme.primary;
     return MaterialVideoControlsThemeData(
       visibleOnMount: true,
       speedUpOnLongPress: false,
       seekOnDoubleTap: false,
+      // media_kit's auto seek bar is disabled — we render the same
+      // MaterialSeekBar inside [BufferedSeekBar] so we can stack a
+      // download-fraction overlay on top while keeping the lib intact.
+      // [buttonBarHeight] is bumped to fit the seek bar above the row.
+      displaySeekBar: false,
+      buttonBarHeight: 96,
+      // Override media_kit's default fullscreen padding (would add
+      // MediaQuery.padding on top of the insets baked into the margins
+      // below — double-counting the safe area).
+      padding: EdgeInsets.zero,
       topButtonBarMargin: EdgeInsets.only(
         left: 16 + insets.left,
         right: 16 + insets.right,
-        top: 8,
+        top: 8 + insets.top,
       ),
       topButtonBar: _topButtonBar(),
       bottomButtonBarMargin: EdgeInsets.only(
@@ -578,20 +646,50 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         right: 16 + insets.right,
         bottom: 8 + insets.bottom,
       ),
+      // No vertical margin — the Column inside [_seekBarOverButtons]
+      // handles vertical spacing.
       seekBarMargin: EdgeInsets.only(
         left: 16 + insets.left,
         right: 16 + insets.right,
-        bottom: 8 + insets.bottom,
       ),
-      bottomButtonBar: [
+      seekBarColor: Colors.white.withValues(alpha: 0.18),
+      // Transparent — the BufferedSeekBar wrapper paints the download
+      // band underneath, so we don't want mpv's small read-ahead
+      // indicator stacking on top of it.
+      seekBarBufferColor: Colors.transparent,
+      seekBarPositionColor: primary,
+      seekBarThumbColor: primary,
+      bottomButtonBar: _seekBarOverButtons([
         const MaterialPlayOrPauseButton(),
         const MaterialPositionIndicator(),
         const Spacer(),
         const MaterialFullscreenButton(),
         LockButton(onTap: _onLockTap),
-      ],
+      ]),
     );
   }
+
+  /// Stacks our [BufferedSeekBar] (MaterialSeekBar + download overlay)
+  /// above the bottom button row, both inside a Column that fills the
+  /// bumped `buttonBarHeight`.
+  List<Widget> _seekBarOverButtons(List<Widget> buttons) => [
+        Expanded(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              BufferedSeekBar(
+                downloadedFraction: _downloadedFractionNotifier,
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.max,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: buttons,
+              ),
+            ],
+          ),
+        ),
+      ];
 
   MaterialDesktopVideoControlsThemeData _buildDesktopTheme(
     BuildContext context,
@@ -602,10 +700,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         visibleOnMount: true,
         toggleFullscreenOnDoublePress: false,
         displaySeekBar: false,
+        padding: EdgeInsets.zero,
         topButtonBarMargin: EdgeInsets.only(
           left: 16 + insets.left,
           right: 16 + insets.right,
-          top: 8,
+          top: 8 + insets.top,
         ),
         topButtonBar: _lockedTopButtonBar(),
         primaryButtonBar: const [],
@@ -624,13 +723,18 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         ],
       );
     }
+    final primary = Theme.of(context).colorScheme.primary;
     return MaterialDesktopVideoControlsThemeData(
       visibleOnMount: true,
       toggleFullscreenOnDoublePress: false,
+      // See _buildMobileTheme.
+      displaySeekBar: false,
+      buttonBarHeight: 96,
+      padding: EdgeInsets.zero,
       topButtonBarMargin: EdgeInsets.only(
         left: 16 + insets.left,
         right: 16 + insets.right,
-        top: 8,
+        top: 8 + insets.top,
       ),
       topButtonBar: _topButtonBar(),
       bottomButtonBarMargin: EdgeInsets.only(
@@ -641,17 +745,44 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       seekBarMargin: EdgeInsets.only(
         left: 16 + insets.left,
         right: 16 + insets.right,
-        bottom: 8 + insets.bottom,
       ),
-      bottomButtonBar: [
+      seekBarColor: Colors.white.withValues(alpha: 0.18),
+      // Transparent — the BufferedSeekBar wrapper paints the download
+      // band underneath, so we don't want mpv's small read-ahead
+      // indicator stacking on top of it.
+      seekBarBufferColor: Colors.transparent,
+      seekBarPositionColor: primary,
+      seekBarThumbColor: primary,
+      bottomButtonBar: _seekBarOverButtons([
         const MaterialDesktopPlayOrPauseButton(),
         const MaterialDesktopVolumeButton(),
         const MaterialDesktopPositionIndicator(),
         const Spacer(),
         const MaterialDesktopFullscreenButton(),
         LockButton(onTap: _onLockTap),
-      ],
+      ]),
     );
+  }
+
+  /// Top-right badge surfacing the current download percentage. Hidden
+  /// when locked. The seek bar's own buffered indicator (driven by mpv's
+  /// `demuxer-cache-time`) shows the read-ahead portion already; the
+  /// snap-back guard prevents seeks past the safe boundary.
+  List<Widget> _downloadOverlays(BuildContext context) {
+    final dl = _lastDownload;
+    if (dl == null || dl.status == DownloadStatusDto.complete) return const [];
+    if (_isLocked) return const [];
+    final insets = _safeInsets(context);
+    return [
+      Positioned(
+        top: insets.top + 12,
+        right: 16 + insets.right,
+        child: DownloadStatusBadge(
+          bytesReceived: dl.bytesReceived,
+          bytesTotal: dl.bytesTotal,
+        ),
+      ),
+    ];
   }
 
   @override
@@ -667,7 +798,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     if (engine != null) {
       final mobileTheme = _buildMobileTheme(context);
       final desktopTheme = _buildDesktopTheme(context);
-      return MaterialVideoControlsTheme(
+      final controls = MaterialVideoControlsTheme(
         key: ValueKey(_isLocked),
         normal: mobileTheme,
         fullscreen: mobileTheme,
@@ -676,6 +807,13 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
           fullscreen: desktopTheme,
           child: engine.buildSurface(),
         ),
+      );
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          controls,
+          ..._downloadOverlays(context),
+        ],
       );
     }
 
