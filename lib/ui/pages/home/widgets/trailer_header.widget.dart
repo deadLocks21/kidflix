@@ -88,6 +88,11 @@ class _TrailerHeaderState extends State<TrailerHeader> {
     });
     _errorSub = player.stream.error.listen((err) {
       debugPrint('[TrailerHeader] player error: $err');
+      // Audio device init failure is non-fatal: the trailer is muted by
+      // design, so the video keeps playing silently rather than dropping
+      // to the static fallback. mpv emits this on iOS when AVAudioSession
+      // can't be opened (silent switch on, route held by another app).
+      if (err.contains('audio device')) return;
       if (mounted) setState(() => _showFallback = true);
     });
 
