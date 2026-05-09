@@ -26,6 +26,8 @@ sealed class CatalogItem {
   String? get tagline;
   String? get posterUrl;
   String? get backdropUrl;
+  String? get logoUrl;
+  String? get trailerUrl;
   AgeCategory get ageCategory;
   List<String> get genres;
   String? get sagaId;
@@ -76,6 +78,10 @@ class Movie extends CatalogItem implements PlayableMedia {
   @override
   final String? backdropUrl;
   @override
+  final String? logoUrl;
+  @override
+  final String? trailerUrl;
+  @override
   final AgeCategory ageCategory;
   @override
   final List<String> genres;
@@ -105,6 +111,8 @@ class Movie extends CatalogItem implements PlayableMedia {
     this.tagline,
     this.posterUrl,
     this.backdropUrl,
+    this.logoUrl,
+    this.trailerUrl,
     this.sagaId,
     this.sagaLabel,
   });
@@ -152,6 +160,10 @@ class Series extends CatalogItem {
   @override
   final String? backdropUrl;
   @override
+  final String? logoUrl;
+  @override
+  final String? trailerUrl;
+  @override
   final AgeCategory ageCategory;
   @override
   final List<String> genres;
@@ -195,6 +207,8 @@ class Series extends CatalogItem {
     this.tagline,
     this.posterUrl,
     this.backdropUrl,
+    this.logoUrl,
+    this.trailerUrl,
     this.sagaId,
     this.sagaLabel,
   });

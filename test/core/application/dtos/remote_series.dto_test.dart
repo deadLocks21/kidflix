@@ -14,6 +14,9 @@ Map<String, dynamic> _pinguCatalogJson() => {
   'tagline': null,
   'poster_url': 'https://image.tmdb.org/t/p/original/poster.jpg',
   'backdrop_url': 'https://image.tmdb.org/t/p/original/backdrop.jpg',
+  'logo_url': 'https://image.tmdb.org/t/p/original/pingu_catalog_logo.png',
+  'trailer_url':
+      'plugin://plugin.video.youtube/play/?video_id=PinguTrailer1',
   'age_category': 'enfant',
   'genres': ['Animation', 'Familial'],
   'saga_id': null,
@@ -32,6 +35,9 @@ Map<String, dynamic> _pinguDetailJson() => {
   'tagline': null,
   'poster_url': 'https://image.tmdb.org/t/p/original/poster.jpg',
   'backdrop_url': 'https://image.tmdb.org/t/p/original/backdrop.jpg',
+  'logo_url': 'https://image.tmdb.org/t/p/original/pingu_detail_logo.png',
+  'trailer_url':
+      'plugin://plugin.video.youtube/play/?video_id=PinguTrailer2',
   'age_category': 'enfant',
   'genres': ['Animation', 'Familial'],
   'director': <String>[],
@@ -106,6 +112,25 @@ void main() {
       expect(domain.ageCategory, AgeCategory.enfant);
       expect(domain.genres, ['Animation', 'Familial']);
       expect(domain.seasons, isEmpty);
+      expect(
+        domain.trailerUrl,
+        'plugin://plugin.video.youtube/play/?video_id=PinguTrailer1',
+      );
+    });
+
+    test('trailer_url is null when absent from the catalog payload', () {
+      final payload = _pinguCatalogJson()..remove('trailer_url');
+      final domain = RemoteSeriesCatalogDto.fromJson(payload).toDomain();
+      expect(domain.trailerUrl, isNull);
+    });
+
+    test('logo_url is projected through to the catalog projection', () {
+      final domain =
+          RemoteSeriesCatalogDto.fromJson(_pinguCatalogJson()).toDomain();
+      expect(
+        domain.logoUrl,
+        'https://image.tmdb.org/t/p/original/pingu_catalog_logo.png',
+      );
     });
 
     test('throws on unknown age_category', () {
@@ -170,6 +195,24 @@ void main() {
           RemoteSeriesDetailDto.fromJson(_pinguDetailJson()).toDomain();
       final special = domain.seasons[0].episodes[0];
       expect(special.duration, const Duration(seconds: 1500));
+    });
+
+    test('trailer_url is projected through to the domain Series', () {
+      final domain =
+          RemoteSeriesDetailDto.fromJson(_pinguDetailJson()).toDomain();
+      expect(
+        domain.trailerUrl,
+        'plugin://plugin.video.youtube/play/?video_id=PinguTrailer2',
+      );
+    });
+
+    test('logo_url is projected through to the domain Series', () {
+      final domain =
+          RemoteSeriesDetailDto.fromJson(_pinguDetailJson()).toDomain();
+      expect(
+        domain.logoUrl,
+        'https://image.tmdb.org/t/p/original/pingu_detail_logo.png',
+      );
     });
   });
 }

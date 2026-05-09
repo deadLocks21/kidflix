@@ -22,6 +22,8 @@ class RemoteSeriesCatalogDto {
   final String? tagline;
   final String? posterUrl;
   final String? backdropUrl;
+  final String? logoUrl;
+  final String? trailerUrl;
   final AgeCategory ageCategory;
   final List<String> genres;
   final String? sagaId;
@@ -46,6 +48,8 @@ class RemoteSeriesCatalogDto {
     this.tagline,
     this.posterUrl,
     this.backdropUrl,
+    this.logoUrl,
+    this.trailerUrl,
     this.sagaId,
     this.sagaLabel,
   });
@@ -62,6 +66,8 @@ class RemoteSeriesCatalogDto {
         tagline: json['tagline'] as String?,
         posterUrl: json['poster_url'] as String?,
         backdropUrl: json['backdrop_url'] as String?,
+        logoUrl: json['logo_url'] as String?,
+        trailerUrl: json['trailer_url'] as String?,
         ageCategory: ageCategoryFromWire(json['age_category'] as String),
         genres: (json['genres'] as List).cast<String>(),
         sagaId: json['saga_id'] as String?,
@@ -83,6 +89,8 @@ class RemoteSeriesCatalogDto {
         tagline: tagline,
         posterUrl: posterUrl,
         backdropUrl: backdropUrl,
+        logoUrl: logoUrl,
+        trailerUrl: trailerUrl,
         ageCategory: ageCategory,
         genres: genres,
         sagaId: sagaId,
@@ -112,6 +120,8 @@ class RemoteSeriesDetailDto {
   final String? tagline;
   final String? posterUrl;
   final String? backdropUrl;
+  final String? logoUrl;
+  final String? trailerUrl;
   final AgeCategory ageCategory;
   final List<String> genres;
   final String? sagaId;
@@ -136,6 +146,8 @@ class RemoteSeriesDetailDto {
     this.tagline,
     this.posterUrl,
     this.backdropUrl,
+    this.logoUrl,
+    this.trailerUrl,
     this.sagaId,
     this.sagaLabel,
   });
@@ -150,6 +162,8 @@ class RemoteSeriesDetailDto {
         tagline: json['tagline'] as String?,
         posterUrl: json['poster_url'] as String?,
         backdropUrl: json['backdrop_url'] as String?,
+        logoUrl: json['logo_url'] as String?,
+        trailerUrl: json['trailer_url'] as String?,
         ageCategory: ageCategoryFromWire(json['age_category'] as String),
         genres: (json['genres'] as List).cast<String>(),
         sagaId: json['saga_id'] as String?,
@@ -185,6 +199,8 @@ class RemoteSeriesDetailDto {
       tagline: tagline,
       posterUrl: posterUrl,
       backdropUrl: backdropUrl,
+      logoUrl: logoUrl,
+      trailerUrl: trailerUrl,
       ageCategory: ageCategory,
       genres: genres,
       sagaId: sagaId,

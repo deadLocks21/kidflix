@@ -13,6 +13,9 @@ Map<String, dynamic> _asterixJson() => {
   'tagline': 'Il y a très très longtemps…',
   'poster_url': 'https://image.tmdb.org/t/p/original/poster.jpg',
   'backdrop_url': 'https://image.tmdb.org/t/p/original/backdrop.jpg',
+  'logo_url': 'https://image.tmdb.org/t/p/original/logo.png',
+  'trailer_url':
+      'plugin://plugin.video.youtube/play/?video_id=fet2dxgJGNk',
   'age_category': 'enfant',
   'genres': ['Familial', 'Comédie', 'Aventure', 'Fantastique'],
   'saga_id': 'asterix',
@@ -46,6 +49,11 @@ void main() {
       expect(
         dto.backdropUrl,
         'https://image.tmdb.org/t/p/original/backdrop.jpg',
+      );
+      expect(dto.logoUrl, 'https://image.tmdb.org/t/p/original/logo.png');
+      expect(
+        dto.trailerUrl,
+        'plugin://plugin.video.youtube/play/?video_id=fet2dxgJGNk',
       );
       expect(dto.ageCategory, AgeCategory.enfant);
       expect(dto.genres, ['Familial', 'Comédie', 'Aventure', 'Fantastique']);
@@ -99,12 +107,29 @@ void main() {
       expect(movie.tagline, isNull);
       expect(movie.posterUrl, isNull);
       expect(movie.backdropUrl, isNull);
+      expect(movie.logoUrl, isNull);
+      expect(movie.trailerUrl, isNull);
       expect(movie.sagaId, isNull);
       expect(movie.sagaLabel, isNull);
       expect(movie.cast, isEmpty);
       expect(movie.genres, isEmpty);
       expect(movie.director, isEmpty);
       expect(movie.duration, const Duration(seconds: 5400));
+    });
+
+    test('toDomain projects trailer_url through to the Movie', () {
+      final movie = RemoteMovieDto.fromJson(_asterixJson()).toDomain();
+
+      expect(
+        movie.trailerUrl,
+        'plugin://plugin.video.youtube/play/?video_id=fet2dxgJGNk',
+      );
+    });
+
+    test('toDomain projects logo_url through to the Movie', () {
+      final movie = RemoteMovieDto.fromJson(_asterixJson()).toDomain();
+
+      expect(movie.logoUrl, 'https://image.tmdb.org/t/p/original/logo.png');
     });
 
     test('throws FormatException on unknown age_category wire value', () {

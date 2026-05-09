@@ -56,6 +56,8 @@ class MovieDetailDto {
   final String? tagline;
   final String? posterUrl;
   final String? backdropUrl;
+  final String? logoUrl;
+  final String? trailerUrl;
   final String ageCategory;
   final List<String> genres;
   final List<String> director;
@@ -75,6 +77,8 @@ class MovieDetailDto {
     this.tagline,
     this.posterUrl,
     this.backdropUrl,
+    this.logoUrl,
+    this.trailerUrl,
   });
 
   factory MovieDetailDto.fromDomain(Movie movie) => MovieDetailDto(
@@ -87,6 +91,8 @@ class MovieDetailDto {
     tagline: movie.tagline,
     posterUrl: movie.posterUrl,
     backdropUrl: movie.backdropUrl,
+    logoUrl: movie.logoUrl,
+    trailerUrl: movie.trailerUrl,
     ageCategory: movie.ageCategory.name,
     genres: List.unmodifiable(movie.genres),
     director: List.unmodifiable(movie.director),

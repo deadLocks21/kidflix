@@ -1,14 +1,13 @@
 import 'dart:async';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/infrastructure/providers/download.repository_provider.dart';
 import 'package:kidflix/shared/duration_format.dart';
-import 'package:kidflix/shared/tmdb_image.dart';
 import 'package:kidflix/ui/pages/home/widgets/download_intent_button.widget.dart';
+import 'package:kidflix/ui/pages/home/widgets/trailer_header.widget.dart';
 
 /// Width threshold to choose between dialog and bottom-sheet presentation.
 const double _adaptiveBreakpointDp = 600;
@@ -70,7 +69,11 @@ class MovieDetailContent extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _Backdrop(url: movie.backdropUrl),
+          TrailerHeader(
+            trailerUrl: movie.trailerUrl,
+            fallbackImageUrl: movie.backdropUrl,
+            logoUrl: movie.logoUrl,
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
             child: Column(
@@ -177,38 +180,6 @@ class MovieDetailContent extends StatelessWidget {
     parts.add(formatDurationHuman(movie.duration));
     if (movie.genres.isNotEmpty) parts.add(movie.genres.first);
     return parts.join(' · ');
-  }
-}
-
-class _Backdrop extends StatelessWidget {
-  final String? url;
-
-  const _Backdrop({required this.url});
-
-  @override
-  Widget build(BuildContext context) {
-    final fallback = Container(
-      height: 200,
-      color: Theme.of(context).colorScheme.surfaceContainerHigh,
-    );
-    final src = url;
-    if (src == null || src.isEmpty) return fallback;
-    return AspectRatio(
-      aspectRatio: 16 / 9,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final dpr = MediaQuery.devicePixelRatioOf(context);
-          return CachedNetworkImage(
-            imageUrl: tmdbResize(src, 'w780'),
-            fit: BoxFit.cover,
-            filterQuality: FilterQuality.medium,
-            memCacheWidth: (constraints.maxWidth * dpr).round(),
-            placeholder: (_, _) => fallback,
-            errorWidget: (_, _, _) => fallback,
-          );
-        },
-      ),
-    );
   }
 }
 

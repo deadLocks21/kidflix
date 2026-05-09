@@ -18,6 +18,7 @@ import 'package:kidflix/ui/pages/home/widgets/download_intent_button.widget.dart
 import 'package:kidflix/ui/pages/home/widgets/resume_progress_bar.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/season_download_button.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/series/play_label.dart';
+import 'package:kidflix/ui/pages/home/widgets/trailer_header.widget.dart';
 
 const double _adaptiveBreakpointDp = 600;
 
@@ -137,7 +138,11 @@ class _SeriesDetailContentState extends ConsumerState<SeriesDetailContent> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _Backdrop(url: catalogSeries.backdropUrl),
+          TrailerHeader(
+            trailerUrl: catalogSeries.trailerUrl,
+            fallbackImageUrl: catalogSeries.backdropUrl,
+            logoUrl: catalogSeries.logoUrl,
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
             child: Column(
@@ -562,34 +567,3 @@ class _SeasonsErrorState extends StatelessWidget {
   }
 }
 
-class _Backdrop extends StatelessWidget {
-  final String? url;
-
-  const _Backdrop({required this.url});
-
-  @override
-  Widget build(BuildContext context) {
-    final placeholder = Container(
-      color: Theme.of(context).colorScheme.surfaceContainerHigh,
-    );
-    if (url == null || url!.isEmpty) {
-      return AspectRatio(aspectRatio: 16 / 9, child: placeholder);
-    }
-    return AspectRatio(
-      aspectRatio: 16 / 9,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final dpr = MediaQuery.devicePixelRatioOf(context);
-          return CachedNetworkImage(
-            imageUrl: tmdbResize(url!, 'w780'),
-            fit: BoxFit.cover,
-            filterQuality: FilterQuality.medium,
-            memCacheWidth: (constraints.maxWidth * dpr).round(),
-            placeholder: (_, _) => placeholder,
-            errorWidget: (_, _, _) => placeholder,
-          );
-        },
-      ),
-    );
-  }
-}
