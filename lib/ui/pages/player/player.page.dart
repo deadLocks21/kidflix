@@ -13,7 +13,9 @@ import 'package:kidflix/core/application/usecases/pick_next_shuffle_episode.usec
 import 'package:kidflix/core/application/usecases/resolve_continue_watching.usecase.dart';
 import 'package:kidflix/core/application/usecases/save_watch_progress.usecase.dart';
 import 'package:kidflix/core/domain/model/media.dart';
+import 'package:kidflix/core/domain/model/media_track.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
+import 'package:kidflix/core/domain/model/track_preferences.dart';
 import 'package:kidflix/core/domain/model/watch_progress.dart';
 import 'package:kidflix/core/domain/services/kids_lock.service.dart';
 import 'package:kidflix/core/domain/services/profile_pin.service.dart';
@@ -23,11 +25,13 @@ import 'package:kidflix/infrastructure/providers/kids_lock.service_provider.dart
 import 'package:kidflix/infrastructure/providers/profile_pin.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/series.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
+import 'package:kidflix/infrastructure/providers/track_preferences.usecases_provider.dart';
 import 'package:kidflix/infrastructure/providers/watch_progress.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/watch_progress.usecases_provider.dart';
 import 'package:kidflix/ui/pages/player/media_kit_player_engine.dart';
 import 'package:kidflix/ui/pages/player/player_engine.dart';
 import 'package:kidflix/ui/pages/player/player_media_ref.dart';
+import 'package:kidflix/ui/pages/player/widgets/audio_track_button.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/buffered_seek_bar.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/download_status_badge.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/episode_nav_buttons.widget.dart';
@@ -36,6 +40,8 @@ import 'package:kidflix/ui/pages/player/widgets/lock_button.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/player_download_gate.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/player_error_state.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/resume_dialog.widget.dart';
+import 'package:kidflix/ui/pages/player/widgets/subtitle_track_button.widget.dart';
+import 'package:kidflix/ui/pages/player/widgets/track_selector_sheet.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/unlock_button.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/unlock_pin_dialog.widget.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -146,6 +152,25 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<Duration?>? _durationSub;
   StreamSubscription<bool>? _playingSub;
+  StreamSubscription<AvailableTracks>? _tracksSub;
+  StreamSubscription<SelectedTracks>? _selectedTracksSub;
+
+  /// Track lists & current selection are backed by [ValueNotifier]s
+  /// rather than `setState` fields because the audio / subtitle buttons
+  /// live inside [MaterialVideoControlsTheme], which has an inverted
+  /// `updateShouldNotify` — widgets nested inside the controls don't
+  /// rebuild on parent `setState`. Same workaround as
+  /// [_downloadedFractionNotifier] for the seek bar.
+  final ValueNotifier<List<MediaTrack>> _audioTracksNotifier =
+      ValueNotifier<List<MediaTrack>>(const []);
+  final ValueNotifier<List<MediaTrack>> _subtitleTracksNotifier =
+      ValueNotifier<List<MediaTrack>>(const []);
+  final ValueNotifier<String?> _selectedAudioIdNotifier =
+      ValueNotifier<String?>(null);
+  final ValueNotifier<String?> _selectedSubtitleIdNotifier =
+      ValueNotifier<String?>(null);
+  TrackPreferences? _trackPreferences;
+  bool _initialTracksApplied = false;
 
   _DownloadView? _lastDownload;
   String? _mediaTitle;
@@ -200,7 +225,13 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     _positionSub?.cancel();
     _durationSub?.cancel();
     _playingSub?.cancel();
+    _tracksSub?.cancel();
+    _selectedTracksSub?.cancel();
     _downloadedFractionNotifier.dispose();
+    _audioTracksNotifier.dispose();
+    _subtitleTracksNotifier.dispose();
+    _selectedAudioIdNotifier.dispose();
+    _selectedSubtitleIdNotifier.dispose();
     unawaited(_saveProgressNow());
     unawaited(_engine?.dispose());
     unawaited(_kidsLock.stopLock());
@@ -238,6 +269,21 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       _profileId = session.profile.id;
       _mainProfile =
           session.session.profiles.where((p) => p.isMain).firstOrNull;
+    }
+
+    // Load persisted track preferences for the current profile so the
+    // initial-track usecase can find a matching language as soon as the
+    // engine emits its first tracks snapshot.
+    final profileId = _profileId;
+    if (profileId != null) {
+      try {
+        _trackPreferences = await ref
+            .read(loadTrackPreferencesUseCaseProvider)
+            .execute(profileId);
+      } catch (_) {
+        _trackPreferences = null;
+      }
+      if (_disposed) return;
     }
 
     await _loadEpisodeContext();
@@ -427,9 +473,82 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         _stopPeriodicSave();
       }
     });
+    _tracksSub = engine.tracksStream.listen(_onTracksAvailable);
+    _selectedTracksSub = engine.selectedTracksStream.listen((selected) {
+      if (_disposed) return;
+      _selectedAudioIdNotifier.value = selected.audioId;
+      _selectedSubtitleIdNotifier.value = selected.subtitleId;
+    });
     await engine.open(localPath, initialPosition: initialPosition);
     if (_disposed) return;
     await engine.play();
+  }
+
+  void _onTracksAvailable(AvailableTracks tracks) {
+    if (_disposed) return;
+    // Diagnostic: surface what the engine reports each time the track
+    // list changes. Helps debug « les boutons restent grisés » — if
+    // this prints empty lists for a known multi-track file, the
+    // problem is on the engine / demux side, not in the UI wiring.
+    debugPrint(
+      '[kidflix.player] tracks emitted — audio=${tracks.audio.length} '
+      'subtitle=${tracks.subtitle.length}',
+    );
+    for (final t in tracks.audio) {
+      debugPrint(
+        '[kidflix.player]   audio  id=${t.id} lang=${t.language} title=${t.title}',
+      );
+    }
+    for (final t in tracks.subtitle) {
+      debugPrint(
+        '[kidflix.player]   subtitle id=${t.id} lang=${t.language} title=${t.title}',
+      );
+    }
+    _audioTracksNotifier.value = tracks.audio;
+    _subtitleTracksNotifier.value = tracks.subtitle;
+    // Wait until the engine has actually advertised real tracks before
+    // attempting to apply the saved preferences. media_kit emits an
+    // initial empty `Tracks()` snapshot during `open` — applying then
+    // would race with the still-loading demuxer.
+    final hasTracks = tracks.audio.isNotEmpty || tracks.subtitle.isNotEmpty;
+    if (!_initialTracksApplied && hasTracks && _trackPreferences != null) {
+      _initialTracksApplied = true;
+      _applyInitialTrackPreferences();
+    }
+  }
+
+  void _applyInitialTrackPreferences() {
+    final engine = _engine;
+    if (engine == null) return;
+    final selection = ref.read(pickInitialTracksUseCaseProvider).execute(
+          audio: _audioTracksNotifier.value,
+          subtitle: _subtitleTracksNotifier.value,
+          preferences: _trackPreferences,
+        );
+    final audioId = selection.audioId;
+    if (audioId != null) {
+      unawaited(_safeApply(() => engine.setAudioTrack(audioId)));
+    }
+    if (selection.disableSubtitles) {
+      unawaited(_safeApply(() => engine.setSubtitleTrack('no')));
+    } else {
+      final subtitleId = selection.subtitleId;
+      if (subtitleId != null) {
+        unawaited(_safeApply(() => engine.setSubtitleTrack(subtitleId)));
+      }
+    }
+  }
+
+  /// Wraps an engine track-apply call so a transient failure (e.g. the
+  /// underlying `Player` rejecting the id mid-load) cannot bubble up
+  /// and turn a recoverable race into a broken playback.
+  Future<void> _safeApply(Future<void> Function() op) async {
+    try {
+      await op();
+    } catch (_) {
+      // Track application is best-effort — playback continues with the
+      // engine's default selection.
+    }
   }
 
   Future<Duration> _resolveInitialPosition() async {
@@ -752,6 +871,10 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       _durationSub = null;
       await _playingSub?.cancel();
       _playingSub = null;
+      await _tracksSub?.cancel();
+      _tracksSub = null;
+      await _selectedTracksSub?.cancel();
+      _selectedTracksSub = null;
       await _engine?.dispose();
       _engine = null;
       WakelockPlus.disable();
@@ -770,7 +893,12 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         _completedSaved = false;
         _saving = false;
         _autoAdvanceFired = false;
+        _initialTracksApplied = false;
       });
+      _audioTracksNotifier.value = const [];
+      _subtitleTracksNotifier.value = const [];
+      _selectedAudioIdNotifier.value = null;
+      _selectedSubtitleIdNotifier.value = null;
       _downloadedFractionNotifier.value = null;
       _shuffleHistory.add(newEpisodeId);
       await _bootstrap();
@@ -844,6 +972,96 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     await _switchToEpisode(picked);
   }
 
+  Future<void> _onAudioTrackTap() async {
+    final engine = _engine;
+    if (engine == null) return;
+    final tracks = _audioTracksNotifier.value;
+    if (tracks.isEmpty) return;
+    final picked = await showTrackSelectorSheet(
+      context,
+      kind: MediaTrackKind.audio,
+      tracks: tracks,
+      selectedId: _selectedAudioIdNotifier.value,
+      subtitlesDisabled: false,
+    );
+    if (picked == null) return;
+    final id = picked.id;
+    if (id == null) return;
+    await engine.setAudioTrack(id);
+    final track = tracks.firstWhere(
+      (t) => t.id == id,
+      orElse: () => MediaTrack(id: id, kind: MediaTrackKind.audio),
+    );
+    await _persistAudioPreference(track.language);
+  }
+
+  Future<void> _onSubtitleTrackTap() async {
+    final engine = _engine;
+    if (engine == null) return;
+    final tracks = _subtitleTracksNotifier.value;
+    if (tracks.isEmpty) return;
+    final selectedSubtitleId = _selectedSubtitleIdNotifier.value;
+    final isCurrentlyOff =
+        selectedSubtitleId == null || selectedSubtitleId == 'no';
+    final picked = await showTrackSelectorSheet(
+      context,
+      kind: MediaTrackKind.subtitle,
+      tracks: tracks,
+      selectedId: selectedSubtitleId,
+      subtitlesDisabled: isCurrentlyOff,
+    );
+    if (picked == null) return;
+    if (picked.disable) {
+      await engine.setSubtitleTrack('no');
+      await _persistSubtitlePreference(language: null, disabled: true);
+      return;
+    }
+    final id = picked.id;
+    if (id == null) return;
+    await engine.setSubtitleTrack(id);
+    final track = tracks.firstWhere(
+      (t) => t.id == id,
+      orElse: () => MediaTrack(id: id, kind: MediaTrackKind.subtitle),
+    );
+    await _persistSubtitlePreference(language: track.language, disabled: false);
+  }
+
+  Future<void> _persistAudioPreference(String? language) async {
+    final profileId = _profileId;
+    if (profileId == null) return;
+    final next = (_trackPreferences ?? TrackPreferences(profileId: profileId))
+        .copyWith(
+      audioLanguage: language,
+      clearAudioLanguage: language == null,
+    );
+    _trackPreferences = next;
+    try {
+      await ref.read(saveTrackPreferencesUseCaseProvider).execute(next);
+    } catch (_) {
+      // Best-effort persistence — failure must not interrupt playback.
+    }
+  }
+
+  Future<void> _persistSubtitlePreference({
+    required String? language,
+    required bool disabled,
+  }) async {
+    final profileId = _profileId;
+    if (profileId == null) return;
+    final next = (_trackPreferences ?? TrackPreferences(profileId: profileId))
+        .copyWith(
+      subtitleLanguage: language,
+      clearSubtitleLanguage: language == null,
+      subtitlesDisabled: disabled,
+    );
+    _trackPreferences = next;
+    try {
+      await ref.read(saveTrackPreferencesUseCaseProvider).execute(next);
+    } catch (_) {
+      // Best-effort persistence — failure must not interrupt playback.
+    }
+  }
+
   void _onRetryDownload() {
     setState(() {
       _lastDownload = null;
@@ -880,6 +1098,44 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     final ep = _nextEpisodeOrNull();
     return NextEpisodeButton(
       onTap: ep == null ? null : () => _switchToEpisode(ep.id),
+    );
+  }
+
+  /// Listens to [_audioTracksNotifier] so the button rebuilds and toggles
+  /// from greyed-out → enabled the moment mpv emits the real track list.
+  /// A plain [AudioTrackButton] inlined into the bottom bar would never
+  /// rebuild here because `MaterialVideoControlsTheme` swallows parent
+  /// `setState` notifications.
+  Widget _audioTrackButton() {
+    return ValueListenableBuilder<List<MediaTrack>>(
+      valueListenable: _audioTracksNotifier,
+      builder: (_, tracks, _) => AudioTrackButton(
+        onTap: tracks.length > 1 ? _onAudioTrackTap : null,
+      ),
+    );
+  }
+
+  /// See [_audioTrackButton] for the reason this is wrapped. We listen
+  /// to both the track list (for enable/disable) and the current
+  /// selection (for the filled vs outlined icon) — `Listenable.merge`
+  /// keeps the rebuild surface minimal.
+  Widget _subtitleTrackButton() {
+    return ListenableBuilder(
+      listenable: Listenable.merge([
+        _subtitleTracksNotifier,
+        _selectedSubtitleIdNotifier,
+      ]),
+      builder: (_, _) {
+        final tracks = _subtitleTracksNotifier.value;
+        final selectedId = _selectedSubtitleIdNotifier.value;
+        final isActive = selectedId != null &&
+            selectedId != 'no' &&
+            selectedId != 'auto';
+        return SubtitleTrackButton(
+          onTap: tracks.isNotEmpty ? _onSubtitleTrackTap : null,
+          active: isActive,
+        );
+      },
     );
   }
 
@@ -987,6 +1243,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         if (_seriesControlsEnabled) _nextEpisodeButton(),
         const MaterialPositionIndicator(),
         const Spacer(),
+        _audioTrackButton(),
+        _subtitleTrackButton(),
         if (_seriesControlsEnabled)
           EpisodePickerButton(onTap: _onPickEpisodeTap),
         const MaterialFullscreenButton(),
@@ -1091,6 +1349,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         const MaterialDesktopVolumeButton(),
         const MaterialDesktopPositionIndicator(),
         const Spacer(),
+        _audioTrackButton(),
+        _subtitleTrackButton(),
         if (_seriesControlsEnabled)
           EpisodePickerButton(onTap: _onPickEpisodeTap),
         const MaterialDesktopFullscreenButton(),
