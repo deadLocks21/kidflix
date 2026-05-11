@@ -65,8 +65,16 @@ GoRouter appRouter(Ref ref) {
   // cache cleanup pass. Subsequent state changes (logout, profile
   // switch) do not retrigger. `unawaited(...)` keeps boot non-blocking.
   var didRunStartupCleanup = false;
-  ref.listen<SessionState>(sessionControllerProvider, (_, next) {
-    refresh.value++;
+  ref.listen<SessionState>(sessionControllerProvider, (previous, next) {
+    // Only refresh the router on state TYPE transitions: the redirect
+    // logic branches solely on the runtime type of `SessionState`, so
+    // same-type mutations (e.g. `ManagingProfiles(s1) → ManagingProfiles(s2)`
+    // when a profile is created / edited) would otherwise trigger a
+    // gratuitous re-resolution that races with imperative `context.pop()`
+    // and re-pushes the form page on top of the manage list.
+    if (previous?.runtimeType != next.runtimeType) {
+      refresh.value++;
+    }
     if (!didRunStartupCleanup &&
         (next is Authenticated ||
             next is ProfileSelected ||
