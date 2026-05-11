@@ -5,6 +5,7 @@ import 'package:kidflix/core/application/usecases/clear_profile_pin.usecase.dart
 import 'package:kidflix/core/application/usecases/delete_profile.usecase.dart';
 import 'package:kidflix/core/application/usecases/update_profile_metadata.usecase.dart';
 import 'package:kidflix/core/domain/exceptions/unknown_profile.exception.dart';
+import 'package:kidflix/core/domain/model/avatar_update.dart';
 import 'package:kidflix/core/domain/model/device.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/model/session.dart';
@@ -150,6 +151,7 @@ class _ThrowingRepository implements ProfileManagementRepository {
     required String name,
     required AgeCategory ageCategory,
     String? rawPin,
+    String? avatarId,
   }) {
     calls.add('create');
     throw _toThrow;
@@ -160,6 +162,7 @@ class _ThrowingRepository implements ProfileManagementRepository {
     required String id,
     required String name,
     required AgeCategory ageCategory,
+    AvatarUpdate avatar = const AvatarUnchanged(),
   }) {
     calls.add('updateMetadata');
     throw _toThrow;

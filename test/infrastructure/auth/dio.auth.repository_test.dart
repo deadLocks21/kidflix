@@ -197,14 +197,14 @@ void main() {
       required String name,
       required String ageCategory,
       String? pinHash,
-      String? avatarUrl,
+      String? avatarId,
       required bool isMain,
     }) => {
       'id': id,
       'name': name,
       'age_category': ageCategory,
       'pin_hash': pinHash,
-      'avatar_url': avatarUrl,
+      'avatar_id': avatarId,
       'is_main': isMain,
     };
 
@@ -381,14 +381,14 @@ void main() {
       required String name,
       required String ageCategory,
       String? pinHash,
-      String? avatarUrl,
+      String? avatarId,
       required bool isMain,
     }) => {
       'id': id,
       'name': name,
       'age_category': ageCategory,
       'pin_hash': pinHash,
-      'avatar_url': avatarUrl,
+      'avatar_id': avatarId,
       'is_main': isMain,
     };
 

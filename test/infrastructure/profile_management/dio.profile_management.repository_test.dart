@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kidflix/core/domain/exceptions/cannot_clear_main_profile_pin.exception.dart';
 import 'package:kidflix/core/domain/exceptions/cannot_delete_main_profile.exception.dart';
 import 'package:kidflix/core/domain/exceptions/unknown_profile.exception.dart';
+import 'package:kidflix/core/domain/model/avatar_update.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/infrastructure/profile_management/dio.profile_management.repository.dart';
 
@@ -108,14 +109,14 @@ Map<String, dynamic> _profilePayload({
   String name = 'Léa',
   String ageCategory = 'enfant',
   String? pinHash,
-  String? avatarUrl,
+  String? avatarId,
   bool isMain = false,
 }) => {
   'id': id,
   'name': name,
   'age_category': ageCategory,
   'pin_hash': pinHash,
-  'avatar_url': avatarUrl,
+  'avatar_id': avatarId,
   'is_main': isMain,
 };
 
@@ -192,6 +193,32 @@ void main() {
         throwsA(isA<DioException>()),
       );
     });
+
+    test('includes avatar_id in the body when provided', () async {
+      final adapter = _FakeAdapter((_, _) => _jsonResponse(200, _profilePayload()));
+      final repo = DioProfileManagementRepository(_makeDio(adapter));
+
+      await repo.create(
+        name: 'Léa',
+        ageCategory: AgeCategory.enfant,
+        avatarId: 'cat-01',
+      );
+
+      expect(adapter.requests.single.bodyJson, {
+        'name': 'Léa',
+        'age_category': 'enfant',
+        'avatar_id': 'cat-01',
+      });
+    });
+
+    test('omits avatar_id when not provided', () async {
+      final adapter = _FakeAdapter((_, _) => _jsonResponse(200, _profilePayload()));
+      final repo = DioProfileManagementRepository(_makeDio(adapter));
+
+      await repo.create(name: 'Léa', ageCategory: AgeCategory.enfant);
+
+      expect(adapter.requests.single.bodyJson!.containsKey('avatar_id'), isFalse);
+    });
   });
 
   group('DioProfileManagementRepository.updateMetadata', () {
@@ -219,6 +246,60 @@ void main() {
         'name': 'Arthur',
         'age_category': 'ado',
       });
+    });
+
+    test('AvatarUnchanged omits avatar_id from body', () async {
+      final adapter = _FakeAdapter(
+        (_, _) => _jsonResponse(200, _profilePayload(id: 'ar')),
+      );
+      final repo = DioProfileManagementRepository(_makeDio(adapter));
+
+      await repo.updateMetadata(
+        id: 'ar',
+        name: 'Ar',
+        ageCategory: AgeCategory.enfant,
+        avatar: const AvatarUnchanged(),
+      );
+
+      expect(adapter.requests.single.bodyJson!.containsKey('avatar_id'), isFalse);
+    });
+
+    test('AvatarSetTo sends avatar_id as string', () async {
+      final adapter = _FakeAdapter(
+        (_, _) => _jsonResponse(200, _profilePayload(id: 'ar')),
+      );
+      final repo = DioProfileManagementRepository(_makeDio(adapter));
+
+      await repo.updateMetadata(
+        id: 'ar',
+        name: 'Ar',
+        ageCategory: AgeCategory.enfant,
+        avatar: const AvatarSetTo('panda-01'),
+      );
+
+      expect(adapter.requests.single.bodyJson, {
+        'name': 'Ar',
+        'age_category': 'enfant',
+        'avatar_id': 'panda-01',
+      });
+    });
+
+    test('AvatarClear sends avatar_id as explicit null', () async {
+      final adapter = _FakeAdapter(
+        (_, _) => _jsonResponse(200, _profilePayload(id: 'ar')),
+      );
+      final repo = DioProfileManagementRepository(_makeDio(adapter));
+
+      await repo.updateMetadata(
+        id: 'ar',
+        name: 'Ar',
+        ageCategory: AgeCategory.enfant,
+        avatar: const AvatarClear(),
+      );
+
+      final body = adapter.requests.single.bodyJson!;
+      expect(body.containsKey('avatar_id'), isTrue);
+      expect(body['avatar_id'], isNull);
     });
 
     test('maps 404 to UnknownProfileException', () async {

@@ -18,7 +18,7 @@ class RemoteProfileDto {
   final String name;
   final AgeCategory ageCategory;
   final String? pinHash;
-  final String? avatarUrl;
+  final String? avatarId;
   final bool isMain;
 
   const RemoteProfileDto({
@@ -27,7 +27,7 @@ class RemoteProfileDto {
     required this.ageCategory,
     required this.isMain,
     this.pinHash,
-    this.avatarUrl,
+    this.avatarId,
   });
 
   factory RemoteProfileDto.fromJson(Map<String, dynamic> json) =>
@@ -36,7 +36,7 @@ class RemoteProfileDto {
         name: json['name'] as String,
         ageCategory: ageCategoryFromWire(json['age_category'] as String),
         pinHash: json['pin_hash'] as String?,
-        avatarUrl: json['avatar_url'] as String?,
+        avatarId: json['avatar_id'] as String?,
         isMain: json['is_main'] as bool,
       );
 
@@ -45,7 +45,7 @@ class RemoteProfileDto {
     'name': name,
     'age_category': ageCategoryToWire(ageCategory),
     'pin_hash': pinHash,
-    'avatar_url': avatarUrl,
+    'avatar_id': avatarId,
     'is_main': isMain,
   };
 
@@ -54,7 +54,7 @@ class RemoteProfileDto {
     name: name,
     ageCategory: ageCategory,
     pinHash: pinHash,
-    avatarUrl: avatarUrl,
+    avatarId: avatarId,
     isMain: isMain,
   );
 }

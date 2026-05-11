@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:kidflix/core/application/dtos/profile.dto.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
+import 'package:kidflix/ui/avatars/widgets/avatar_image.widget.dart';
 import 'package:kidflix/ui/pages/profile_management/widgets/age_category_picker.widget.dart';
 
 /// Tile d'un profil dans la liste de gestion. Affiche nom, catégorie d'âge,
@@ -27,15 +28,18 @@ class ProfileManagementTile extends StatelessWidget {
     final categoryLabel = AgeCategoryPicker.labelFor(
       AgeCategory.values.firstWhere((c) => c.name == profile.ageCategory),
     );
+    final initial = profile.name.isNotEmpty
+        ? profile.name.characters.first.toUpperCase()
+        : '?';
     return Card(
       child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: theme.colorScheme.primaryContainer,
-          foregroundColor: theme.colorScheme.onPrimaryContainer,
-          child: Text(
-            profile.name.isNotEmpty
-                ? profile.name.characters.first.toUpperCase()
-                : '?',
+        leading: SizedBox(
+          width: 40,
+          height: 40,
+          child: AvatarImage(
+            avatarId: profile.avatarId,
+            fallbackInitial: initial,
+            size: 40,
           ),
         ),
         title: Row(

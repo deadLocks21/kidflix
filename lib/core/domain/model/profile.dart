@@ -29,7 +29,7 @@ class Profile {
   final String name;
   final AgeCategory ageCategory;
   final String? pinHash;
-  final String? avatarUrl;
+  final String? avatarId;
   final bool isMain;
 
   const Profile({
@@ -37,7 +37,7 @@ class Profile {
     required this.name,
     required this.ageCategory,
     this.pinHash,
-    this.avatarUrl,
+    this.avatarId,
     this.isMain = false,
   });
 

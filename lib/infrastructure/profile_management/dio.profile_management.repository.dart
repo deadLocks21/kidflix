@@ -4,6 +4,7 @@ import 'package:kidflix/core/application/dtos/remote_profile.dto.dart';
 import 'package:kidflix/core/domain/exceptions/cannot_clear_main_profile_pin.exception.dart';
 import 'package:kidflix/core/domain/exceptions/cannot_delete_main_profile.exception.dart';
 import 'package:kidflix/core/domain/exceptions/unknown_profile.exception.dart';
+import 'package:kidflix/core/domain/model/avatar_update.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/services/profile_management.repository.dart';
 import 'package:kidflix/infrastructure/http/error_code.dart';
@@ -34,6 +35,7 @@ class DioProfileManagementRepository implements ProfileManagementRepository {
     required String name,
     required AgeCategory ageCategory,
     String? rawPin,
+    String? avatarId,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/profiles',
@@ -41,6 +43,7 @@ class DioProfileManagementRepository implements ProfileManagementRepository {
         'name': name,
         'age_category': ageCategoryToWire(ageCategory),
         'raw_pin': ?rawPin,
+        'avatar_id': ?avatarId,
       },
     );
     return RemoteProfileDto.fromJson(response.data!).toDomain();
@@ -51,14 +54,24 @@ class DioProfileManagementRepository implements ProfileManagementRepository {
     required String id,
     required String name,
     required AgeCategory ageCategory,
+    AvatarUpdate avatar = const AvatarUnchanged(),
   }) async {
+    final body = <String, dynamic>{
+      'name': name,
+      'age_category': ageCategoryToWire(ageCategory),
+    };
+    switch (avatar) {
+      case AvatarUnchanged():
+        break;
+      case AvatarSetTo(:final avatarId):
+        body['avatar_id'] = avatarId;
+      case AvatarClear():
+        body['avatar_id'] = null;
+    }
     try {
       final response = await _dio.patch<Map<String, dynamic>>(
         '/profiles/$id',
-        data: {
-          'name': name,
-          'age_category': ageCategoryToWire(ageCategory),
-        },
+        data: body,
       );
       return RemoteProfileDto.fromJson(response.data!).toDomain();
     } on DioException catch (e) {

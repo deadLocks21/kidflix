@@ -42,6 +42,7 @@ class CreateProfileUseCase {
     required String rawName,
     required AgeCategory ageCategory,
     String? rawPin,
+    String? avatarId,
   }) async {
     final trimmed = rawName.trim();
     if (trimmed.isEmpty) {
@@ -57,6 +58,7 @@ class CreateProfileUseCase {
       name: trimmed,
       ageCategory: ageCategory,
       rawPin: rawPin,
+      avatarId: avatarId,
     );
     return CreateProfileSuccess(created);
   }

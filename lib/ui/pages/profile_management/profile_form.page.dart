@@ -8,8 +8,13 @@ import 'package:kidflix/core/application/usecases/clear_profile_pin.usecase.dart
 import 'package:kidflix/core/application/usecases/create_profile.usecase.dart';
 import 'package:kidflix/core/application/usecases/update_profile_metadata.usecase.dart';
 import 'package:kidflix/core/domain/exceptions/invalid_profile_name.exception.dart';
+import 'package:kidflix/core/domain/model/avatar_update.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
+import 'package:kidflix/infrastructure/providers/avatars.usecases_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
+import 'package:kidflix/ui/avatars/avatar_random.dart';
+import 'package:kidflix/ui/avatars/widgets/avatar_image.widget.dart';
+import 'package:kidflix/ui/avatars/widgets/avatar_picker.widget.dart';
 import 'package:kidflix/ui/pages/profile_management/widgets/age_category_picker.widget.dart';
 
 /// Formulaire d'ajout / édition d'un profil non-principal.
@@ -38,10 +43,36 @@ class _ProfileFormPageState extends ConsumerState<ProfileFormPage> {
   bool _prefilled = false;
   bool _submitting = false;
 
+  /// Avatar id currently selected in the form (write-side).
+  /// - Création : null tant que la catalogue n'a pas chargé ; auto-rempli
+  ///   par un id random dès qu'elle est résolue.
+  /// - Édition : valeur existante au prefill ; modifié si l'utilisateur
+  ///   ouvre le picker et choisit un nouvel avatar.
+  String? _avatarId;
+
+  /// Vrai dès que l'utilisateur a explicitement choisi un avatar via le
+  /// picker. Détermine si le PATCH d'édition envoie `AvatarSetTo` (vrai)
+  /// ou `AvatarUnchanged` (faux).
+  bool _avatarChanged = false;
+
   bool get _isEdit => widget.profileId != null;
 
   @override
+  void initState() {
+    super.initState();
+    // Le hero affiche la lettre fallback (à partir du nom) tant qu'aucun
+    // avatar n'est sélectionné. On rebuild à chaque frappe pour la voir
+    // évoluer en temps réel.
+    _nameController.addListener(_handleNameChanged);
+  }
+
+  void _handleNameChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   void dispose() {
+    _nameController.removeListener(_handleNameChanged);
     _nameController.dispose();
     _pinController.dispose();
     super.dispose();
@@ -59,6 +90,18 @@ class _ProfileFormPageState extends ConsumerState<ProfileFormPage> {
   void _prefill(Profile profile) {
     _nameController.text = profile.name;
     _ageCategory = profile.ageCategory;
+    _avatarId = profile.avatarId;
+    _avatarChanged = false;
+  }
+
+  Future<void> _pickAvatar() async {
+    final picked = await showAvatarPicker(context, currentId: _avatarId);
+    if (picked != null && mounted) {
+      setState(() {
+        _avatarId = picked;
+        _avatarChanged = true;
+      });
+    }
   }
 
   Future<void> _submit() async {
@@ -85,6 +128,7 @@ class _ProfileFormPageState extends ConsumerState<ProfileFormPage> {
           name: name,
           ageCategory: _ageCategory,
           rawPin: rawPin,
+          avatarId: _avatarId,
         );
     if (!mounted) return;
     switch (result) {
@@ -102,12 +146,16 @@ class _ProfileFormPageState extends ConsumerState<ProfileFormPage> {
   Future<void> _submitEdit(String name, String? rawPin) async {
     final id = widget.profileId!;
     final existing = _existingProfile();
+    final avatarUpdate = _avatarChanged && _avatarId != null
+        ? AvatarSetTo(_avatarId!)
+        : const AvatarUnchanged();
     final result = await ref
         .read(sessionControllerProvider.notifier)
         .updateProfileMetadata(
           profileId: id,
           name: name,
           ageCategory: _ageCategory,
+          avatar: avatarUpdate,
         );
     if (!mounted) return;
     switch (result) {
@@ -190,6 +238,21 @@ class _ProfileFormPageState extends ConsumerState<ProfileFormPage> {
       _prefill(existing);
       _prefilled = true;
     }
+
+    // En mode création, on tire un avatar random dès que la liste est
+    // disponible. `ref.listen` évite de toucher au state pendant le build.
+    if (!_isEdit) {
+      ref.listen(avatarsListProvider, (previous, next) {
+        next.whenData((options) {
+          if (_avatarId == null && options.isNotEmpty) {
+            setState(() {
+              _avatarId = pickRandomAvatarId(options);
+            });
+          }
+        });
+      });
+    }
+
     final isMain = existing?.isMain ?? false;
     final hasPin = existing?.pinHash != null;
     final title = _isEdit
@@ -207,55 +270,62 @@ class _ProfileFormPageState extends ConsumerState<ProfileFormPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-              TextField(
-                controller: _nameController,
-                autofocus: !_isEdit,
-                maxLength: 30,
-                decoration: InputDecoration(
-                  labelText: 'Nom',
-                  border: const OutlineInputBorder(),
-                  errorText: _nameError,
-                ),
-              ),
-              const SizedBox(height: 16),
-              AgeCategoryPicker(
-                value: _ageCategory,
-                onChanged: (c) => setState(() => _ageCategory = c),
-              ),
-              const SizedBox(height: 24),
-              if (!_isEdit || (!isMain && !hasPin)) _buildPinField(label: 'Code (optionnel, 4 chiffres)'),
-              if (_isEdit && !isMain && hasPin) ...[
-                _buildPinField(label: 'Nouveau code (4 chiffres)'),
-                const SizedBox(height: 8),
-                TextButton.icon(
-                  onPressed: _submitting ? null : _clearPin,
-                  icon: const Icon(Icons.lock_open),
-                  label: const Text('Retirer le code'),
-                ),
-              ],
-              if (_isEdit && isMain)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Text(
-                    'Pour changer le code du profil principal, utilise '
-                    'l\'icône « clé » dans la liste.',
-                    style: Theme.of(context).textTheme.bodySmall,
+                  _AvatarHero(
+                    avatarId: _avatarId,
+                    nameForFallback: _nameController.text,
+                    onTap: _submitting ? null : _pickAvatar,
                   ),
-                ),
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: _submitting ? null : _submit,
-                child: _submitting
-                    ? const SizedBox(
-                        height: 16,
-                        width: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text('Valider'),
-              ),
+                  const SizedBox(height: 24),
+                  TextField(
+                    controller: _nameController,
+                    autofocus: !_isEdit,
+                    maxLength: 30,
+                    decoration: InputDecoration(
+                      labelText: 'Nom',
+                      border: const OutlineInputBorder(),
+                      errorText: _nameError,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  AgeCategoryPicker(
+                    value: _ageCategory,
+                    onChanged: (c) => setState(() => _ageCategory = c),
+                  ),
+                  const SizedBox(height: 24),
+                  if (!_isEdit || (!isMain && !hasPin))
+                    _buildPinField(label: 'Code (optionnel, 4 chiffres)'),
+                  if (_isEdit && !isMain && hasPin) ...[
+                    _buildPinField(label: 'Nouveau code (4 chiffres)'),
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      onPressed: _submitting ? null : _clearPin,
+                      icon: const Icon(Icons.lock_open),
+                      label: const Text('Retirer le code'),
+                    ),
+                  ],
+                  if (_isEdit && isMain)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Text(
+                        'Pour changer le code du profil principal, utilise '
+                        'l\'icône « clé » dans la liste.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                  const SizedBox(height: 24),
+                  FilledButton(
+                    onPressed: _submitting ? null : _submit,
+                    child: _submitting
+                        ? const SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Valider'),
+                  ),
                 ],
               ),
             ),
@@ -278,4 +348,58 @@ class _ProfileFormPageState extends ConsumerState<ProfileFormPage> {
       counterText: '',
     ),
   );
+}
+
+/// Hero avatar in the form header: tap → opens the avatar picker. Affiche un
+/// badge d'édition (crayon) en bas-droite pour signaler l'affordance.
+class _AvatarHero extends StatelessWidget {
+  final String? avatarId;
+  final String nameForFallback;
+  final VoidCallback? onTap;
+
+  const _AvatarHero({
+    required this.avatarId,
+    required this.nameForFallback,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final initial = nameForFallback.isNotEmpty
+        ? nameForFallback.characters.first.toUpperCase()
+        : '?';
+    return Center(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Stack(
+          alignment: Alignment.bottomRight,
+          clipBehavior: Clip.none,
+          children: [
+            AvatarImage(
+              avatarId: avatarId,
+              fallbackInitial: initial,
+              size: 144,
+            ),
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: theme.colorScheme.surface,
+                  width: 2,
+                ),
+              ),
+              child: Icon(
+                Icons.edit,
+                size: 18,
+                color: theme.colorScheme.onPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

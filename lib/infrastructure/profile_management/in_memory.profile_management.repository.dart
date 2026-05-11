@@ -1,5 +1,6 @@
 import 'package:kidflix/core/domain/exceptions/cannot_clear_main_profile_pin.exception.dart';
 import 'package:kidflix/core/domain/exceptions/cannot_delete_main_profile.exception.dart';
+import 'package:kidflix/core/domain/model/avatar_update.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/services/profile_management.repository.dart';
 import 'package:kidflix/core/domain/services/profile_pin.service.dart';
@@ -29,6 +30,7 @@ class InMemoryProfileManagementRepository
     required String name,
     required AgeCategory ageCategory,
     String? rawPin,
+    String? avatarId,
   }) async {
     final account = _store.currentAccount;
     if (account == null) {
@@ -43,6 +45,7 @@ class InMemoryProfileManagementRepository
       name: name,
       ageCategory: ageCategory,
       pinHash: pinHash,
+      avatarId: avatarId,
     );
     account.profiles.add(created);
     return created;
@@ -53,15 +56,21 @@ class InMemoryProfileManagementRepository
     required String id,
     required String name,
     required AgeCategory ageCategory,
+    AvatarUpdate avatar = const AvatarUnchanged(),
   }) async {
     final (account, index) = _locate(id);
     final existing = account.profiles[index];
+    final newAvatarId = switch (avatar) {
+      AvatarUnchanged() => existing.avatarId,
+      AvatarSetTo(:final avatarId) => avatarId,
+      AvatarClear() => null,
+    };
     final updated = Profile(
       id: existing.id,
       name: name,
       ageCategory: ageCategory,
       pinHash: existing.pinHash,
-      avatarUrl: existing.avatarUrl,
+      avatarId: newAvatarId,
       isMain: existing.isMain,
     );
     account.profiles[index] = updated;
@@ -78,7 +87,7 @@ class InMemoryProfileManagementRepository
       name: existing.name,
       ageCategory: existing.ageCategory,
       pinHash: hash,
-      avatarUrl: existing.avatarUrl,
+      avatarId: existing.avatarId,
       isMain: existing.isMain,
     );
     account.profiles[index] = updated;
@@ -97,7 +106,7 @@ class InMemoryProfileManagementRepository
       name: existing.name,
       ageCategory: existing.ageCategory,
       pinHash: null,
-      avatarUrl: existing.avatarUrl,
+      avatarId: existing.avatarId,
       isMain: existing.isMain,
     );
     account.profiles[index] = updated;

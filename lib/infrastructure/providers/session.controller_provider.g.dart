@@ -47,7 +47,7 @@ final class SessionControllerProvider
   }
 }
 
-String _$sessionControllerHash() => r'28d1d39b62418604ecdf7f745715bf9a95f7b1b0';
+String _$sessionControllerHash() => r'24a3839e30e17c0fb42554386008fba034323ea5';
 
 /// Central controller for [SessionState]. Single point of contact between
 /// the UI and the application layer.

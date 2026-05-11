@@ -10,7 +10,7 @@ void main() {
         'name': 'Ar',
         'age_category': 'enfant',
         'pin_hash': null,
-        'avatar_url': null,
+        'avatar_id': null,
         'is_main': false,
       });
 
@@ -18,22 +18,22 @@ void main() {
       expect(dto.name, 'Ar');
       expect(dto.ageCategory, AgeCategory.enfant);
       expect(dto.pinHash, isNull);
-      expect(dto.avatarUrl, isNull);
+      expect(dto.avatarId, isNull);
       expect(dto.isMain, isFalse);
     });
 
-    test('parses main profile with PIN hash and avatar URL', () {
+    test('parses main profile with PIN hash and avatar id', () {
       final dto = RemoteProfileDto.fromJson({
         'id': 'papa',
         'name': 'Papa',
         'age_category': 'adulte',
         'pin_hash': r'$2b$12$abc',
-        'avatar_url': 'https://example.com/papa.png',
+        'avatar_id': 'cat-01',
         'is_main': true,
       });
 
       expect(dto.pinHash, r'$2b$12$abc');
-      expect(dto.avatarUrl, 'https://example.com/papa.png');
+      expect(dto.avatarId, 'cat-01');
       expect(dto.isMain, isTrue);
       expect(dto.ageCategory, AgeCategory.adulte);
     });
@@ -44,7 +44,7 @@ void main() {
         'name': 'X',
         'age_category': 'jeune_adulte',
         'pin_hash': null,
-        'avatar_url': null,
+        'avatar_id': null,
         'is_main': false,
       });
 
@@ -58,7 +58,7 @@ void main() {
           'name': 'X',
           'age_category': 'extraterrestre',
           'pin_hash': null,
-          'avatar_url': null,
+          'avatar_id': null,
           'is_main': false,
         }),
         throwsA(
@@ -86,7 +86,7 @@ void main() {
           'name': 'Profile $wire',
           'age_category': wire,
           'pin_hash': null,
-          'avatar_url': null,
+          'avatar_id': null,
           'is_main': false,
         };
 
@@ -126,7 +126,7 @@ void main() {
       expect(profile.name, 'Papa');
       expect(profile.ageCategory, AgeCategory.adulte);
       expect(profile.pinHash, r'$2b$12$abc');
-      expect(profile.avatarUrl, isNull);
+      expect(profile.avatarId, isNull);
       expect(profile.isMain, isTrue);
       expect(profile.hasPin, isTrue);
     });

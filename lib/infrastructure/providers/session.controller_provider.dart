@@ -13,6 +13,7 @@ import 'package:kidflix/core/application/usecases/update_profile_metadata.usecas
 import 'package:kidflix/core/application/usecases/verify_management_pin.usecase.dart';
 import 'package:kidflix/core/application/usecases/verify_otp.usecase.dart';
 import 'package:kidflix/core/application/usecases/verify_profile_pin.usecase.dart';
+import 'package:kidflix/core/domain/model/avatar_update.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/model/session.dart';
 import 'package:kidflix/infrastructure/providers/auth.service_provider.dart';
@@ -223,6 +224,7 @@ class SessionController extends _$SessionController {
     required String name,
     required AgeCategory ageCategory,
     String? rawPin,
+    String? avatarId,
   }) async {
     final current = state;
     if (current is! ManagingProfiles) {
@@ -233,6 +235,7 @@ class SessionController extends _$SessionController {
       rawName: name,
       ageCategory: ageCategory,
       rawPin: rawPin,
+      avatarId: avatarId,
     );
     if (result is CreateProfileSuccess) {
       final updatedProfiles = List<Profile>.from(current.session.profiles)
@@ -248,6 +251,7 @@ class SessionController extends _$SessionController {
     required String profileId,
     required String name,
     required AgeCategory ageCategory,
+    AvatarUpdate avatar = const AvatarUnchanged(),
   }) async {
     final current = state;
     if (current is! ManagingProfiles) {
@@ -259,6 +263,7 @@ class SessionController extends _$SessionController {
       profileId: profileId,
       rawName: name,
       ageCategory: ageCategory,
+      avatar: avatar,
     );
     if (result is UpdateProfileMetadataSuccess) {
       await _persistAndReplaceSession(

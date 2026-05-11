@@ -1,5 +1,6 @@
 import 'package:kidflix/core/domain/exceptions/invalid_profile_name.exception.dart';
 import 'package:kidflix/core/domain/exceptions/unknown_profile.exception.dart';
+import 'package:kidflix/core/domain/model/avatar_update.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/model/session.dart';
 import 'package:kidflix/core/domain/services/profile_management.repository.dart';
@@ -29,8 +30,9 @@ class UpdateProfileMetadataInvalidState extends UpdateProfileMetadataResult {
   const UpdateProfileMetadataInvalidState();
 }
 
-/// Updates the display name and age category of a profile. Preserves
-/// `isMain`, `pinHash` and `avatarUrl`.
+/// Updates the display name and age category of a profile, plus optionally
+/// the `avatarId` per the tri-state contract (cf. [AvatarUpdate]).
+/// Preserves `isMain` and `pinHash`.
 class UpdateProfileMetadataUseCase {
   static const int _maxNameLength = 30;
 
@@ -43,6 +45,7 @@ class UpdateProfileMetadataUseCase {
     required String profileId,
     required String rawName,
     required AgeCategory ageCategory,
+    AvatarUpdate avatar = const AvatarUnchanged(),
   }) async {
     final exists = session.profiles.any((p) => p.id == profileId);
     if (!exists) return const UpdateProfileMetadataUnknownProfile();
@@ -64,6 +67,7 @@ class UpdateProfileMetadataUseCase {
         id: profileId,
         name: trimmed,
         ageCategory: ageCategory,
+        avatar: avatar,
       );
       return UpdateProfileMetadataSuccess(updated);
     } on UnknownProfileException {

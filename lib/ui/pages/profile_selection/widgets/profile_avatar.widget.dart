@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kidflix/core/application/dtos/profile.dto.dart';
+import 'package:kidflix/ui/avatars/widgets/avatar_image.widget.dart';
 
 /// Avatar circulaire d'un profil avec un petit cadenas en overlay si
 /// le profil est protégé par un PIN. Le ripple du tap est confiné au
@@ -24,23 +25,15 @@ class ProfileAvatar extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             Material(
-              color: theme.colorScheme.primaryContainer,
               shape: const CircleBorder(),
               clipBehavior: Clip.antiAlias,
               child: InkWell(
                 onTap: onTap,
                 customBorder: const CircleBorder(),
-                child: SizedBox(
-                  width: 96,
-                  height: 96,
-                  child: Center(
-                    child: Text(
-                      initial,
-                      style: theme.textTheme.headlineLarge?.copyWith(
-                        color: theme.colorScheme.onPrimaryContainer,
-                      ),
-                    ),
-                  ),
+                child: AvatarImage(
+                  avatarId: profile.avatarId,
+                  fallbackInitial: initial,
+                  size: 96,
                 ),
               ),
             ),

@@ -1,3 +1,4 @@
+import 'package:kidflix/core/domain/model/avatar_update.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 
 /// Contract for creating, updating and deleting profiles attached to an
@@ -10,20 +11,25 @@ import 'package:kidflix/core/domain/model/profile.dart';
 /// profile is created server-side alongside the user account.
 abstract interface class ProfileManagementRepository {
   /// Creates a new profile with `isMain == false`. If [rawPin] is provided,
-  /// it is hashed with bcrypt before persistence. The returned [Profile]
+  /// it is hashed with bcrypt before persistence. If [avatarId] is provided,
+  /// it must be an id from the server-side avatar catalogue (validated
+  /// against `AvatarsRepository.list()` upstream). The returned [Profile]
   /// carries the newly-generated stable id.
   Future<Profile> create({
     required String name,
     required AgeCategory ageCategory,
     String? rawPin,
+    String? avatarId,
   });
 
   /// Updates the display name and age category of the profile with [id].
-  /// Preserves `isMain`, `pinHash` and `avatarUrl`.
+  /// [avatar] controls the `avatarId` field per the tri-state contract.
+  /// Preserves `isMain` and `pinHash`.
   Future<Profile> updateMetadata({
     required String id,
     required String name,
     required AgeCategory ageCategory,
+    AvatarUpdate avatar = const AvatarUnchanged(),
   });
 
   /// Sets or replaces the PIN of the profile with [id]. Hashes [rawPin]

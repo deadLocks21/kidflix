@@ -12,7 +12,7 @@ class ProfileDto {
   final String name;
   final String ageCategory;
   final bool hasPin;
-  final String? avatarUrl;
+  final String? avatarId;
   final bool isMain;
 
   const ProfileDto({
@@ -20,7 +20,7 @@ class ProfileDto {
     required this.name,
     required this.ageCategory,
     required this.hasPin,
-    this.avatarUrl,
+    this.avatarId,
     required this.isMain,
   });
 
@@ -29,7 +29,7 @@ class ProfileDto {
     name: profile.name,
     ageCategory: profile.ageCategory.name,
     hasPin: profile.hasPin,
-    avatarUrl: profile.avatarUrl,
+    avatarId: profile.avatarId,
     isMain: profile.isMain,
   );
 }
