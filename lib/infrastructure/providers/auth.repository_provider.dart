@@ -24,7 +24,7 @@ part 'auth.repository_provider.g.dart';
 @Riverpod(keepAlive: true)
 AuthRepository authRepository(Ref ref) {
   final baseUrl = ref.watch(apiBaseUrlProvider);
-  if (baseUrl.isEmpty) {
+  if (isInMemoryBaseUrl(baseUrl)) {
     final pin = ref.watch(profilePinServiceProvider);
     final store = ref.watch(inMemoryAccountsStoreProvider);
     return InMemoryAuthRepository(pin, store);

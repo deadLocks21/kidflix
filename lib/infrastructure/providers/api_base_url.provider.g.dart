@@ -12,15 +12,19 @@ part of 'api_base_url.provider.dart';
 /// [dioProvider] and every `*RepositoryProvider` that picks between its
 /// in-memory and Dio implementations.
 ///
-/// Resolution order:
-/// 1. After [load] has been called (during [bootstrapProvider]), the value
-///    is whatever the user persisted via the ⚙ dialog on the phone-entry
-///    page (an empty string means "in-memory mode").
-/// 2. Before [load], or when nothing has ever been persisted, the value
-///    falls back to the compile-time constant
-///    `String.fromEnvironment('API_BASE_URL')`. Builds that don't pass
-///    `--dart-define=API_BASE_URL=...` therefore start in in-memory mode,
-///    preserving the historical behaviour.
+/// Resolution order (highest precedence first):
+/// 1. The value the user persisted via the ⚙ dialog on the phone-entry
+///    page (an empty string means "in-memory mode" and is preserved
+///    verbatim — that's how the user opts out of any backend).
+/// 2. The compile-time constant `String.fromEnvironment('API_BASE_URL')`,
+///    so `--dart-define=API_BASE_URL=...` still pins a URL for CI / dev
+///    builds when nothing has been persisted yet.
+/// 3. [kDemoApiBaseUrl] — the public demo URL shown on a fresh install.
+///    It maps to in-memory mode via [isInMemoryBaseUrl].
+///
+/// Before [load] has been called (e.g. in unit tests that don't run
+/// [bootstrapProvider]) the state is whatever the env var resolves to,
+/// which keeps the historical test behaviour (empty → in-memory) intact.
 ///
 /// Calling [update] writes to storage AND emits a new state, which causes
 /// Riverpod to rebuild [dioProvider] (and the repository providers that
@@ -33,15 +37,19 @@ final apiBaseUrlProvider = ApiBaseUrlProvider._();
 /// [dioProvider] and every `*RepositoryProvider` that picks between its
 /// in-memory and Dio implementations.
 ///
-/// Resolution order:
-/// 1. After [load] has been called (during [bootstrapProvider]), the value
-///    is whatever the user persisted via the ⚙ dialog on the phone-entry
-///    page (an empty string means "in-memory mode").
-/// 2. Before [load], or when nothing has ever been persisted, the value
-///    falls back to the compile-time constant
-///    `String.fromEnvironment('API_BASE_URL')`. Builds that don't pass
-///    `--dart-define=API_BASE_URL=...` therefore start in in-memory mode,
-///    preserving the historical behaviour.
+/// Resolution order (highest precedence first):
+/// 1. The value the user persisted via the ⚙ dialog on the phone-entry
+///    page (an empty string means "in-memory mode" and is preserved
+///    verbatim — that's how the user opts out of any backend).
+/// 2. The compile-time constant `String.fromEnvironment('API_BASE_URL')`,
+///    so `--dart-define=API_BASE_URL=...` still pins a URL for CI / dev
+///    builds when nothing has been persisted yet.
+/// 3. [kDemoApiBaseUrl] — the public demo URL shown on a fresh install.
+///    It maps to in-memory mode via [isInMemoryBaseUrl].
+///
+/// Before [load] has been called (e.g. in unit tests that don't run
+/// [bootstrapProvider]) the state is whatever the env var resolves to,
+/// which keeps the historical test behaviour (empty → in-memory) intact.
 ///
 /// Calling [update] writes to storage AND emits a new state, which causes
 /// Riverpod to rebuild [dioProvider] (and the repository providers that
@@ -51,15 +59,19 @@ final class ApiBaseUrlProvider extends $NotifierProvider<ApiBaseUrl, String> {
   /// [dioProvider] and every `*RepositoryProvider` that picks between its
   /// in-memory and Dio implementations.
   ///
-  /// Resolution order:
-  /// 1. After [load] has been called (during [bootstrapProvider]), the value
-  ///    is whatever the user persisted via the ⚙ dialog on the phone-entry
-  ///    page (an empty string means "in-memory mode").
-  /// 2. Before [load], or when nothing has ever been persisted, the value
-  ///    falls back to the compile-time constant
-  ///    `String.fromEnvironment('API_BASE_URL')`. Builds that don't pass
-  ///    `--dart-define=API_BASE_URL=...` therefore start in in-memory mode,
-  ///    preserving the historical behaviour.
+  /// Resolution order (highest precedence first):
+  /// 1. The value the user persisted via the ⚙ dialog on the phone-entry
+  ///    page (an empty string means "in-memory mode" and is preserved
+  ///    verbatim — that's how the user opts out of any backend).
+  /// 2. The compile-time constant `String.fromEnvironment('API_BASE_URL')`,
+  ///    so `--dart-define=API_BASE_URL=...` still pins a URL for CI / dev
+  ///    builds when nothing has been persisted yet.
+  /// 3. [kDemoApiBaseUrl] — the public demo URL shown on a fresh install.
+  ///    It maps to in-memory mode via [isInMemoryBaseUrl].
+  ///
+  /// Before [load] has been called (e.g. in unit tests that don't run
+  /// [bootstrapProvider]) the state is whatever the env var resolves to,
+  /// which keeps the historical test behaviour (empty → in-memory) intact.
   ///
   /// Calling [update] writes to storage AND emits a new state, which causes
   /// Riverpod to rebuild [dioProvider] (and the repository providers that
@@ -91,21 +103,25 @@ final class ApiBaseUrlProvider extends $NotifierProvider<ApiBaseUrl, String> {
   }
 }
 
-String _$apiBaseUrlHash() => r'425a09cff616306c3de042623f666abfdc98880e';
+String _$apiBaseUrlHash() => r'200009f2602e70fd8b07b822c69712b25ef0d9c8';
 
 /// Holds the API base URL currently in effect. Read synchronously by
 /// [dioProvider] and every `*RepositoryProvider` that picks between its
 /// in-memory and Dio implementations.
 ///
-/// Resolution order:
-/// 1. After [load] has been called (during [bootstrapProvider]), the value
-///    is whatever the user persisted via the ⚙ dialog on the phone-entry
-///    page (an empty string means "in-memory mode").
-/// 2. Before [load], or when nothing has ever been persisted, the value
-///    falls back to the compile-time constant
-///    `String.fromEnvironment('API_BASE_URL')`. Builds that don't pass
-///    `--dart-define=API_BASE_URL=...` therefore start in in-memory mode,
-///    preserving the historical behaviour.
+/// Resolution order (highest precedence first):
+/// 1. The value the user persisted via the ⚙ dialog on the phone-entry
+///    page (an empty string means "in-memory mode" and is preserved
+///    verbatim — that's how the user opts out of any backend).
+/// 2. The compile-time constant `String.fromEnvironment('API_BASE_URL')`,
+///    so `--dart-define=API_BASE_URL=...` still pins a URL for CI / dev
+///    builds when nothing has been persisted yet.
+/// 3. [kDemoApiBaseUrl] — the public demo URL shown on a fresh install.
+///    It maps to in-memory mode via [isInMemoryBaseUrl].
+///
+/// Before [load] has been called (e.g. in unit tests that don't run
+/// [bootstrapProvider]) the state is whatever the env var resolves to,
+/// which keeps the historical test behaviour (empty → in-memory) intact.
 ///
 /// Calling [update] writes to storage AND emits a new state, which causes
 /// Riverpod to rebuild [dioProvider] (and the repository providers that

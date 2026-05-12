@@ -25,7 +25,7 @@ part 'download.repository_provider.g.dart';
 DownloadRepository downloadRepository(Ref ref) {
   final manifest = ref.watch(downloadManifestStoreProvider);
   final baseUrl = ref.watch(apiBaseUrlProvider);
-  if (baseUrl.isEmpty) {
+  if (isInMemoryBaseUrl(baseUrl)) {
     return InMemoryDownloadRepository(manifest: manifest);
   }
   return DioDownloadRepository(

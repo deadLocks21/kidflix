@@ -24,7 +24,7 @@ part 'profile_management.repository_provider.g.dart';
 @Riverpod(keepAlive: true)
 ProfileManagementRepository profileManagementRepository(Ref ref) {
   final baseUrl = ref.watch(apiBaseUrlProvider);
-  if (baseUrl.isEmpty) {
+  if (isInMemoryBaseUrl(baseUrl)) {
     final store = ref.watch(inMemoryAccountsStoreProvider);
     final pin = ref.watch(profilePinServiceProvider);
     return InMemoryProfileManagementRepository(store, pin);

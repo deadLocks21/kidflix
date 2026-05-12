@@ -19,7 +19,7 @@ part 'series.repository_provider.g.dart';
 @Riverpod(keepAlive: true)
 SeriesRepository seriesRepository(Ref ref) {
   final baseUrl = ref.watch(apiBaseUrlProvider);
-  if (baseUrl.isEmpty) {
+  if (isInMemoryBaseUrl(baseUrl)) {
     return InMemorySeriesRepository();
   }
   return DioSeriesRepository(ref.watch(dioProvider));

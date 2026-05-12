@@ -19,7 +19,7 @@ part 'catalog.repository_provider.g.dart';
 @Riverpod(keepAlive: true)
 CatalogRepository catalogRepository(Ref ref) {
   final baseUrl = ref.watch(apiBaseUrlProvider);
-  if (baseUrl.isEmpty) {
+  if (isInMemoryBaseUrl(baseUrl)) {
     return InMemoryCatalogRepository();
   }
   return DioCatalogRepository(ref.watch(dioProvider));

@@ -95,4 +95,4 @@ final class WatchProgressRepositoryProvider
 }
 
 String _$watchProgressRepositoryHash() =>
-    r'314e154e0cf42a7b91a89436586c211a48a32900';
+    r'e5985531d10187724604048c1a25c65403624740';

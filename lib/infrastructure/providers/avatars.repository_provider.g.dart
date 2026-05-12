@@ -70,4 +70,4 @@ final class AvatarsRepositoryProvider
   }
 }
 
-String _$avatarsRepositoryHash() => r'1becbe85ebba8e77574287e50c17992d589ff539';
+String _$avatarsRepositoryHash() => r'c16352709d54d676c450a24d2c91e355372ad30b';

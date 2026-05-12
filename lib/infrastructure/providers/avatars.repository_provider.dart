@@ -15,7 +15,7 @@ part 'avatars.repository_provider.g.dart';
 @Riverpod(keepAlive: true)
 AvatarsRepository avatarsRepository(Ref ref) {
   final baseUrl = ref.watch(apiBaseUrlProvider);
-  if (baseUrl.isEmpty) {
+  if (isInMemoryBaseUrl(baseUrl)) {
     return InMemoryAvatarsRepository();
   }
   return DioAvatarsRepository(ref.watch(dioProvider));

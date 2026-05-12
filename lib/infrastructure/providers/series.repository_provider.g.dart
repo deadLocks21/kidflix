@@ -81,4 +81,4 @@ final class SeriesRepositoryProvider
   }
 }
 
-String _$seriesRepositoryHash() => r'e42b4b774aa6baf8fc703d37af8d8cb81e811161';
+String _$seriesRepositoryHash() => r'ec019c7788418ad632bb90e3101e318201a583df';

@@ -23,7 +23,7 @@ part 'watch_progress.repository_provider.g.dart';
 @Riverpod(keepAlive: true)
 WatchProgressRepository watchProgressRepository(Ref ref) {
   final baseUrl = ref.watch(apiBaseUrlProvider);
-  if (baseUrl.isEmpty) {
+  if (isInMemoryBaseUrl(baseUrl)) {
     return InMemoryWatchProgressRepository();
   }
   return DioWatchProgressRepository(dio: ref.watch(dioProvider));
