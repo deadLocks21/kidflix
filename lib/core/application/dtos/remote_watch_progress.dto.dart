@@ -13,9 +13,15 @@ import 'package:kidflix/core/domain/model/watch_progress.dart';
 ///   "media_id": "...",         // movie_id ou episode_id selon kind
 ///   "position_seconds": 1845,
 ///   "completed": false,
+///   "dismissed": false,
 ///   "updated_at": "2026-04-22T10:30:00Z"
 /// }
 /// ```
+///
+/// `dismissed` is documented as always present once the backend rollout
+/// of `add-progress-dismiss` lands, but we default to `false` when the
+/// key is missing so the client keeps working against an older backend
+/// during the deployment window.
 ///
 /// Fail-fast on missing or unknown `kind` (FormatException).
 WatchProgress watchProgressFromJson(Map<String, dynamic> json) {
@@ -24,6 +30,7 @@ WatchProgress watchProgressFromJson(Map<String, dynamic> json) {
   final mediaId = json['media_id'] as String;
   final positionSeconds = json['position_seconds'] as int;
   final completed = json['completed'] as bool;
+  final dismissed = (json['dismissed'] as bool?) ?? false;
   final updatedAt = DateTime.parse(json['updated_at'] as String);
 
   switch (kind) {
@@ -33,6 +40,7 @@ WatchProgress watchProgressFromJson(Map<String, dynamic> json) {
         movieId: mediaId,
         positionSeconds: positionSeconds,
         completed: completed,
+        dismissed: dismissed,
         updatedAt: updatedAt,
       );
     case 'episode':
@@ -41,6 +49,7 @@ WatchProgress watchProgressFromJson(Map<String, dynamic> json) {
         episodeId: mediaId,
         positionSeconds: positionSeconds,
         completed: completed,
+        dismissed: dismissed,
         updatedAt: updatedAt,
       );
     default:
@@ -52,7 +61,8 @@ WatchProgress watchProgressFromJson(Map<String, dynamic> json) {
 /// request.
 ///
 /// The PUT body intentionally omits `profile_id`, `media_id` (both
-/// travel in the URL path), `kind` (carried by the path) and
+/// travel in the URL path), `kind` (carried by the path), `dismissed`
+/// (server-managed — auto-reset to false on every save) and
 /// `updated_at` (the server stamps its own clock — any client-supplied
 /// value would be ignored).
 Map<String, dynamic> watchProgressToWireBody(WatchProgress progress) => {

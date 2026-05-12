@@ -369,6 +369,62 @@ void main() {
     });
   });
 
+  group('DioWatchProgressRepository.dismiss / unDismiss', () {
+    test('dismissMovie hits POST /…/dismiss', () async {
+      final adapter = _FakeAdapter((_) => _emptyResponse(204));
+      final repo = DioWatchProgressRepository(dio: _makeDio(adapter));
+
+      await repo.dismissMovie(profileId: 'p1', movieId: 'nemo');
+
+      final request = adapter.requests.single;
+      expect(request.method, 'POST');
+      expect(request.path, '/profiles/p1/progress/movies/nemo/dismiss');
+    });
+
+    test('unDismissMovie hits DELETE /…/dismiss', () async {
+      final adapter = _FakeAdapter((_) => _emptyResponse(204));
+      final repo = DioWatchProgressRepository(dio: _makeDio(adapter));
+
+      await repo.unDismissMovie(profileId: 'p1', movieId: 'nemo');
+
+      final request = adapter.requests.single;
+      expect(request.method, 'DELETE');
+      expect(request.path, '/profiles/p1/progress/movies/nemo/dismiss');
+    });
+
+    test('dismissEpisode hits POST on the episode path', () async {
+      final adapter = _FakeAdapter((_) => _emptyResponse(204));
+      final repo = DioWatchProgressRepository(dio: _makeDio(adapter));
+
+      await repo.dismissEpisode(profileId: 'p1', episodeId: 'ep-1');
+
+      final request = adapter.requests.single;
+      expect(request.method, 'POST');
+      expect(request.path, '/profiles/p1/progress/episodes/ep-1/dismiss');
+    });
+
+    test('unDismissEpisode hits DELETE on the episode path', () async {
+      final adapter = _FakeAdapter((_) => _emptyResponse(204));
+      final repo = DioWatchProgressRepository(dio: _makeDio(adapter));
+
+      await repo.unDismissEpisode(profileId: 'p1', episodeId: 'ep-1');
+
+      final request = adapter.requests.single;
+      expect(request.method, 'DELETE');
+      expect(request.path, '/profiles/p1/progress/episodes/ep-1/dismiss');
+    });
+
+    test('dismissMovie rethrows DioException on 404', () async {
+      final adapter = _FakeAdapter((_) => _emptyResponse(404));
+      final repo = DioWatchProgressRepository(dio: _makeDio(adapter));
+
+      await expectLater(
+        repo.dismissMovie(profileId: 'p1', movieId: 'ghost'),
+        throwsA(isA<DioException>()),
+      );
+    });
+  });
+
   group('DioWatchProgressRepository.listForProfile (mixed)', () {
     test('parses mixed entries with kind discriminator', () async {
       final adapter = _FakeAdapter(

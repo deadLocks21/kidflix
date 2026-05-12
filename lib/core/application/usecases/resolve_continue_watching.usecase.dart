@@ -56,6 +56,12 @@ class ResolveContinueWatchingUseCase {
     final seenSeriesIds = <String>{};
 
     for (final progress in sorted) {
+      if (progress.dismissed) {
+        // User explicitly removed this entry from the rail. Position is
+        // preserved server-side but the row hides it until the next
+        // save (which auto-resets `dismissed` on the backend).
+        continue;
+      }
       switch (progress) {
         case MovieProgress():
           if (progress.completed) {

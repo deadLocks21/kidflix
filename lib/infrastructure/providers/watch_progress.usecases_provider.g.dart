@@ -104,3 +104,54 @@ final class SaveWatchProgressUseCaseProvider
 
 String _$saveWatchProgressUseCaseHash() =>
     r'4eab9b4ea8418268edfead93c881f38d4ade7462';
+
+@ProviderFor(dismissContinueWatchingUseCase)
+final dismissContinueWatchingUseCaseProvider =
+    DismissContinueWatchingUseCaseProvider._();
+
+final class DismissContinueWatchingUseCaseProvider
+    extends
+        $FunctionalProvider<
+          DismissContinueWatchingUseCase,
+          DismissContinueWatchingUseCase,
+          DismissContinueWatchingUseCase
+        >
+    with $Provider<DismissContinueWatchingUseCase> {
+  DismissContinueWatchingUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'dismissContinueWatchingUseCaseProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$dismissContinueWatchingUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<DismissContinueWatchingUseCase> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  DismissContinueWatchingUseCase create(Ref ref) {
+    return dismissContinueWatchingUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(DismissContinueWatchingUseCase value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<DismissContinueWatchingUseCase>(
+        value,
+      ),
+    );
+  }
+}
+
+String _$dismissContinueWatchingUseCaseHash() =>
+    r'9b4dba027dc7242428ebcc9404dd141e319dd9b5';

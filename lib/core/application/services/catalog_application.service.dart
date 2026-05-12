@@ -141,10 +141,18 @@ class CatalogApplicationService {
       MovieContinueDto() => ContinueWatchingCardDto(
         inner: entry.movie,
         progress: _movieProgress(entry),
+        dismissTarget: MovieDismissTarget(entry.movie.id),
       ),
       EpisodeContinueDto() => ContinueWatchingCardDto(
         inner: SeriesDto.fromDomain(entry.series),
         progress: _episodeProgress(entry),
+        dismissTarget: SeriesDismissTarget(
+          seriesId: entry.series.id,
+          episodeIds: [
+            for (final season in entry.series.seasons)
+              for (final ep in season.episodes) ep.id,
+          ],
+        ),
       ),
     };
   }

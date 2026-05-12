@@ -5,15 +5,18 @@ import 'package:kidflix/core/domain/services/watch_progress.repository.dart';
 
 /// HTTP implementation of [WatchProgressRepository] backed by Dio.
 ///
-/// Hits the four endpoints documented in `API.md` § Progression de
-/// lecture :
+/// Hits the endpoints documented in `API.md` § Progression de lecture
+/// and `DISMISS_FEATURE.md` :
 ///
-/// * `GET /profiles/{p}/progress/movies/{m}` — returns a movie progress
-///   or `204 No Content` when none exists.
-/// * `GET /profiles/{p}/progress/episodes/{e}` — episode counterpart.
-/// * `PUT /profiles/{p}/progress/movies/{m}` — upsert a movie progress.
-/// * `PUT /profiles/{p}/progress/episodes/{e}` — episode counterpart.
-/// * `GET /profiles/{p}/progress` — mixed list with `kind` discriminator.
+/// * `GET    /profiles/{p}/progress/movies/{m}`
+/// * `GET    /profiles/{p}/progress/episodes/{e}`
+/// * `PUT    /profiles/{p}/progress/movies/{m}`
+/// * `PUT    /profiles/{p}/progress/episodes/{e}`
+/// * `GET    /profiles/{p}/progress`
+/// * `POST   /profiles/{p}/progress/movies/{m}/dismiss`
+/// * `DELETE /profiles/{p}/progress/movies/{m}/dismiss`
+/// * `POST   /profiles/{p}/progress/episodes/{e}/dismiss`
+/// * `DELETE /profiles/{p}/progress/episodes/{e}/dismiss`
 ///
 /// `findForMovie` / `findForEpisode` treat `204` as `null` per the API
 /// contract, with a defensive fallback on a `null` body if the backend
@@ -91,5 +94,45 @@ class DioWatchProgressRepository implements WatchProgressRepository {
     final list = (response.data!['progress'] as List)
         .cast<Map<String, dynamic>>();
     return list.map(watchProgressFromJson).toList(growable: false);
+  }
+
+  @override
+  Future<void> dismissMovie({
+    required String profileId,
+    required String movieId,
+  }) async {
+    await _dio.post<void>(
+      '/profiles/$profileId/progress/movies/$movieId/dismiss',
+    );
+  }
+
+  @override
+  Future<void> unDismissMovie({
+    required String profileId,
+    required String movieId,
+  }) async {
+    await _dio.delete<void>(
+      '/profiles/$profileId/progress/movies/$movieId/dismiss',
+    );
+  }
+
+  @override
+  Future<void> dismissEpisode({
+    required String profileId,
+    required String episodeId,
+  }) async {
+    await _dio.post<void>(
+      '/profiles/$profileId/progress/episodes/$episodeId/dismiss',
+    );
+  }
+
+  @override
+  Future<void> unDismissEpisode({
+    required String profileId,
+    required String episodeId,
+  }) async {
+    await _dio.delete<void>(
+      '/profiles/$profileId/progress/episodes/$episodeId/dismiss',
+    );
   }
 }

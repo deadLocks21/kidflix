@@ -144,6 +144,113 @@ void main() {
       expect(episode.completed, isTrue);
     });
 
+    test('dismissMovie flips dismissed flag, leaves position untouched',
+        () async {
+      final repo = InMemoryWatchProgressRepository();
+      await repo.save(
+        MovieProgress(
+          profileId: 'p1',
+          movieId: 'nemo',
+          positionSeconds: 1800,
+          completed: false,
+          updatedAt: DateTime.utc(2026, 5, 1),
+        ),
+      );
+
+      await repo.dismissMovie(profileId: 'p1', movieId: 'nemo');
+
+      final found = await repo.findForMovie(profileId: 'p1', movieId: 'nemo');
+      expect(found!.dismissed, isTrue);
+      expect(found.positionSeconds, 1800);
+    });
+
+    test('dismissMovie is idempotent and a no-op on unknown pair', () async {
+      final repo = InMemoryWatchProgressRepository();
+      await repo.dismissMovie(profileId: 'p1', movieId: 'ghost');
+      // No throw. Listing remains empty.
+      expect(await repo.listForProfile('p1'), isEmpty);
+    });
+
+    test('unDismissMovie restores the entry to the rail', () async {
+      final repo = InMemoryWatchProgressRepository();
+      await repo.save(
+        MovieProgress(
+          profileId: 'p1',
+          movieId: 'nemo',
+          positionSeconds: 1800,
+          completed: false,
+          updatedAt: DateTime.utc(2026, 5, 1),
+        ),
+      );
+      await repo.dismissMovie(profileId: 'p1', movieId: 'nemo');
+
+      await repo.unDismissMovie(profileId: 'p1', movieId: 'nemo');
+
+      final found = await repo.findForMovie(profileId: 'p1', movieId: 'nemo');
+      expect(found!.dismissed, isFalse);
+    });
+
+    test('save() resets dismissed to false (server auto-reset rule)',
+        () async {
+      final repo = InMemoryWatchProgressRepository();
+      await repo.save(
+        MovieProgress(
+          profileId: 'p1',
+          movieId: 'nemo',
+          positionSeconds: 100,
+          completed: false,
+          updatedAt: DateTime.utc(2026, 5, 1),
+        ),
+      );
+      await repo.dismissMovie(profileId: 'p1', movieId: 'nemo');
+
+      // A new save (e.g. user resumes playback) wipes the dismiss.
+      await repo.save(
+        MovieProgress(
+          profileId: 'p1',
+          movieId: 'nemo',
+          positionSeconds: 200,
+          completed: false,
+          updatedAt: DateTime.utc(2026, 5, 2),
+        ),
+      );
+
+      final found = await repo.findForMovie(profileId: 'p1', movieId: 'nemo');
+      expect(found!.dismissed, isFalse);
+      expect(found.positionSeconds, 200);
+    });
+
+    test('dismissEpisode is independent of dismissMovie on the same id',
+        () async {
+      final repo = InMemoryWatchProgressRepository();
+      await repo.save(
+        MovieProgress(
+          profileId: 'p1',
+          movieId: 'x',
+          positionSeconds: 10,
+          completed: false,
+          updatedAt: DateTime.utc(2026, 5, 1),
+        ),
+      );
+      await repo.save(
+        EpisodeProgress(
+          profileId: 'p1',
+          episodeId: 'x',
+          positionSeconds: 20,
+          completed: false,
+          updatedAt: DateTime.utc(2026, 5, 1),
+        ),
+      );
+
+      await repo.dismissEpisode(profileId: 'p1', episodeId: 'x');
+
+      final movie = await repo.findForMovie(profileId: 'p1', movieId: 'x');
+      final episode =
+          await repo.findForEpisode(profileId: 'p1', episodeId: 'x');
+      expect(movie!.dismissed, isFalse);
+      expect(episode!.dismissed, isTrue);
+    });
+
     test('listForProfile returns mixed kinds', () async {
       final repo = InMemoryWatchProgressRepository();
       await repo.save(

@@ -10,12 +10,18 @@
 /// modifier lets the player layer switch exhaustively without a default
 /// branch.
 ///
+/// The [dismissed] flag tracks an explicit user opt-out of the Continue
+/// Watching row without modifying the position. It is server-managed:
+/// the backend resets it to `false` on every successful save (cf.
+/// `DISMISS_FEATURE.md` — auto-reset rule).
+///
 /// No `deviceId` field: device identity is a server-side concern. The
 /// backend infers it from the JWT.
 sealed class WatchProgress {
   String get profileId;
   int get positionSeconds;
   bool get completed;
+  bool get dismissed;
   DateTime get updatedAt;
 }
 
@@ -32,6 +38,8 @@ class MovieProgress extends WatchProgress {
   @override
   final bool completed;
   @override
+  final bool dismissed;
+  @override
   final DateTime updatedAt;
 
   MovieProgress({
@@ -40,6 +48,7 @@ class MovieProgress extends WatchProgress {
     required this.positionSeconds,
     required this.completed,
     required this.updatedAt,
+    this.dismissed = false,
   });
 
   @override
@@ -55,7 +64,8 @@ class MovieProgress extends WatchProgress {
   @override
   String toString() =>
       'MovieProgress(profileId: $profileId, movieId: $movieId, '
-      'positionSeconds: $positionSeconds, completed: $completed)';
+      'positionSeconds: $positionSeconds, completed: $completed, '
+      'dismissed: $dismissed)';
 }
 
 /// Playback progress of an episode of a series.
@@ -71,6 +81,8 @@ class EpisodeProgress extends WatchProgress {
   @override
   final bool completed;
   @override
+  final bool dismissed;
+  @override
   final DateTime updatedAt;
 
   EpisodeProgress({
@@ -79,6 +91,7 @@ class EpisodeProgress extends WatchProgress {
     required this.positionSeconds,
     required this.completed,
     required this.updatedAt,
+    this.dismissed = false,
   });
 
   @override
@@ -94,5 +107,6 @@ class EpisodeProgress extends WatchProgress {
   @override
   String toString() =>
       'EpisodeProgress(profileId: $profileId, episodeId: $episodeId, '
-      'positionSeconds: $positionSeconds, completed: $completed)';
+      'positionSeconds: $positionSeconds, completed: $completed, '
+      'dismissed: $dismissed)';
 }

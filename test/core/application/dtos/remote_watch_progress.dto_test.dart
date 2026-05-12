@@ -80,6 +80,22 @@ void main() {
 
       expect(progress.completed, isTrue);
     });
+
+    test('parses dismissed: true when present', () {
+      final payload = _moviePayload()..['dismissed'] = true;
+
+      final progress = watchProgressFromJson(payload);
+
+      expect(progress.dismissed, isTrue);
+    });
+
+    test('defaults dismissed to false when missing (older backend)', () {
+      final payload = _moviePayload()..remove('dismissed');
+
+      final progress = watchProgressFromJson(payload);
+
+      expect(progress.dismissed, isFalse);
+    });
   });
 
   group('watchProgressToWireBody', () {
@@ -113,6 +129,21 @@ void main() {
 
       expect(body['position_seconds'], 240);
       expect(body['completed'], isFalse);
+    });
+
+    test('does not serialize dismissed (server-managed)', () {
+      final progress = MovieProgress(
+        profileId: 'p1',
+        movieId: 'm1',
+        positionSeconds: 100,
+        completed: false,
+        dismissed: true,
+        updatedAt: DateTime.utc(2026, 4, 22),
+      );
+
+      final body = watchProgressToWireBody(progress);
+
+      expect(body.containsKey('dismissed'), isFalse);
     });
 
     test('omits profile_id and media_id (path-only)', () {

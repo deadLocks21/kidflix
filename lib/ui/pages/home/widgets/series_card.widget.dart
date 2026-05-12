@@ -20,11 +20,16 @@ class SeriesCard extends StatelessWidget {
   /// progress strip is overlaid at the bottom of the poster.
   final double? progress;
 
+  /// Optional long-press handler. Wired by the Continue Watching row to
+  /// open the "Retirer" action sheet ; other rows leave it null.
+  final VoidCallback? onLongPress;
+
   const SeriesCard({
     super.key,
     required this.series,
     this.onTap,
     this.progress,
+    this.onLongPress,
   });
 
   @override
@@ -36,6 +41,7 @@ class SeriesCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
+          onLongPress: onLongPress,
           borderRadius: BorderRadius.circular(8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

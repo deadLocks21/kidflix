@@ -47,6 +47,26 @@ class _NoopProgressRepo implements WatchProgressRepository {
   Future<void> save(WatchProgress progress) async {}
   @override
   Future<List<WatchProgress>> listForProfile(String profileId) async => const [];
+  @override
+  Future<void> dismissMovie({
+    required String profileId,
+    required String movieId,
+  }) async {}
+  @override
+  Future<void> unDismissMovie({
+    required String profileId,
+    required String movieId,
+  }) async {}
+  @override
+  Future<void> dismissEpisode({
+    required String profileId,
+    required String episodeId,
+  }) async {}
+  @override
+  Future<void> unDismissEpisode({
+    required String profileId,
+    required String episodeId,
+  }) async {}
 }
 
 class _CannedProgressRepo extends _NoopProgressRepo {

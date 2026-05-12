@@ -4,6 +4,7 @@ import 'package:kidflix/core/application/dtos/catalog_row.dto.dart';
 import 'package:kidflix/core/application/dtos/continue_watching_card.dto.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/core/application/dtos/series.dto.dart';
+import 'package:kidflix/ui/pages/home/widgets/dismiss_continue_watching_sheet.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/movie_card.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/series_card.widget.dart';
 
@@ -14,6 +15,10 @@ import 'package:kidflix/ui/pages/home/widgets/series_card.widget.dart';
 /// Series tap currently delegates to a series-specific callback ; movie
 /// tap keeps the existing onMovieTap signature for backward compat with
 /// the homepage's controller.
+///
+/// Long-press on a [ContinueWatchingCardDto] opens the "Retirer de
+/// Continuer à regarder" bottom sheet. Cards from other rows ignore
+/// long-press.
 class CatalogRowWidget extends StatelessWidget {
   final CatalogRowDto row;
   final void Function(MovieDto movie) onMovieTap;
@@ -50,7 +55,7 @@ class CatalogRowWidget extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: row.items.length,
               separatorBuilder: (_, _) => const SizedBox(width: 12),
-              itemBuilder: (_, i) => _buildCard(row.items[i]),
+              itemBuilder: (context, i) => _buildCard(context, row.items[i]),
             ),
           ),
         ],
@@ -58,19 +63,29 @@ class CatalogRowWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildCard(CatalogItemDto item) {
+  Widget _buildCard(BuildContext context, CatalogItemDto item) {
     if (item is ContinueWatchingCardDto) {
-      return _buildLeaf(item.inner, progress: item.progress);
+      return _buildLeaf(
+        item.inner,
+        progress: item.progress,
+        onLongPress: () =>
+            showDismissContinueWatchingSheet(context, card: item),
+      );
     }
     return _buildLeaf(item);
   }
 
-  Widget _buildLeaf(CatalogItemDto item, {double? progress}) {
+  Widget _buildLeaf(
+    CatalogItemDto item, {
+    double? progress,
+    VoidCallback? onLongPress,
+  }) {
     if (item is MovieDto) {
       return MovieCard(
         movie: item,
         onTap: () => onMovieTap(item),
         progress: progress,
+        onLongPress: onLongPress,
       );
     }
     if (item is SeriesDto) {
@@ -78,6 +93,7 @@ class CatalogRowWidget extends StatelessWidget {
         series: item,
         onTap: onSeriesTap == null ? null : () => onSeriesTap!(item),
         progress: progress,
+        onLongPress: onLongPress,
       );
     }
     // Unknown subtype: empty placeholder.

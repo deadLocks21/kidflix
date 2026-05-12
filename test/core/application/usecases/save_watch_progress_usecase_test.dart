@@ -112,4 +112,28 @@ class _FakeRepo implements WatchProgressRepository {
 
   @override
   Future<List<WatchProgress>> listForProfile(String profileId) async => [];
+
+  @override
+  Future<void> dismissMovie({
+    required String profileId,
+    required String movieId,
+  }) async {}
+
+  @override
+  Future<void> unDismissMovie({
+    required String profileId,
+    required String movieId,
+  }) async {}
+
+  @override
+  Future<void> dismissEpisode({
+    required String profileId,
+    required String episodeId,
+  }) async {}
+
+  @override
+  Future<void> unDismissEpisode({
+    required String profileId,
+    required String episodeId,
+  }) async {}
 }

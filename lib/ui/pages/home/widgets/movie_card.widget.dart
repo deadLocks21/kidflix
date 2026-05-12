@@ -21,11 +21,16 @@ class MovieCard extends StatelessWidget {
   /// progress strip is overlaid at the bottom of the poster.
   final double? progress;
 
+  /// Optional long-press handler. Wired by the Continue Watching row to
+  /// open the "Retirer" action sheet ; other rows leave it null.
+  final VoidCallback? onLongPress;
+
   const MovieCard({
     super.key,
     required this.movie,
     required this.onTap,
     this.progress,
+    this.onLongPress,
   });
 
   @override
@@ -37,6 +42,7 @@ class MovieCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
+          onLongPress: onLongPress,
           borderRadius: BorderRadius.circular(8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

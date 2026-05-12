@@ -104,6 +104,26 @@ class _FakeProgress implements WatchProgressRepository {
   }) async => null;
   @override
   Future<void> save(WatchProgress progress) async {}
+  @override
+  Future<void> dismissMovie({
+    required String profileId,
+    required String movieId,
+  }) async {}
+  @override
+  Future<void> unDismissMovie({
+    required String profileId,
+    required String movieId,
+  }) async {}
+  @override
+  Future<void> dismissEpisode({
+    required String profileId,
+    required String episodeId,
+  }) async {}
+  @override
+  Future<void> unDismissEpisode({
+    required String profileId,
+    required String episodeId,
+  }) async {}
 }
 
 void main() {
@@ -140,6 +160,55 @@ void main() {
       expect(m.movie.id, 'nemo');
       expect(m.resumeSeconds, 1845);
       expect(m.completed, isFalse);
+    });
+
+    test('dismissed movie is excluded from Continue Watching', () async {
+      final movie = _movie();
+      final progress = MovieProgress(
+        profileId: 'p1',
+        movieId: 'nemo',
+        positionSeconds: 600,
+        completed: false,
+        dismissed: true,
+        updatedAt: DateTime(2026, 5, 6),
+      );
+      final uc = ResolveContinueWatchingUseCase(
+        progressRepo: _FakeProgress([progress]),
+        catalogRepo: _FakeCatalog([movie]),
+        seriesRepo: _FakeSeries({}),
+      );
+
+      final result = await uc.execute('p1');
+
+      expect(result, isEmpty);
+    });
+
+    test('dismissed episode is excluded from Continue Watching', () async {
+      final s1e3 = _ep(id: 's1e3', seasonNumber: 1, episodeNumber: 3);
+      final series = _seriesWith(
+        id: 'pingu',
+        seasons: [
+          Season(seasonNumber: 1, episodes: [s1e3]),
+        ],
+      );
+      final progress = EpisodeProgress(
+        profileId: 'p1',
+        episodeId: 's1e3',
+        positionSeconds: 100,
+        completed: false,
+        dismissed: true,
+        updatedAt: DateTime(2026, 5, 6),
+      );
+      final uc = ResolveContinueWatchingUseCase(
+        progressRepo: _FakeProgress([progress]),
+        catalogRepo:
+            _FakeCatalog([_seriesWith(id: 'pingu', seasons: const [])]),
+        seriesRepo: _FakeSeries({'pingu': series}),
+      );
+
+      final result = await uc.execute('p1');
+
+      expect(result, isEmpty);
     });
 
     test('completed movie is excluded from Continue Watching', () async {
