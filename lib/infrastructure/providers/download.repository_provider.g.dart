@@ -10,42 +10,34 @@ part of 'download.repository_provider.dart';
 // ignore_for_file: type=lint, type=warning
 /// Download repository provider.
 ///
-/// Selects between two implementations based on the compile-time constant
-/// `String.fromEnvironment('API_BASE_URL')`:
+/// Selects between two implementations based on [apiBaseUrlProvider]:
 ///
-/// - **empty (default)** → [InMemoryDownloadRepository] — used by tests, by
-///   `flutter run` without flag, and by anyone running offline. Streams
-///   Big Buck Bunny from archive.org through a private `Dio` (no auth
-///   interceptor, so credentials never leak to the third-party CDN).
+/// - **empty** → [InMemoryDownloadRepository] — used by tests and when no
+///   backend has been configured. Streams Big Buck Bunny from archive.org
+///   through a private `Dio` (no auth interceptor, so credentials never
+///   leak to the third-party CDN).
 /// - **non-empty** → [DioDownloadRepository] consuming [dioProvider] —
 ///   hits `GET /movies/{movie_id}/download` on the Kidflix backend with
 ///   `Authorization: Bearer <jwt>` and `X-Device-Id` headers injected
-///   transparently by the `AuthInterceptor`. Used by
-///   `flutter run --dart-define=API_BASE_URL=http://localhost:8080`.
-///
-/// Switching modes requires a full rebuild — `String.fromEnvironment` is
-/// evaluated at compile time, not at runtime.
+///   transparently by the `AuthInterceptor`. The URL is configured by the
+///   user via the ⚙ dialog on the phone-entry page.
 
 @ProviderFor(downloadRepository)
 final downloadRepositoryProvider = DownloadRepositoryProvider._();
 
 /// Download repository provider.
 ///
-/// Selects between two implementations based on the compile-time constant
-/// `String.fromEnvironment('API_BASE_URL')`:
+/// Selects between two implementations based on [apiBaseUrlProvider]:
 ///
-/// - **empty (default)** → [InMemoryDownloadRepository] — used by tests, by
-///   `flutter run` without flag, and by anyone running offline. Streams
-///   Big Buck Bunny from archive.org through a private `Dio` (no auth
-///   interceptor, so credentials never leak to the third-party CDN).
+/// - **empty** → [InMemoryDownloadRepository] — used by tests and when no
+///   backend has been configured. Streams Big Buck Bunny from archive.org
+///   through a private `Dio` (no auth interceptor, so credentials never
+///   leak to the third-party CDN).
 /// - **non-empty** → [DioDownloadRepository] consuming [dioProvider] —
 ///   hits `GET /movies/{movie_id}/download` on the Kidflix backend with
 ///   `Authorization: Bearer <jwt>` and `X-Device-Id` headers injected
-///   transparently by the `AuthInterceptor`. Used by
-///   `flutter run --dart-define=API_BASE_URL=http://localhost:8080`.
-///
-/// Switching modes requires a full rebuild — `String.fromEnvironment` is
-/// evaluated at compile time, not at runtime.
+///   transparently by the `AuthInterceptor`. The URL is configured by the
+///   user via the ⚙ dialog on the phone-entry page.
 
 final class DownloadRepositoryProvider
     extends
@@ -57,21 +49,17 @@ final class DownloadRepositoryProvider
     with $Provider<DownloadRepository> {
   /// Download repository provider.
   ///
-  /// Selects between two implementations based on the compile-time constant
-  /// `String.fromEnvironment('API_BASE_URL')`:
+  /// Selects between two implementations based on [apiBaseUrlProvider]:
   ///
-  /// - **empty (default)** → [InMemoryDownloadRepository] — used by tests, by
-  ///   `flutter run` without flag, and by anyone running offline. Streams
-  ///   Big Buck Bunny from archive.org through a private `Dio` (no auth
-  ///   interceptor, so credentials never leak to the third-party CDN).
+  /// - **empty** → [InMemoryDownloadRepository] — used by tests and when no
+  ///   backend has been configured. Streams Big Buck Bunny from archive.org
+  ///   through a private `Dio` (no auth interceptor, so credentials never
+  ///   leak to the third-party CDN).
   /// - **non-empty** → [DioDownloadRepository] consuming [dioProvider] —
   ///   hits `GET /movies/{movie_id}/download` on the Kidflix backend with
   ///   `Authorization: Bearer <jwt>` and `X-Device-Id` headers injected
-  ///   transparently by the `AuthInterceptor`. Used by
-  ///   `flutter run --dart-define=API_BASE_URL=http://localhost:8080`.
-  ///
-  /// Switching modes requires a full rebuild — `String.fromEnvironment` is
-  /// evaluated at compile time, not at runtime.
+  ///   transparently by the `AuthInterceptor`. The URL is configured by the
+  ///   user via the ⚙ dialog on the phone-entry page.
   DownloadRepositoryProvider._()
     : super(
         from: null,
@@ -107,4 +95,4 @@ final class DownloadRepositoryProvider
 }
 
 String _$downloadRepositoryHash() =>
-    r'6a4632898435ddbf850e31e51a1d8112566efedd';
+    r'9a9254d0d16c00a0414ff6a96d56c2316d6fea72';

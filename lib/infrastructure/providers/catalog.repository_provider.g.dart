@@ -10,34 +10,26 @@ part of 'catalog.repository_provider.dart';
 // ignore_for_file: type=lint, type=warning
 /// Catalog repository provider.
 ///
-/// Selects between two implementations based on the compile-time constant
-/// `String.fromEnvironment('API_BASE_URL')`:
+/// Selects between two implementations based on [apiBaseUrlProvider]:
 ///
-/// - **empty (default)** → [InMemoryCatalogRepository] — used by tests, by
-///   `flutter run` without flag, and by anyone running offline.
-/// - **non-empty** → [DioCatalogRepository] consuming [dioProvider] — used
-///   to talk to the real backend, e.g.
-///   `flutter run --dart-define=API_BASE_URL=http://localhost:8080`.
-///
-/// Switching modes requires a full rebuild — `String.fromEnvironment` is
-/// evaluated at compile time, not at runtime.
+/// - **empty** → [InMemoryCatalogRepository] — used by tests and when no
+///   backend has been configured.
+/// - **non-empty** → [DioCatalogRepository] consuming [dioProvider] —
+///   talks to the real backend at the URL the user configured via the ⚙
+///   dialog on the phone-entry page (persisted in `shared_preferences`).
 
 @ProviderFor(catalogRepository)
 final catalogRepositoryProvider = CatalogRepositoryProvider._();
 
 /// Catalog repository provider.
 ///
-/// Selects between two implementations based on the compile-time constant
-/// `String.fromEnvironment('API_BASE_URL')`:
+/// Selects between two implementations based on [apiBaseUrlProvider]:
 ///
-/// - **empty (default)** → [InMemoryCatalogRepository] — used by tests, by
-///   `flutter run` without flag, and by anyone running offline.
-/// - **non-empty** → [DioCatalogRepository] consuming [dioProvider] — used
-///   to talk to the real backend, e.g.
-///   `flutter run --dart-define=API_BASE_URL=http://localhost:8080`.
-///
-/// Switching modes requires a full rebuild — `String.fromEnvironment` is
-/// evaluated at compile time, not at runtime.
+/// - **empty** → [InMemoryCatalogRepository] — used by tests and when no
+///   backend has been configured.
+/// - **non-empty** → [DioCatalogRepository] consuming [dioProvider] —
+///   talks to the real backend at the URL the user configured via the ⚙
+///   dialog on the phone-entry page (persisted in `shared_preferences`).
 
 final class CatalogRepositoryProvider
     extends
@@ -49,17 +41,13 @@ final class CatalogRepositoryProvider
     with $Provider<CatalogRepository> {
   /// Catalog repository provider.
   ///
-  /// Selects between two implementations based on the compile-time constant
-  /// `String.fromEnvironment('API_BASE_URL')`:
+  /// Selects between two implementations based on [apiBaseUrlProvider]:
   ///
-  /// - **empty (default)** → [InMemoryCatalogRepository] — used by tests, by
-  ///   `flutter run` without flag, and by anyone running offline.
-  /// - **non-empty** → [DioCatalogRepository] consuming [dioProvider] — used
-  ///   to talk to the real backend, e.g.
-  ///   `flutter run --dart-define=API_BASE_URL=http://localhost:8080`.
-  ///
-  /// Switching modes requires a full rebuild — `String.fromEnvironment` is
-  /// evaluated at compile time, not at runtime.
+  /// - **empty** → [InMemoryCatalogRepository] — used by tests and when no
+  ///   backend has been configured.
+  /// - **non-empty** → [DioCatalogRepository] consuming [dioProvider] —
+  ///   talks to the real backend at the URL the user configured via the ⚙
+  ///   dialog on the phone-entry page (persisted in `shared_preferences`).
   CatalogRepositoryProvider._()
     : super(
         from: null,
@@ -94,4 +82,4 @@ final class CatalogRepositoryProvider
   }
 }
 
-String _$catalogRepositoryHash() => r'5d2c92eeeae712ef9018ae292f77c29f897ba55b';
+String _$catalogRepositoryHash() => r'ad59320c9b7863b7654965f75f644a89546e543c';

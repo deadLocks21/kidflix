@@ -10,18 +10,18 @@ part of 'avatars.repository_provider.dart';
 // ignore_for_file: type=lint, type=warning
 /// Avatars catalogue repository provider.
 ///
-/// Selects the implementation by the same `String.fromEnvironment('API_BASE_URL')`
-/// flag used by `profileManagementRepositoryProvider` and `authRepositoryProvider`
-/// — keep them consistent.
+/// Selects the implementation by reading [apiBaseUrlProvider] — same source
+/// used by `profileManagementRepositoryProvider` and `authRepositoryProvider`,
+/// so all three stay consistent when the user switches backend.
 
 @ProviderFor(avatarsRepository)
 final avatarsRepositoryProvider = AvatarsRepositoryProvider._();
 
 /// Avatars catalogue repository provider.
 ///
-/// Selects the implementation by the same `String.fromEnvironment('API_BASE_URL')`
-/// flag used by `profileManagementRepositoryProvider` and `authRepositoryProvider`
-/// — keep them consistent.
+/// Selects the implementation by reading [apiBaseUrlProvider] — same source
+/// used by `profileManagementRepositoryProvider` and `authRepositoryProvider`,
+/// so all three stay consistent when the user switches backend.
 
 final class AvatarsRepositoryProvider
     extends
@@ -33,9 +33,9 @@ final class AvatarsRepositoryProvider
     with $Provider<AvatarsRepository> {
   /// Avatars catalogue repository provider.
   ///
-  /// Selects the implementation by the same `String.fromEnvironment('API_BASE_URL')`
-  /// flag used by `profileManagementRepositoryProvider` and `authRepositoryProvider`
-  /// — keep them consistent.
+  /// Selects the implementation by reading [apiBaseUrlProvider] — same source
+  /// used by `profileManagementRepositoryProvider` and `authRepositoryProvider`,
+  /// so all three stay consistent when the user switches backend.
   AvatarsRepositoryProvider._()
     : super(
         from: null,
@@ -70,4 +70,4 @@ final class AvatarsRepositoryProvider
   }
 }
 
-String _$avatarsRepositoryHash() => r'c0079f60c1624b150f6809e3aa297c3dd8a97b46';
+String _$avatarsRepositoryHash() => r'1becbe85ebba8e77574287e50c17992d589ff539';

@@ -10,17 +10,16 @@ part of 'profile_management.repository_provider.dart';
 // ignore_for_file: type=lint, type=warning
 /// Profile-management repository provider.
 ///
-/// Selects between two implementations based on the compile-time constant
-/// `String.fromEnvironment('API_BASE_URL')`:
+/// Selects between two implementations based on [apiBaseUrlProvider]:
 ///
-/// - **empty (default)** → [InMemoryProfileManagementRepository] — used by
-///   tests, by `flutter run` without flag, and by anyone running offline.
+/// - **empty** → [InMemoryProfileManagementRepository] — used by tests and
+///   when no backend has been configured.
 /// - **non-empty** → [DioProfileManagementRepository] consuming [dioProvider]
-///   — used to talk to the real backend, e.g.
-///   `flutter run --dart-define=API_BASE_URL=http://localhost:8080`.
+///   — talks to the real backend at the URL the user configured via the
+///   ⚙ dialog on the phone-entry page (persisted in `shared_preferences`).
 ///
-/// Switching modes requires a full rebuild. The selection MUST stay
-/// consistent with `authRepositoryProvider` — they read the same flag.
+/// The selection MUST stay consistent with `authRepositoryProvider` —
+/// both watch the same [apiBaseUrlProvider].
 
 @ProviderFor(profileManagementRepository)
 final profileManagementRepositoryProvider =
@@ -28,17 +27,16 @@ final profileManagementRepositoryProvider =
 
 /// Profile-management repository provider.
 ///
-/// Selects between two implementations based on the compile-time constant
-/// `String.fromEnvironment('API_BASE_URL')`:
+/// Selects between two implementations based on [apiBaseUrlProvider]:
 ///
-/// - **empty (default)** → [InMemoryProfileManagementRepository] — used by
-///   tests, by `flutter run` without flag, and by anyone running offline.
+/// - **empty** → [InMemoryProfileManagementRepository] — used by tests and
+///   when no backend has been configured.
 /// - **non-empty** → [DioProfileManagementRepository] consuming [dioProvider]
-///   — used to talk to the real backend, e.g.
-///   `flutter run --dart-define=API_BASE_URL=http://localhost:8080`.
+///   — talks to the real backend at the URL the user configured via the
+///   ⚙ dialog on the phone-entry page (persisted in `shared_preferences`).
 ///
-/// Switching modes requires a full rebuild. The selection MUST stay
-/// consistent with `authRepositoryProvider` — they read the same flag.
+/// The selection MUST stay consistent with `authRepositoryProvider` —
+/// both watch the same [apiBaseUrlProvider].
 
 final class ProfileManagementRepositoryProvider
     extends
@@ -50,17 +48,16 @@ final class ProfileManagementRepositoryProvider
     with $Provider<ProfileManagementRepository> {
   /// Profile-management repository provider.
   ///
-  /// Selects between two implementations based on the compile-time constant
-  /// `String.fromEnvironment('API_BASE_URL')`:
+  /// Selects between two implementations based on [apiBaseUrlProvider]:
   ///
-  /// - **empty (default)** → [InMemoryProfileManagementRepository] — used by
-  ///   tests, by `flutter run` without flag, and by anyone running offline.
+  /// - **empty** → [InMemoryProfileManagementRepository] — used by tests and
+  ///   when no backend has been configured.
   /// - **non-empty** → [DioProfileManagementRepository] consuming [dioProvider]
-  ///   — used to talk to the real backend, e.g.
-  ///   `flutter run --dart-define=API_BASE_URL=http://localhost:8080`.
+  ///   — talks to the real backend at the URL the user configured via the
+  ///   ⚙ dialog on the phone-entry page (persisted in `shared_preferences`).
   ///
-  /// Switching modes requires a full rebuild. The selection MUST stay
-  /// consistent with `authRepositoryProvider` — they read the same flag.
+  /// The selection MUST stay consistent with `authRepositoryProvider` —
+  /// both watch the same [apiBaseUrlProvider].
   ProfileManagementRepositoryProvider._()
     : super(
         from: null,
@@ -96,4 +93,4 @@ final class ProfileManagementRepositoryProvider
 }
 
 String _$profileManagementRepositoryHash() =>
-    r'eb7447d71f33ad9e3671a736986ccb61f9c6afe0';
+    r'f11944e70e6811409f1288570fb09d7d251327ee';

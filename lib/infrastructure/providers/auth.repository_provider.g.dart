@@ -10,51 +10,48 @@ part of 'auth.repository_provider.dart';
 // ignore_for_file: type=lint, type=warning
 /// Auth repository provider.
 ///
-/// Selects between two implementations based on the compile-time constant
-/// `String.fromEnvironment('API_BASE_URL')`:
+/// Selects between two implementations based on [apiBaseUrlProvider]:
 ///
-/// - **empty (default)** → [InMemoryAuthRepository] — used by tests, by
-///   `flutter run` without flag, and by anyone running offline.
-/// - **non-empty** → [DioAuthRepository] consuming [dioProvider] — used to
-///   talk to the real backend, e.g.
-///   `flutter run --dart-define=API_BASE_URL=http://localhost:8080`.
+/// - **empty** → [InMemoryAuthRepository] — used by tests and when no
+///   backend has been configured.
+/// - **non-empty** → [DioAuthRepository] consuming [dioProvider] — talks
+///   to the real backend at the URL configured by the user via the ⚙
+///   dialog on the phone-entry page (persisted in `shared_preferences`).
 ///
-/// Switching modes requires a full rebuild — `String.fromEnvironment` is
-/// evaluated at compile time, not at runtime.
+/// The URL changes at runtime invalidate this provider via the
+/// `ref.watch` below, so the next call uses the freshly built repository.
 
 @ProviderFor(authRepository)
 final authRepositoryProvider = AuthRepositoryProvider._();
 
 /// Auth repository provider.
 ///
-/// Selects between two implementations based on the compile-time constant
-/// `String.fromEnvironment('API_BASE_URL')`:
+/// Selects between two implementations based on [apiBaseUrlProvider]:
 ///
-/// - **empty (default)** → [InMemoryAuthRepository] — used by tests, by
-///   `flutter run` without flag, and by anyone running offline.
-/// - **non-empty** → [DioAuthRepository] consuming [dioProvider] — used to
-///   talk to the real backend, e.g.
-///   `flutter run --dart-define=API_BASE_URL=http://localhost:8080`.
+/// - **empty** → [InMemoryAuthRepository] — used by tests and when no
+///   backend has been configured.
+/// - **non-empty** → [DioAuthRepository] consuming [dioProvider] — talks
+///   to the real backend at the URL configured by the user via the ⚙
+///   dialog on the phone-entry page (persisted in `shared_preferences`).
 ///
-/// Switching modes requires a full rebuild — `String.fromEnvironment` is
-/// evaluated at compile time, not at runtime.
+/// The URL changes at runtime invalidate this provider via the
+/// `ref.watch` below, so the next call uses the freshly built repository.
 
 final class AuthRepositoryProvider
     extends $FunctionalProvider<AuthRepository, AuthRepository, AuthRepository>
     with $Provider<AuthRepository> {
   /// Auth repository provider.
   ///
-  /// Selects between two implementations based on the compile-time constant
-  /// `String.fromEnvironment('API_BASE_URL')`:
+  /// Selects between two implementations based on [apiBaseUrlProvider]:
   ///
-  /// - **empty (default)** → [InMemoryAuthRepository] — used by tests, by
-  ///   `flutter run` without flag, and by anyone running offline.
-  /// - **non-empty** → [DioAuthRepository] consuming [dioProvider] — used to
-  ///   talk to the real backend, e.g.
-  ///   `flutter run --dart-define=API_BASE_URL=http://localhost:8080`.
+  /// - **empty** → [InMemoryAuthRepository] — used by tests and when no
+  ///   backend has been configured.
+  /// - **non-empty** → [DioAuthRepository] consuming [dioProvider] — talks
+  ///   to the real backend at the URL configured by the user via the ⚙
+  ///   dialog on the phone-entry page (persisted in `shared_preferences`).
   ///
-  /// Switching modes requires a full rebuild — `String.fromEnvironment` is
-  /// evaluated at compile time, not at runtime.
+  /// The URL changes at runtime invalidate this provider via the
+  /// `ref.watch` below, so the next call uses the freshly built repository.
   AuthRepositoryProvider._()
     : super(
         from: null,
@@ -88,4 +85,4 @@ final class AuthRepositoryProvider
   }
 }
 
-String _$authRepositoryHash() => r'cf6a67225de92fab7f12eeff3bf730eaffbbf787';
+String _$authRepositoryHash() => r'88551bb76d1c28f8799456b639709aeb9851c123';

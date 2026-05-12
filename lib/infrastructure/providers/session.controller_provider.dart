@@ -16,6 +16,7 @@ import 'package:kidflix/core/application/usecases/verify_profile_pin.usecase.dar
 import 'package:kidflix/core/domain/model/avatar_update.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/model/session.dart';
+import 'package:kidflix/infrastructure/providers/api_base_url.provider.dart';
 import 'package:kidflix/infrastructure/providers/auth.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/in_memory_accounts_store.provider.dart';
 import 'package:kidflix/infrastructure/providers/profile_management.service_provider.dart';
@@ -441,9 +442,15 @@ class SessionController extends _$SessionController {
   }
 }
 
-/// Bootstrap provider: triggers [SessionController.restoreSession] at
-/// app startup. The UI waits on this before building the router.
+/// Bootstrap provider: hydrates the user-configurable API base URL from
+/// `shared_preferences`, then triggers [SessionController.restoreSession].
+/// The UI waits on this before building the router.
+///
+/// Order matters: the URL must be loaded before `restoreSession()`, which
+/// transitively builds `dioProvider` and the repository providers — they
+/// read the URL from [apiBaseUrlProvider] at first build.
 @Riverpod(keepAlive: true)
 Future<void> bootstrap(Ref ref) async {
+  await ref.read(apiBaseUrlProvider.notifier).load();
   await ref.read(sessionControllerProvider.notifier).restoreSession();
 }

@@ -1,6 +1,7 @@
 import 'package:kidflix/core/domain/services/auth.repository.dart';
 import 'package:kidflix/infrastructure/auth/dio.auth.repository.dart';
 import 'package:kidflix/infrastructure/auth/in_memory.auth.repository.dart';
+import 'package:kidflix/infrastructure/providers/api_base_url.provider.dart';
 import 'package:kidflix/infrastructure/providers/dio.provider.dart';
 import 'package:kidflix/infrastructure/providers/in_memory_accounts_store.provider.dart';
 import 'package:kidflix/infrastructure/providers/profile_pin.service_provider.dart';
@@ -10,20 +11,19 @@ part 'auth.repository_provider.g.dart';
 
 /// Auth repository provider.
 ///
-/// Selects between two implementations based on the compile-time constant
-/// `String.fromEnvironment('API_BASE_URL')`:
+/// Selects between two implementations based on [apiBaseUrlProvider]:
 ///
-/// - **empty (default)** → [InMemoryAuthRepository] — used by tests, by
-///   `flutter run` without flag, and by anyone running offline.
-/// - **non-empty** → [DioAuthRepository] consuming [dioProvider] — used to
-///   talk to the real backend, e.g.
-///   `flutter run --dart-define=API_BASE_URL=http://localhost:8080`.
+/// - **empty** → [InMemoryAuthRepository] — used by tests and when no
+///   backend has been configured.
+/// - **non-empty** → [DioAuthRepository] consuming [dioProvider] — talks
+///   to the real backend at the URL configured by the user via the ⚙
+///   dialog on the phone-entry page (persisted in `shared_preferences`).
 ///
-/// Switching modes requires a full rebuild — `String.fromEnvironment` is
-/// evaluated at compile time, not at runtime.
+/// The URL changes at runtime invalidate this provider via the
+/// `ref.watch` below, so the next call uses the freshly built repository.
 @Riverpod(keepAlive: true)
 AuthRepository authRepository(Ref ref) {
-  const baseUrl = String.fromEnvironment('API_BASE_URL');
+  final baseUrl = ref.watch(apiBaseUrlProvider);
   if (baseUrl.isEmpty) {
     final pin = ref.watch(profilePinServiceProvider);
     final store = ref.watch(inMemoryAccountsStoreProvider);

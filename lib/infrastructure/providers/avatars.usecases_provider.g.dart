@@ -116,4 +116,4 @@ final class AvatarsListProvider
   }
 }
 
-String _$avatarsListHash() => r'1766a1aff2e9b01a267f9064ca3b209c152af81a';
+String _$avatarsListHash() => r'c016890930fdccf7efb9cacc8accb005acb627f7';

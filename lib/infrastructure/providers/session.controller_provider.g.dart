@@ -70,20 +70,35 @@ abstract class _$SessionController extends $Notifier<SessionState> {
   }
 }
 
-/// Bootstrap provider: triggers [SessionController.restoreSession] at
-/// app startup. The UI waits on this before building the router.
+/// Bootstrap provider: hydrates the user-configurable API base URL from
+/// `shared_preferences`, then triggers [SessionController.restoreSession].
+/// The UI waits on this before building the router.
+///
+/// Order matters: the URL must be loaded before `restoreSession()`, which
+/// transitively builds `dioProvider` and the repository providers — they
+/// read the URL from [apiBaseUrlProvider] at first build.
 
 @ProviderFor(bootstrap)
 final bootstrapProvider = BootstrapProvider._();
 
-/// Bootstrap provider: triggers [SessionController.restoreSession] at
-/// app startup. The UI waits on this before building the router.
+/// Bootstrap provider: hydrates the user-configurable API base URL from
+/// `shared_preferences`, then triggers [SessionController.restoreSession].
+/// The UI waits on this before building the router.
+///
+/// Order matters: the URL must be loaded before `restoreSession()`, which
+/// transitively builds `dioProvider` and the repository providers — they
+/// read the URL from [apiBaseUrlProvider] at first build.
 
 final class BootstrapProvider
     extends $FunctionalProvider<AsyncValue<void>, void, FutureOr<void>>
     with $FutureModifier<void>, $FutureProvider<void> {
-  /// Bootstrap provider: triggers [SessionController.restoreSession] at
-  /// app startup. The UI waits on this before building the router.
+  /// Bootstrap provider: hydrates the user-configurable API base URL from
+  /// `shared_preferences`, then triggers [SessionController.restoreSession].
+  /// The UI waits on this before building the router.
+  ///
+  /// Order matters: the URL must be loaded before `restoreSession()`, which
+  /// transitively builds `dioProvider` and the repository providers — they
+  /// read the URL from [apiBaseUrlProvider] at first build.
   BootstrapProvider._()
     : super(
         from: null,
@@ -109,4 +124,4 @@ final class BootstrapProvider
   }
 }
 
-String _$bootstrapHash() => r'21189af28a72e26ccc2240f4ae11e863a854a300';
+String _$bootstrapHash() => r'a7c6b7861961816df24d87c355c98d72e3b03832';

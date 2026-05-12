@@ -10,30 +10,26 @@ part of 'series.repository_provider.dart';
 // ignore_for_file: type=lint, type=warning
 /// Series repository provider.
 ///
-/// Selects between two implementations based on the compile-time constant
-/// `String.fromEnvironment('API_BASE_URL')`:
+/// Selects between two implementations based on [apiBaseUrlProvider]:
 ///
-/// - **empty (default)** → [InMemorySeriesRepository] — exercises the
-///   modal détail UX with the seeded Pingu series.
-/// - **non-empty** → [DioSeriesRepository] consuming [dioProvider] —
-///   talks to the real backend's `/series/{id}` endpoint.
-///
-/// Switching modes requires a full rebuild.
+/// - **empty** → [InMemorySeriesRepository] — exercises the modal détail
+///   UX with the seeded Pingu series.
+/// - **non-empty** → [DioSeriesRepository] consuming [dioProvider] — talks
+///   to the real backend's `/series/{id}` endpoint at the URL the user
+///   configured via the ⚙ dialog on the phone-entry page.
 
 @ProviderFor(seriesRepository)
 final seriesRepositoryProvider = SeriesRepositoryProvider._();
 
 /// Series repository provider.
 ///
-/// Selects between two implementations based on the compile-time constant
-/// `String.fromEnvironment('API_BASE_URL')`:
+/// Selects between two implementations based on [apiBaseUrlProvider]:
 ///
-/// - **empty (default)** → [InMemorySeriesRepository] — exercises the
-///   modal détail UX with the seeded Pingu series.
-/// - **non-empty** → [DioSeriesRepository] consuming [dioProvider] —
-///   talks to the real backend's `/series/{id}` endpoint.
-///
-/// Switching modes requires a full rebuild.
+/// - **empty** → [InMemorySeriesRepository] — exercises the modal détail
+///   UX with the seeded Pingu series.
+/// - **non-empty** → [DioSeriesRepository] consuming [dioProvider] — talks
+///   to the real backend's `/series/{id}` endpoint at the URL the user
+///   configured via the ⚙ dialog on the phone-entry page.
 
 final class SeriesRepositoryProvider
     extends
@@ -45,15 +41,13 @@ final class SeriesRepositoryProvider
     with $Provider<SeriesRepository> {
   /// Series repository provider.
   ///
-  /// Selects between two implementations based on the compile-time constant
-  /// `String.fromEnvironment('API_BASE_URL')`:
+  /// Selects between two implementations based on [apiBaseUrlProvider]:
   ///
-  /// - **empty (default)** → [InMemorySeriesRepository] — exercises the
-  ///   modal détail UX with the seeded Pingu series.
-  /// - **non-empty** → [DioSeriesRepository] consuming [dioProvider] —
-  ///   talks to the real backend's `/series/{id}` endpoint.
-  ///
-  /// Switching modes requires a full rebuild.
+  /// - **empty** → [InMemorySeriesRepository] — exercises the modal détail
+  ///   UX with the seeded Pingu series.
+  /// - **non-empty** → [DioSeriesRepository] consuming [dioProvider] — talks
+  ///   to the real backend's `/series/{id}` endpoint at the URL the user
+  ///   configured via the ⚙ dialog on the phone-entry page.
   SeriesRepositoryProvider._()
     : super(
         from: null,
@@ -87,4 +81,4 @@ final class SeriesRepositoryProvider
   }
 }
 
-String _$seriesRepositoryHash() => r'd4e2f2ee745c442a07fb80e97c863b98c18288e8';
+String _$seriesRepositoryHash() => r'e42b4b774aa6baf8fc703d37af8d8cb81e811161';

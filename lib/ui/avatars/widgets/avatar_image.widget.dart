@@ -1,12 +1,13 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:kidflix/infrastructure/providers/api_base_url.provider.dart';
 import 'package:kidflix/infrastructure/providers/avatars.usecases_provider.dart';
 import 'package:kidflix/ui/avatars/avatar_url_resolver.dart';
 
 /// Circular profile avatar. Renders three states:
 ///
-/// 1. **No avatarId / unknown id / no `API_BASE_URL`** → letter placeholder on
+/// 1. **No avatarId / unknown id / empty base URL** → letter placeholder on
 ///    `colorScheme.primaryContainer`.
 /// 2. **Avatar resolved** → raster image (PNG/JPEG/WebP) fetched via
 ///    `CachedNetworkImage`. The disk cache survives across app sessions.
@@ -38,6 +39,7 @@ class AvatarImage extends ConsumerWidget {
     }
 
     final catalogue = ref.watch(avatarsListProvider);
+    final baseUrl = ref.watch(apiBaseUrlProvider);
     return catalogue.when(
       loading: () => _circle(child: fallback),
       error: (_, _) => _circle(child: fallback),
@@ -47,7 +49,7 @@ class AvatarImage extends ConsumerWidget {
             .cast<dynamic>()
             .firstOrNull;
         if (match == null) return _circle(child: fallback);
-        final absoluteUrl = resolveAvatarFullUrl(match.url as String);
+        final absoluteUrl = resolveAvatarFullUrl(match.url as String, baseUrl);
         if (absoluteUrl == null) return _circle(child: fallback);
 
         return _circle(

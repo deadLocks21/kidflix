@@ -1,6 +1,7 @@
 import 'package:kidflix/core/domain/services/profile_management.repository.dart';
 import 'package:kidflix/infrastructure/profile_management/dio.profile_management.repository.dart';
 import 'package:kidflix/infrastructure/profile_management/in_memory.profile_management.repository.dart';
+import 'package:kidflix/infrastructure/providers/api_base_url.provider.dart';
 import 'package:kidflix/infrastructure/providers/dio.provider.dart';
 import 'package:kidflix/infrastructure/providers/in_memory_accounts_store.provider.dart';
 import 'package:kidflix/infrastructure/providers/profile_pin.service_provider.dart';
@@ -10,20 +11,19 @@ part 'profile_management.repository_provider.g.dart';
 
 /// Profile-management repository provider.
 ///
-/// Selects between two implementations based on the compile-time constant
-/// `String.fromEnvironment('API_BASE_URL')`:
+/// Selects between two implementations based on [apiBaseUrlProvider]:
 ///
-/// - **empty (default)** → [InMemoryProfileManagementRepository] — used by
-///   tests, by `flutter run` without flag, and by anyone running offline.
+/// - **empty** → [InMemoryProfileManagementRepository] — used by tests and
+///   when no backend has been configured.
 /// - **non-empty** → [DioProfileManagementRepository] consuming [dioProvider]
-///   — used to talk to the real backend, e.g.
-///   `flutter run --dart-define=API_BASE_URL=http://localhost:8080`.
+///   — talks to the real backend at the URL the user configured via the
+///   ⚙ dialog on the phone-entry page (persisted in `shared_preferences`).
 ///
-/// Switching modes requires a full rebuild. The selection MUST stay
-/// consistent with `authRepositoryProvider` — they read the same flag.
+/// The selection MUST stay consistent with `authRepositoryProvider` —
+/// both watch the same [apiBaseUrlProvider].
 @Riverpod(keepAlive: true)
 ProfileManagementRepository profileManagementRepository(Ref ref) {
-  const baseUrl = String.fromEnvironment('API_BASE_URL');
+  final baseUrl = ref.watch(apiBaseUrlProvider);
   if (baseUrl.isEmpty) {
     final store = ref.watch(inMemoryAccountsStoreProvider);
     final pin = ref.watch(profilePinServiceProvider);

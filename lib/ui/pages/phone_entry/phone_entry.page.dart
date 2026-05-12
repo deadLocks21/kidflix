@@ -4,6 +4,7 @@ import 'package:kidflix/core/application/usecases/request_otp.usecase.dart';
 import 'package:kidflix/core/domain/exceptions/invalid_phone_number.exception.dart';
 import 'package:kidflix/core/domain/model/phone_number.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
+import 'package:kidflix/ui/pages/phone_entry/widgets/backend_url_dialog.widget.dart';
 import 'package:kidflix/ui/pages/phone_entry/widgets/phone_number_field.widget.dart';
 
 class PhoneEntryPage extends ConsumerStatefulWidget {
@@ -60,7 +61,16 @@ class _PhoneEntryPageState extends ConsumerState<PhoneEntryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Connexion')),
+      appBar: AppBar(
+        title: const Text('Connexion'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'URL du backend',
+            onPressed: () => BackendUrlDialog.show(context),
+          ),
+        ],
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
