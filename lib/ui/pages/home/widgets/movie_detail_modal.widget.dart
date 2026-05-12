@@ -69,10 +69,22 @@ class MovieDetailContent extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TrailerHeader(
-            trailerUrl: movie.trailerUrl,
-            fallbackImageUrl: movie.backdropUrl,
-            logoUrl: movie.logoUrl,
+          Stack(
+            children: [
+              TrailerHeader(
+                trailerUrl: movie.trailerUrl,
+                fallbackImageUrl: movie.backdropUrl,
+                logoUrl: movie.logoUrl,
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: IconButton.filled(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close),
+                ),
+              ),
+            ],
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),

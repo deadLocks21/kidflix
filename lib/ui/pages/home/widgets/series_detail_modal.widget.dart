@@ -138,10 +138,22 @@ class _SeriesDetailContentState extends ConsumerState<SeriesDetailContent> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TrailerHeader(
-            trailerUrl: catalogSeries.trailerUrl,
-            fallbackImageUrl: catalogSeries.backdropUrl,
-            logoUrl: catalogSeries.logoUrl,
+          Stack(
+            children: [
+              TrailerHeader(
+                trailerUrl: catalogSeries.trailerUrl,
+                fallbackImageUrl: catalogSeries.backdropUrl,
+                logoUrl: catalogSeries.logoUrl,
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: IconButton.filled(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close),
+                ),
+              ),
+            ],
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
