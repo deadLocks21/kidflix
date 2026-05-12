@@ -88,7 +88,6 @@ class CatalogApplicationService {
     if (downloadedDto.items.isNotEmpty) fixed.add(downloadedDto);
 
     final dynamicRows = <CatalogRow>[
-      ..._buildSagaRows(movies, rng),
       ..._buildGenreRows(movies, rng),
     ];
     final neverWatched = _buildNeverWatchedRow(movies, watchedMovieIds, rng);

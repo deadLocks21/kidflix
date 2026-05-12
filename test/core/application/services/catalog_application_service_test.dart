@@ -205,7 +205,7 @@ void main() {
       },
     );
 
-    test('saga row needs at least 4 movies with same sagaId', () async {
+    test('saga rows are not generated', () async {
       final service = CatalogApplicationService(
         _FakeRepo([
           for (var i = 0; i < 4; i++)
@@ -215,7 +215,7 @@ void main() {
               sagaLabel: 'Astérix',
               genres: const ['Familial'],
             ),
-          // Below threshold, must be filtered out
+          // Below threshold
           _m(
             id: 's1',
             sagaId: 'harry-potter',
@@ -232,12 +232,7 @@ void main() {
       );
       final rows = await service.buildHomeRowsFor(_profile(AgeCategory.enfant));
       final sagaRows = rows.where((r) => r.type == 'saga').toList();
-      expect(sagaRows.length, 1);
-      expect(sagaRows.single.label, 'Astérix');
-      expect(
-        sagaRows.single.items.map((m) => m.id).toSet(),
-        {'a0', 'a1', 'a2', 'a3'},
-      );
+      expect(sagaRows, isEmpty);
     });
 
     test('film appears only in its primary (first) genre row', () async {
@@ -275,10 +270,8 @@ void main() {
         final types = rows.map((r) => r.type).toList();
         final raIdx = types.indexOf('recentlyAdded');
         final favIdx = types.indexOf('favorites');
-        final sagaIdx = types.indexOf('saga');
         final genreIdx = types.indexOf('genre');
         expect(raIdx, lessThan(favIdx));
-        expect(favIdx, lessThan(sagaIdx));
         expect(favIdx, lessThan(genreIdx));
       },
     );
@@ -286,12 +279,10 @@ void main() {
     test('dynamic rows below the 4-item threshold are hidden', () async {
       final service = CatalogApplicationService(
         _FakeRepo([
-          // 3-movie saga: must NOT appear
+          // 3-movie genre: must NOT appear (below threshold)
           for (var i = 0; i < 3; i++)
             _m(
-              id: 'p$i',
-              sagaId: 'pixar',
-              sagaLabel: 'Pixar',
+              id: 'a$i',
               genres: const ['Animation'],
             ),
           // 4-movie genre: must appear
@@ -300,8 +291,9 @@ void main() {
         ]),
       );
       final rows = await service.buildHomeRowsFor(_profile(AgeCategory.enfant));
-      expect(rows.where((r) => r.type == 'saga'), isEmpty);
-      expect(rows.where((r) => r.type == 'genre'), hasLength(1));
+      final genreRows = rows.where((r) => r.type == 'genre').toList();
+      expect(genreRows.length, 1);
+      expect(genreRows.single.label, 'Comédie');
     });
 
     test('recentlyAdded capped at 20 and sorted desc', () async {
@@ -702,7 +694,7 @@ void main() {
       });
     });
 
-    test('Saga row excludes series even when they share a sagaId', () async {
+    test('Sagas are not shown (series appear only in recentlyAdded)', () async {
       final service = CatalogApplicationService(
         _FakeRepo([
           for (var i = 0; i < 4; i++)
@@ -711,12 +703,10 @@ void main() {
         ]),
       );
       final rows = await service.buildHomeRowsFor(_profile(AgeCategory.enfant));
-      final saga = rows.firstWhere((r) => r.type == 'saga');
-      expect(
-        saga.items.map((i) => i.id).toSet(),
-        {'m0', 'm1', 'm2', 'm3'},
-      );
-      expect(saga.items.any((i) => i.id == 's1'), isFalse);
+      expect(rows.where((r) => r.type == 'saga'), isEmpty);
+      // Series appear in recently added
+      final ra = rows.firstWhere((r) => r.type == 'recentlyAdded');
+      expect(ra.items.map((i) => i.id), contains('s1'));
     });
   });
 }
