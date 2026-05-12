@@ -169,6 +169,15 @@ class _ThrowingRepository implements ProfileManagementRepository {
   }
 
   @override
+  Future<Profile> updateIncludedLowerAgeCategories({
+    required String id,
+    required List<AgeCategory> categories,
+  }) {
+    calls.add('updateIncludedLowerAgeCategories');
+    throw _toThrow;
+  }
+
+  @override
   Future<Profile> setPin({required String id, required String rawPin}) {
     calls.add('setPin');
     throw _toThrow;

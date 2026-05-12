@@ -4,6 +4,7 @@ import 'package:kidflix/core/application/usecases/clear_profile_pin.usecase.dart
 import 'package:kidflix/core/application/usecases/create_profile.usecase.dart';
 import 'package:kidflix/core/application/usecases/delete_profile.usecase.dart';
 import 'package:kidflix/core/application/usecases/enter_management_mode.usecase.dart';
+import 'package:kidflix/core/application/usecases/update_profile_included_lower_ages.usecase.dart';
 import 'package:kidflix/core/application/usecases/update_profile_metadata.usecase.dart';
 import 'package:kidflix/core/application/usecases/verify_management_pin.usecase.dart';
 
@@ -14,6 +15,7 @@ class ProfileManagementApplicationService {
   final VerifyManagementPinUseCase verifyManagementPin;
   final CreateProfileUseCase createProfile;
   final UpdateProfileMetadataUseCase updateProfileMetadata;
+  final UpdateProfileIncludedLowerAgesUseCase updateProfileIncludedLowerAges;
   final ChangeProfilePinUseCase changeProfilePin;
   final ClearProfilePinUseCase clearProfilePin;
   final ChangeMainProfilePinUseCase changeMainProfilePin;
@@ -24,6 +26,7 @@ class ProfileManagementApplicationService {
     required this.verifyManagementPin,
     required this.createProfile,
     required this.updateProfileMetadata,
+    required this.updateProfileIncludedLowerAges,
     required this.changeProfilePin,
     required this.clearProfilePin,
     required this.changeMainProfilePin,

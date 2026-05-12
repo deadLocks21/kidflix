@@ -88,6 +88,7 @@ void main() {
           'pin_hash': null,
           'avatar_id': null,
           'is_main': false,
+          'included_lower_age_categories': const <String>[],
         };
 
         expect(

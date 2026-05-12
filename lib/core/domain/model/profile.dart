@@ -32,6 +32,11 @@ class Profile {
   final String? avatarId;
   final bool isMain;
 
+  /// Categories *strictly lower* than [ageCategory] whose content the profile
+  /// has opted-in to seeing on the homepage. Empty = homepage filter falls
+  /// back to the strict `==` match (current default behavior).
+  final List<AgeCategory> includedLowerAgeCategories;
+
   const Profile({
     required this.id,
     required this.name,
@@ -39,6 +44,7 @@ class Profile {
     this.pinHash,
     this.avatarId,
     this.isMain = false,
+    this.includedLowerAgeCategories = const [],
   });
 
   /// `true` when the profile requires PIN verification.

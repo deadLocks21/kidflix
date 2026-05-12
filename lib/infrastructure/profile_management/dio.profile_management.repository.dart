@@ -83,6 +83,29 @@ class DioProfileManagementRepository implements ProfileManagementRepository {
   }
 
   @override
+  Future<Profile> updateIncludedLowerAgeCategories({
+    required String id,
+    required List<AgeCategory> categories,
+  }) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/profiles/$id',
+        data: {
+          'included_lower_age_categories': categories
+              .map(ageCategoryToWire)
+              .toList(growable: false),
+        },
+      );
+      return RemoteProfileDto.fromJson(response.data!).toDomain();
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        throw UnknownProfileException(id);
+      }
+      rethrow;
+    }
+  }
+
+  @override
   Future<Profile> setPin({
     required String id,
     required String rawPin,

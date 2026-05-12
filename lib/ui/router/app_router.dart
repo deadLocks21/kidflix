@@ -17,6 +17,7 @@ import 'package:kidflix/ui/pages/profile_management/profile_form.page.dart';
 import 'package:kidflix/ui/pages/player/player.page.dart';
 import 'package:kidflix/ui/pages/profile_pin/profile_pin.page.dart';
 import 'package:kidflix/ui/pages/profile_selection/profile_selection.page.dart';
+import 'package:kidflix/ui/pages/settings/included_lower_ages_edit.page.dart';
 import 'package:kidflix/ui/pages/settings/self_profile_edit.page.dart';
 import 'package:kidflix/ui/pages/settings/settings.page.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -31,6 +32,7 @@ abstract final class AppRoutes {
   static const home = '/home';
   static const settings = '/home/settings';
   static const settingsProfile = '/home/settings/profile';
+  static const settingsAges = '/home/settings/ages';
   static const settingsDownloads = '/home/settings/downloads';
   static const managementPin = '/profiles/manage/pin';
   static const manage = '/profiles/manage';
@@ -62,6 +64,7 @@ bool _isPlayerRoute(String path) => path.startsWith('/player/');
 bool _isSettingsRoute(String path) =>
     path == AppRoutes.settings ||
     path == AppRoutes.settingsProfile ||
+    path == AppRoutes.settingsAges ||
     path == AppRoutes.settingsDownloads;
 
 @Riverpod(keepAlive: true)
@@ -128,6 +131,10 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: AppRoutes.settingsProfile,
         builder: (_, _) => const SelfProfileEditPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.settingsAges,
+        builder: (_, _) => const IncludedLowerAgesEditPage(),
       ),
       GoRoute(
         path: AppRoutes.settingsDownloads,

@@ -14,6 +14,7 @@ class ProfileDto {
   final bool hasPin;
   final String? avatarId;
   final bool isMain;
+  final List<String> includedLowerAgeCategories;
 
   const ProfileDto({
     required this.id,
@@ -22,6 +23,7 @@ class ProfileDto {
     required this.hasPin,
     this.avatarId,
     required this.isMain,
+    this.includedLowerAgeCategories = const [],
   });
 
   factory ProfileDto.fromDomain(Profile profile) => ProfileDto(
@@ -31,5 +33,8 @@ class ProfileDto {
     hasPin: profile.hasPin,
     avatarId: profile.avatarId,
     isMain: profile.isMain,
+    includedLowerAgeCategories: profile.includedLowerAgeCategories
+        .map((c) => c.name)
+        .toList(growable: false),
   );
 }

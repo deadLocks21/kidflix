@@ -66,6 +66,15 @@ class InMemoryProfileManagementRepository
       AvatarSetTo(:final avatarId) => avatarId,
       AvatarClear() => null,
     };
+    // If the age category changes, any inclusion entry that's no longer
+    // strictly below it would be inconsistent; clear them to keep the
+    // invariant. The current self-edit flow doesn't change `ageCategory`,
+    // but the main-profile management form does.
+    final newIncluded = ageCategory == existing.ageCategory
+        ? existing.includedLowerAgeCategories
+        : existing.includedLowerAgeCategories
+              .where((c) => c.index < ageCategory.index)
+              .toList(growable: false);
     final updated = Profile(
       id: existing.id,
       name: name,
@@ -73,6 +82,27 @@ class InMemoryProfileManagementRepository
       pinHash: existing.pinHash,
       avatarId: newAvatarId,
       isMain: existing.isMain,
+      includedLowerAgeCategories: newIncluded,
+    );
+    account.profiles[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<Profile> updateIncludedLowerAgeCategories({
+    required String id,
+    required List<AgeCategory> categories,
+  }) async {
+    final (account, index) = await _locate(id);
+    final existing = account.profiles[index];
+    final updated = Profile(
+      id: existing.id,
+      name: existing.name,
+      ageCategory: existing.ageCategory,
+      pinHash: existing.pinHash,
+      avatarId: existing.avatarId,
+      isMain: existing.isMain,
+      includedLowerAgeCategories: List.unmodifiable(categories),
     );
     account.profiles[index] = updated;
     return updated;
@@ -90,6 +120,7 @@ class InMemoryProfileManagementRepository
       pinHash: hash,
       avatarId: existing.avatarId,
       isMain: existing.isMain,
+      includedLowerAgeCategories: existing.includedLowerAgeCategories,
     );
     account.profiles[index] = updated;
     return updated;
@@ -109,6 +140,7 @@ class InMemoryProfileManagementRepository
       pinHash: null,
       avatarId: existing.avatarId,
       isMain: existing.isMain,
+      includedLowerAgeCategories: existing.includedLowerAgeCategories,
     );
     account.profiles[index] = updated;
     return updated;

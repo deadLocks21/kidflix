@@ -9,6 +9,7 @@ import 'package:kidflix/core/application/usecases/request_otp.usecase.dart';
 import 'package:kidflix/core/application/usecases/resend_otp.usecase.dart';
 import 'package:kidflix/core/application/usecases/restore_session.usecase.dart';
 import 'package:kidflix/core/application/usecases/select_profile.usecase.dart';
+import 'package:kidflix/core/application/usecases/update_profile_included_lower_ages.usecase.dart';
 import 'package:kidflix/core/application/usecases/update_profile_metadata.usecase.dart';
 import 'package:kidflix/core/application/usecases/verify_management_pin.usecase.dart';
 import 'package:kidflix/core/application/usecases/verify_otp.usecase.dart';
@@ -312,6 +313,30 @@ class SessionController extends _$SessionController {
       avatar: avatar,
     );
     if (result is UpdateProfileMetadataSuccess) {
+      await _persistAndReplaceSession(
+        session.copyWith(
+          profiles: _replaceProfile(session.profiles, result.profile),
+        ),
+      );
+    }
+    return result;
+  }
+
+  Future<UpdateProfileIncludedLowerAgesResult> updateProfileIncludedLowerAges({
+    required String profileId,
+    required List<AgeCategory> categories,
+  }) async {
+    final session = _sessionForProfileEdit(profileId);
+    if (session == null) {
+      return const UpdateProfileIncludedLowerAgesInvalidState();
+    }
+    final service = ref.read(profileManagementServiceProvider);
+    final result = await service.updateProfileIncludedLowerAges.execute(
+      session: session,
+      profileId: profileId,
+      categories: categories,
+    );
+    if (result is UpdateProfileIncludedLowerAgesSuccess) {
       await _persistAndReplaceSession(
         session.copyWith(
           profiles: _replaceProfile(session.profiles, result.profile),

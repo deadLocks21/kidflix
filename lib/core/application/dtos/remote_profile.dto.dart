@@ -21,6 +21,12 @@ class RemoteProfileDto {
   final String? avatarId;
   final bool isMain;
 
+  /// Opt-in lower categories whose content shows up on the profile's home.
+  /// Defaults to `[]` when the field is missing from the wire payload, so
+  /// the client stays compatible with backends that haven't shipped the
+  /// `included_lower_age_categories` field yet.
+  final List<AgeCategory> includedLowerAgeCategories;
+
   const RemoteProfileDto({
     required this.id,
     required this.name,
@@ -28,17 +34,27 @@ class RemoteProfileDto {
     required this.isMain,
     this.pinHash,
     this.avatarId,
+    this.includedLowerAgeCategories = const [],
   });
 
-  factory RemoteProfileDto.fromJson(Map<String, dynamic> json) =>
-      RemoteProfileDto(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        ageCategory: ageCategoryFromWire(json['age_category'] as String),
-        pinHash: json['pin_hash'] as String?,
-        avatarId: json['avatar_id'] as String?,
-        isMain: json['is_main'] as bool,
-      );
+  factory RemoteProfileDto.fromJson(Map<String, dynamic> json) {
+    final rawIncluded = json['included_lower_age_categories'] as List?;
+    final included = rawIncluded == null
+        ? const <AgeCategory>[]
+        : rawIncluded
+              .cast<String>()
+              .map(ageCategoryFromWire)
+              .toList(growable: false);
+    return RemoteProfileDto(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      ageCategory: ageCategoryFromWire(json['age_category'] as String),
+      pinHash: json['pin_hash'] as String?,
+      avatarId: json['avatar_id'] as String?,
+      isMain: json['is_main'] as bool,
+      includedLowerAgeCategories: included,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -47,6 +63,9 @@ class RemoteProfileDto {
     'pin_hash': pinHash,
     'avatar_id': avatarId,
     'is_main': isMain,
+    'included_lower_age_categories': includedLowerAgeCategories
+        .map(ageCategoryToWire)
+        .toList(growable: false),
   };
 
   Profile toDomain() => Profile(
@@ -56,5 +75,6 @@ class RemoteProfileDto {
     pinHash: pinHash,
     avatarId: avatarId,
     isMain: isMain,
+    includedLowerAgeCategories: includedLowerAgeCategories,
   );
 }

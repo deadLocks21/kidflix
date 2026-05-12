@@ -32,6 +32,17 @@ abstract interface class ProfileManagementRepository {
     AvatarUpdate avatar = const AvatarUnchanged(),
   });
 
+  /// Replaces the profile's [Profile.includedLowerAgeCategories] with
+  /// [categories]. Caller is responsible for ensuring every entry is
+  /// strictly lower than the profile's [Profile.ageCategory] — the
+  /// repository assumes pre-validated input.
+  ///
+  /// Preserves all other fields. Returns the updated [Profile].
+  Future<Profile> updateIncludedLowerAgeCategories({
+    required String id,
+    required List<AgeCategory> categories,
+  });
+
   /// Sets or replaces the PIN of the profile with [id]. Hashes [rawPin]
   /// with bcrypt. Preserves all other fields including `isMain`.
   Future<Profile> setPin({required String id, required String rawPin});
