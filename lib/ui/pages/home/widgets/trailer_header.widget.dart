@@ -44,7 +44,9 @@ class _TrailerHeaderState extends State<TrailerHeader> {
   VideoController? _controller;
   StreamSubscription<bool>? _completedSub;
   StreamSubscription<String>? _errorSub;
+  StreamSubscription<bool>? _playingSub;
   bool _showFallback = false;
+  bool _isLoading = false;
   bool _disposed = false;
 
   @override
@@ -55,6 +57,7 @@ class _TrailerHeaderState extends State<TrailerHeader> {
       _showFallback = true;
       return;
     }
+    _isLoading = true;
     debugPrint('[TrailerHeader] resolving stream for videoId=$id');
     unawaited(_resolveAndPlay(id));
   }
@@ -93,7 +96,19 @@ class _TrailerHeaderState extends State<TrailerHeader> {
       // to the static fallback. mpv emits this on iOS when AVAudioSession
       // can't be opened (silent switch on, route held by another app).
       if (err.contains('audio device')) return;
-      if (mounted) setState(() => _showFallback = true);
+      if (mounted) {
+        setState(() {
+          _showFallback = true;
+          _isLoading = false;
+        });
+      }
+    });
+    // First frame rendered — hide the loading indicator and swap the
+    // fallback image for the player.
+    _playingSub = player.stream.playing.listen((playing) {
+      if (playing && mounted && _isLoading) {
+        setState(() => _isLoading = false);
+      }
     });
 
     await player.setVolume(0);
@@ -111,13 +126,17 @@ class _TrailerHeaderState extends State<TrailerHeader> {
 
   void _bailToFallback() {
     if (mounted && !_showFallback) {
-      setState(() => _showFallback = true);
+      setState(() {
+        _showFallback = true;
+        _isLoading = false;
+      });
     }
   }
 
   Future<void> _teardownPlayer(Player player) async {
     await _completedSub?.cancel();
     await _errorSub?.cancel();
+    await _playingSub?.cancel();
     await player.dispose();
   }
 
@@ -130,6 +149,7 @@ class _TrailerHeaderState extends State<TrailerHeader> {
     } else {
       _completedSub?.cancel();
       _errorSub?.cancel();
+      _playingSub?.cancel();
     }
     super.dispose();
   }
@@ -138,8 +158,24 @@ class _TrailerHeaderState extends State<TrailerHeader> {
   Widget build(BuildContext context) {
     final controller = _controller;
     final Widget hero;
-    if (_showFallback || controller == null) {
-      hero = _FallbackImage(url: widget.fallbackImageUrl);
+    if (_isLoading || _showFallback || controller == null) {
+      final fallback = _FallbackImage(url: widget.fallbackImageUrl);
+      hero = _isLoading
+          ? Stack(
+              children: [
+                fallback,
+                const Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: LinearProgressIndicator(
+                    minHeight: 3,
+                    backgroundColor: Colors.black26,
+                  ),
+                ),
+              ],
+            )
+          : fallback;
     } else {
       final bg = Theme.of(context).colorScheme.surfaceContainerHigh;
       final player = _player!;
