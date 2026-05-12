@@ -52,18 +52,6 @@ class ManagementListPage extends ConsumerWidget {
                         context.push(AppRoutes.manageMainPin),
                   ),
                 ),
-                const Divider(height: 32),
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.cloud_download_outlined),
-                    title: const Text('Téléchargements'),
-                    subtitle: const Text(
-                      'Gérer les vidéos téléchargées et le cache',
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => context.push(AppRoutes.downloads),
-                  ),
-                ),
               ],
             ),
           ),

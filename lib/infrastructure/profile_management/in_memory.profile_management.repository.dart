@@ -32,6 +32,7 @@ class InMemoryProfileManagementRepository
     String? rawPin,
     String? avatarId,
   }) async {
+    await _store.ensureSeeded(_pin);
     final account = _store.currentAccount;
     if (account == null) {
       throw StateError(
@@ -58,7 +59,7 @@ class InMemoryProfileManagementRepository
     required AgeCategory ageCategory,
     AvatarUpdate avatar = const AvatarUnchanged(),
   }) async {
-    final (account, index) = _locate(id);
+    final (account, index) = await _locate(id);
     final existing = account.profiles[index];
     final newAvatarId = switch (avatar) {
       AvatarUnchanged() => existing.avatarId,
@@ -80,7 +81,7 @@ class InMemoryProfileManagementRepository
   @override
   Future<Profile> setPin({required String id, required String rawPin}) async {
     final hash = await _pin.hash(rawPin);
-    final (account, index) = _locate(id);
+    final (account, index) = await _locate(id);
     final existing = account.profiles[index];
     final updated = Profile(
       id: existing.id,
@@ -96,7 +97,7 @@ class InMemoryProfileManagementRepository
 
   @override
   Future<Profile> clearPin({required String id}) async {
-    final (account, index) = _locate(id);
+    final (account, index) = await _locate(id);
     final existing = account.profiles[index];
     if (existing.isMain) {
       throw CannotClearMainProfilePinException(id);
@@ -115,7 +116,7 @@ class InMemoryProfileManagementRepository
 
   @override
   Future<void> delete({required String id}) async {
-    final (account, index) = _locate(id);
+    final (account, index) = await _locate(id);
     final existing = account.profiles[index];
     if (existing.isMain) {
       throw CannotDeleteMainProfileException(id);
@@ -123,7 +124,13 @@ class InMemoryProfileManagementRepository
     account.profiles.removeAt(index);
   }
 
-  (InMemoryAccount, int) _locate(String profileId) {
+  /// Re-seed paresseuse + lookup. Le store in-memory perd son contenu
+  /// à chaque cold restart (Map transient) alors que la session restaurée
+  /// depuis SharedPreferences référence des profile ids du seed. Si on ne
+  /// re-seed pas ici, toute mutation après `restoreSession` plante avec
+  /// « profile not found ».
+  Future<(InMemoryAccount, int)> _locate(String profileId) async {
+    await _store.ensureSeeded(_pin);
     final account = _store.findAccountContaining(profileId);
     if (account == null) {
       throw StateError('Profile "$profileId" not found in any account');

@@ -30,6 +30,12 @@ part 'session.controller_provider.g.dart';
 /// the UI and the application layer.
 @Riverpod(keepAlive: true)
 class SessionController extends _$SessionController {
+  /// Profil sur lequel revenir quand on quitte le mode gestion (entrée
+  /// depuis la home). `null` si le mode gestion a été ouvert depuis la
+  /// sélection de profils — dans ce cas la sortie retourne sur l'écran
+  /// de sélection comme avant.
+  String? _returnToProfileId;
+
   @override
   SessionState build() => const Anonymous();
 
@@ -167,6 +173,7 @@ class SessionController extends _$SessionController {
     final service = ref.read(authServiceProvider);
     await service.logout.execute();
     ref.read(inMemoryAccountsStoreProvider).clearCurrentAccount();
+    _returnToProfileId = null;
     state = const Anonymous();
   }
 
@@ -174,17 +181,25 @@ class SessionController extends _$SessionController {
 
   /// Enters management mode. On success, transitions to
   /// `ManagementPinRequired`. Fails if no profile has `isMain`.
+  /// Accepted source states: `Authenticated` (entry from profile
+  /// selection) and `ProfileSelected` (entry from the home profile menu).
   EnterManagementModeResult enterManagementMode() {
     final current = state;
-    if (current is! Authenticated) {
+    final session = switch (current) {
+      Authenticated() => current.session,
+      ProfileSelected() => current.session,
+      _ => null,
+    };
+    if (session == null) {
       return const EnterManagementModeInvalidState();
     }
     final service = ref.read(profileManagementServiceProvider);
-    final result = service.enterManagementMode.execute(
-      session: current.session,
-    );
+    final result = service.enterManagementMode.execute(session: session);
     if (result is EnterManagementModeSuccess) {
-      state = ManagementPinRequired(current.session);
+      _returnToProfileId = current is ProfileSelected
+          ? current.profile.id
+          : null;
+      state = ManagementPinRequired(session);
     }
     return result;
   }
@@ -210,15 +225,31 @@ class SessionController extends _$SessionController {
   void cancelManagementPinEntry() {
     final current = state;
     if (current is ManagementPinRequired) {
-      state = Authenticated(current.session);
+      state = _afterManagementExit(current.session);
     }
   }
 
   void exitManagementMode() {
     final current = state;
     if (current is ManagingProfiles) {
-      state = Authenticated(current.session);
+      state = _afterManagementExit(current.session);
     }
+  }
+
+  /// Si on est entré en mode gestion depuis la home, on retourne sur
+  /// `ProfileSelected` avec le même profil (rafraîchi depuis la session
+  /// éventuellement modifiée pendant la gestion). Sinon — ou si le
+  /// profil n'existe plus — on retombe sur `Authenticated`.
+  SessionState _afterManagementExit(Session session) {
+    final returnId = _returnToProfileId;
+    _returnToProfileId = null;
+    if (returnId == null) return Authenticated(session);
+    final profile = session.profiles
+        .where((p) => p.id == returnId)
+        .cast<Profile?>()
+        .firstOrNull;
+    if (profile == null) return Authenticated(session);
+    return ProfileSelected(profile: profile, session: session);
   }
 
   Future<CreateProfileResult> createProfile({
@@ -248,19 +279,33 @@ class SessionController extends _$SessionController {
     return result;
   }
 
+  /// Retourne la session courante si l'état est `ManagingProfiles` (toute
+  /// édition autorisée) ou `ProfileSelected` ET que `profileId` cible le
+  /// profil actif (auto-édition depuis Paramètres). Sinon `null` :
+  /// l'appelant traduit en `*InvalidState`.
+  Session? _sessionForProfileEdit(String profileId) {
+    final current = state;
+    return switch (current) {
+      ManagingProfiles() => current.session,
+      ProfileSelected() when current.profile.id == profileId =>
+        current.session,
+      _ => null,
+    };
+  }
+
   Future<UpdateProfileMetadataResult> updateProfileMetadata({
     required String profileId,
     required String name,
     required AgeCategory ageCategory,
     AvatarUpdate avatar = const AvatarUnchanged(),
   }) async {
-    final current = state;
-    if (current is! ManagingProfiles) {
+    final session = _sessionForProfileEdit(profileId);
+    if (session == null) {
       return const UpdateProfileMetadataInvalidState();
     }
     final service = ref.read(profileManagementServiceProvider);
     final result = await service.updateProfileMetadata.execute(
-      session: current.session,
+      session: session,
       profileId: profileId,
       rawName: name,
       ageCategory: ageCategory,
@@ -268,8 +313,8 @@ class SessionController extends _$SessionController {
     );
     if (result is UpdateProfileMetadataSuccess) {
       await _persistAndReplaceSession(
-        current.session.copyWith(
-          profiles: _replaceProfile(current.session.profiles, result.profile),
+        session.copyWith(
+          profiles: _replaceProfile(session.profiles, result.profile),
         ),
       );
     }
@@ -280,20 +325,20 @@ class SessionController extends _$SessionController {
     required String profileId,
     required String rawPin,
   }) async {
-    final current = state;
-    if (current is! ManagingProfiles) {
+    final session = _sessionForProfileEdit(profileId);
+    if (session == null) {
       return const ChangeProfilePinInvalidState();
     }
     final service = ref.read(profileManagementServiceProvider);
     final result = await service.changeProfilePin.execute(
-      session: current.session,
+      session: session,
       profileId: profileId,
       rawPin: rawPin,
     );
     if (result is ChangeProfilePinSuccess) {
       await _persistAndReplaceSession(
-        current.session.copyWith(
-          profiles: _replaceProfile(current.session.profiles, result.profile),
+        session.copyWith(
+          profiles: _replaceProfile(session.profiles, result.profile),
         ),
       );
     }
@@ -303,19 +348,19 @@ class SessionController extends _$SessionController {
   Future<ClearProfilePinResult> clearProfilePin({
     required String profileId,
   }) async {
-    final current = state;
-    if (current is! ManagingProfiles) {
+    final session = _sessionForProfileEdit(profileId);
+    if (session == null) {
       return const ClearProfilePinInvalidState();
     }
     final service = ref.read(profileManagementServiceProvider);
     final result = await service.clearProfilePin.execute(
-      session: current.session,
+      session: session,
       profileId: profileId,
     );
     if (result is ClearProfilePinSuccess) {
       await _persistAndReplaceSession(
-        current.session.copyWith(
-          profiles: _replaceProfile(current.session.profiles, result.profile),
+        session.copyWith(
+          profiles: _replaceProfile(session.profiles, result.profile),
         ),
       );
     }
@@ -436,8 +481,22 @@ class SessionController extends _$SessionController {
     ];
   }
 
+  /// Persiste la session mise à jour et reprojette l'état courant en
+  /// préservant son type : `ProfileSelected` reste `ProfileSelected` (avec
+  /// le profil rafraîchi), `ManagingProfiles` reste `ManagingProfiles`.
   Future<void> _persistAndReplaceSession(Session next) async {
     await ref.read(sessionRepositoryProvider).write(next);
+    final current = state;
+    if (current is ProfileSelected) {
+      final updated = next.profiles
+          .where((p) => p.id == current.profile.id)
+          .cast<Profile?>()
+          .firstOrNull;
+      state = updated != null
+          ? ProfileSelected(profile: updated, session: next)
+          : Authenticated(next);
+      return;
+    }
     state = ManagingProfiles(next);
   }
 }

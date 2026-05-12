@@ -14,9 +14,12 @@ import 'package:kidflix/core/domain/model/session.dart';
 /// - PinRequired           → ProfileSelected        (verifyPin success)
 /// - PinRequired           → Authenticated          (cancelPinEntry)
 /// - ProfileSelected       → Authenticated          (deselectProfile)
+/// - ProfileSelected       → ManagementPinRequired  (enterManagementMode, retour mémorisé)
 /// - ManagementPinRequired → ManagingProfiles       (verifyManagementPin OK)
-/// - ManagementPinRequired → Authenticated          (cancelManagementPinEntry)
-/// - ManagingProfiles      → Authenticated          (exitManagementMode)
+/// - ManagementPinRequired → Authenticated          (cancelManagementPinEntry, retour par défaut)
+/// - ManagementPinRequired → ProfileSelected        (cancelManagementPinEntry, retour vers profil d'origine)
+/// - ManagingProfiles      → Authenticated          (exitManagementMode, retour par défaut)
+/// - ManagingProfiles      → ProfileSelected        (exitManagementMode, retour vers profil d'origine)
 /// - any                   → Anonymous              (logout)
 sealed class SessionState {
   const SessionState();

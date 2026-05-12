@@ -9,6 +9,7 @@ import 'package:kidflix/infrastructure/providers/catalog.usecases_provider.dart'
 import 'package:kidflix/ui/pages/home/home.page.dart';
 import 'package:kidflix/ui/pages/home/widgets/catalog_row.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/catalog_skeleton.widget.dart';
+import 'package:kidflix/ui/pages/home/widgets/home_profile_menu.widget.dart';
 
 Widget _app(List<Object> overrides) => ProviderScope(
   overrides: overrides.cast(),
@@ -77,14 +78,14 @@ void main() {
       expect(find.text('Réessayer'), findsOneWidget);
     });
 
-    testWidgets('always shows the switch-account action', (tester) async {
+    testWidgets('always shows the profile menu action', (tester) async {
       await tester.pumpWidget(
         _app([
           homeCatalogRowsProvider.overrideWith((ref) async => const [_row]),
         ]),
       );
       await tester.pumpAndSettle();
-      expect(find.byIcon(Icons.switch_account), findsOneWidget);
+      expect(find.byType(HomeProfileMenu), findsOneWidget);
     });
 
     testWidgets('shows search icon in normal mode', (tester) async {
@@ -110,7 +111,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(TextField), findsOneWidget);
       expect(find.byIcon(Icons.close), findsOneWidget);
-      expect(find.byIcon(Icons.switch_account), findsNothing);
+      expect(find.byType(HomeProfileMenu), findsNothing);
       expect(
         find.text('Tape au moins 2 lettres pour chercher.'),
         findsOneWidget,
@@ -130,7 +131,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byIcon(Icons.close));
       await tester.pumpAndSettle();
-      expect(find.byIcon(Icons.switch_account), findsOneWidget);
+      expect(find.byType(HomeProfileMenu), findsOneWidget);
       expect(find.byIcon(Icons.search), findsOneWidget);
       expect(find.byType(CatalogRowWidget), findsOneWidget);
     });

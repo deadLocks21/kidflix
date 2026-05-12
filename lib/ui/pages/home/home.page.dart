@@ -11,6 +11,7 @@ import 'package:kidflix/infrastructure/providers/search.controller_provider.dart
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/ui/pages/home/widgets/catalog_row.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/catalog_skeleton.widget.dart';
+import 'package:kidflix/ui/pages/home/widgets/home_profile_menu.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/movie_detail_modal.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/search_app_bar.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/search_results.widget.dart';
@@ -46,13 +47,8 @@ class HomePage extends ConsumerWidget {
                       .read(searchUiControllerProvider.notifier)
                       .activate(),
                 ),
-                IconButton(
-                  tooltip: 'Changer de profil',
-                  icon: const Icon(Icons.switch_account),
-                  onPressed: () => ref
-                      .read(sessionControllerProvider.notifier)
-                      .deselectProfile(),
-                ),
+                const HomeProfileMenu(),
+                const SizedBox(width: 4),
               ],
             ),
       body: IndexedStack(

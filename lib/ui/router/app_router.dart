@@ -17,6 +17,8 @@ import 'package:kidflix/ui/pages/profile_management/profile_form.page.dart';
 import 'package:kidflix/ui/pages/player/player.page.dart';
 import 'package:kidflix/ui/pages/profile_pin/profile_pin.page.dart';
 import 'package:kidflix/ui/pages/profile_selection/profile_selection.page.dart';
+import 'package:kidflix/ui/pages/settings/self_profile_edit.page.dart';
+import 'package:kidflix/ui/pages/settings/settings.page.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'app_router.g.dart';
@@ -27,6 +29,9 @@ abstract final class AppRoutes {
   static const profiles = '/profiles';
   static const profilePin = '/profiles/pin';
   static const home = '/home';
+  static const settings = '/home/settings';
+  static const settingsProfile = '/home/settings/profile';
+  static const settingsDownloads = '/home/settings/downloads';
   static const managementPin = '/profiles/manage/pin';
   static const manage = '/profiles/manage';
   static const manageNew = '/profiles/manage/new';
@@ -34,7 +39,6 @@ abstract final class AppRoutes {
   static const manageMainPin = '/profiles/manage/main/pin';
   static const player = '/player/:movieId';
   static const playerEpisode = '/player/episode/:episodeId';
-  static const downloads = '/profiles/manage/downloads';
 }
 
 String _targetRouteFor(SessionState state) => switch (state) {
@@ -51,10 +55,14 @@ bool _isManageSubRoute(String path) =>
     path == AppRoutes.manage ||
     path == AppRoutes.manageNew ||
     path == AppRoutes.manageMainPin ||
-    path == AppRoutes.downloads ||
     (path.startsWith('/profiles/manage/') && path.endsWith('/edit'));
 
 bool _isPlayerRoute(String path) => path.startsWith('/player/');
+
+bool _isSettingsRoute(String path) =>
+    path == AppRoutes.settings ||
+    path == AppRoutes.settingsProfile ||
+    path == AppRoutes.settingsDownloads;
 
 @Riverpod(keepAlive: true)
 GoRouter appRouter(Ref ref) {
@@ -95,7 +103,8 @@ GoRouter appRouter(Ref ref) {
       if (sessionState is ManagingProfiles && _isManageSubRoute(current)) {
         return null;
       }
-      if (sessionState is ProfileSelected && _isPlayerRoute(current)) {
+      if (sessionState is ProfileSelected &&
+          (_isPlayerRoute(current) || _isSettingsRoute(current))) {
         return null;
       }
       return current == target ? null : target;
@@ -112,6 +121,18 @@ GoRouter appRouter(Ref ref) {
         builder: (_, _) => const ProfilePinPage(),
       ),
       GoRoute(path: AppRoutes.home, builder: (_, _) => const HomePage()),
+      GoRoute(
+        path: AppRoutes.settings,
+        builder: (_, _) => const SettingsPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.settingsProfile,
+        builder: (_, _) => const SelfProfileEditPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.settingsDownloads,
+        builder: (_, _) => const DownloadsPage(),
+      ),
       GoRoute(
         path: AppRoutes.managementPin,
         builder: (_, _) => const ManagementPinPage(),
@@ -131,10 +152,6 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: AppRoutes.manageMainPin,
         builder: (_, _) => const ChangeMainPinPage(),
-      ),
-      GoRoute(
-        path: AppRoutes.downloads,
-        builder: (_, _) => const DownloadsPage(),
       ),
       GoRoute(
         path: AppRoutes.player,
