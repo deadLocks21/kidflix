@@ -75,9 +75,6 @@ class _ActionsSheet extends ConsumerWidget {
       await ref
           .read(wishlistControllerProvider.notifier)
           .markAsWatched(entry.watcharrId);
-      messenger.showSnackBar(
-        SnackBar(content: Text('« ${entry.title} » marqué comme vu')),
-      );
     } catch (_) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Impossible de marquer comme vu')),
@@ -93,9 +90,6 @@ class _ActionsSheet extends ConsumerWidget {
       await ref
           .read(wishlistControllerProvider.notifier)
           .remove(entry.watcharrId);
-      messenger.showSnackBar(
-        SnackBar(content: Text('« ${entry.title} » retiré de la liste')),
-      );
     } catch (_) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Impossible de retirer')),

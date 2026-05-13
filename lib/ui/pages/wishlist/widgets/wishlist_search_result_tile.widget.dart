@@ -103,13 +103,12 @@ class _WishlistSearchResultTileState
             kind: widget.result.kind,
           );
       if (!mounted) return;
+      // Success: the trailing "+" flips to a "✓" — sufficient feedback,
+      // no snackbar needed.
       setState(() {
         _adding = false;
         _added = true;
       });
-      messenger.showSnackBar(
-        SnackBar(content: Text('« ${widget.result.title} » ajouté à la liste')),
-      );
     } on WishlistEntryAlreadyExistsException {
       if (!mounted) return;
       setState(() {

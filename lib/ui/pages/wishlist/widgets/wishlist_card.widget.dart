@@ -115,9 +115,8 @@ class WishlistCard extends ConsumerWidget {
       await ref
           .read(wishlistControllerProvider.notifier)
           .remove(entry.watcharrId);
-      messenger.showSnackBar(
-        SnackBar(content: Text('« ${entry.title} » retiré de la liste')),
-      );
+      // Success: the optimistic remove already made the card vanish,
+      // no extra feedback needed.
     } catch (_) {
       messenger.showSnackBar(
         const SnackBar(content: Text('Impossible de retirer')),
