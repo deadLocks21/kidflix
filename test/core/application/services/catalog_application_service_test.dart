@@ -8,6 +8,7 @@ import 'package:kidflix/core/application/services/catalog_application.service.da
 import 'package:kidflix/core/application/usecases/resolve_continue_watching.usecase.dart';
 import 'package:kidflix/core/domain/model/download_entry.dart';
 import 'package:kidflix/core/domain/model/download_kind.dart';
+import 'package:kidflix/core/domain/model/favorite.dart';
 import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/model/watch_progress.dart';
@@ -286,6 +287,13 @@ void main() {
         );
         final rows = await service.buildHomeRowsFor(
           _profile(AgeCategory.enfant),
+          favorites: [
+            MovieFavorite(
+              profileId: 'p1',
+              movieId: 'a0',
+              createdAt: DateTime(2026, 1, 2),
+            ),
+          ],
         );
         final types = rows.map((r) => r.type).toList();
         final raIdx = types.indexOf('recentlyAdded');
@@ -293,6 +301,52 @@ void main() {
         final genreIdx = types.indexOf('genre');
         expect(raIdx, lessThan(favIdx));
         expect(favIdx, lessThan(genreIdx));
+      },
+    );
+
+    test('favorites row hidden when no favorites are passed', () async {
+      final service = CatalogApplicationService(
+        _FakeRepo([for (var i = 0; i < 4; i++) _m(id: 'm$i')]),
+      );
+      final rows = await service.buildHomeRowsFor(_profile(AgeCategory.enfant));
+      expect(rows.where((r) => r.type == 'favorites'), isEmpty);
+    });
+
+    test(
+      'favorites row mixes movies + series sorted by createdAt desc, '
+      'skipping unresolvable ids',
+      () async {
+        final service = CatalogApplicationService(
+          _FakeRepo([
+            _m(id: 'm1'),
+            _s(id: 's1'),
+          ]),
+        );
+        final rows = await service.buildHomeRowsFor(
+          _profile(AgeCategory.enfant),
+          favorites: [
+            MovieFavorite(
+              profileId: 'p1',
+              movieId: 'm1',
+              createdAt: DateTime(2026, 1, 1),
+            ),
+            SeriesFavorite(
+              profileId: 'p1',
+              seriesId: 's1',
+              createdAt: DateTime(2026, 2, 1),
+            ),
+            // Unknown id → silently dropped.
+            MovieFavorite(
+              profileId: 'p1',
+              movieId: 'unknown',
+              createdAt: DateTime(2026, 3, 1),
+            ),
+          ],
+        );
+        final favRow = rows.singleWhere((r) => r.type == 'favorites');
+        expect(favRow.label, 'Ma liste');
+        // SeriesFavorite is more recent → first.
+        expect(favRow.items.map((i) => i.id).toList(), ['s1', 'm1']);
       },
     );
 

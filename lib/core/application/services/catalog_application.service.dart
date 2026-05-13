@@ -10,6 +10,7 @@ import 'package:kidflix/core/application/dtos/series.dto.dart';
 import 'package:kidflix/core/application/usecases/resolve_continue_watching.usecase.dart';
 import 'package:kidflix/core/domain/model/catalog_row.dart';
 import 'package:kidflix/core/domain/model/download_entry.dart';
+import 'package:kidflix/core/domain/model/favorite.dart';
 import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/watch_progress.dart';
 import 'package:kidflix/core/domain/services/catalog.repository.dart';
@@ -61,6 +62,7 @@ class CatalogApplicationService {
   Future<List<CatalogRowDto>> buildHomeRowsFor(
     ProfileDto profile, {
     List<DownloadEntry> downloads = const [],
+    List<Favorite> favorites = const [],
     int? shuffleSeed,
   }) async {
     final rng = shuffleSeed != null ? Random(shuffleSeed) : Random();
@@ -79,10 +81,11 @@ class CatalogApplicationService {
         if (p is MovieProgress) p.movieId,
     };
 
-    // Saga / genre / favorites / never-watched rows are film-only at
-    // MVP (cf. add-series-viewing/design.md D-5). The recently-added
+    // Saga / genre / never-watched rows are film-only at MVP (cf.
+    // add-series-viewing/design.md D-5). The recently-added, favorites
     // and downloaded rows mix both: recently-added via
-    // _buildRecentlyAddedRowFromAll, downloaded via the inventory.
+    // _buildRecentlyAddedRowFromAll, favorites via FavoritesRepository,
+    // downloaded via the inventory.
     final movies = items.whereType<Movie>().toList(growable: false);
 
     final fixed = <CatalogRowDto>[];
@@ -90,8 +93,8 @@ class CatalogApplicationService {
     if (cwDto.items.isNotEmpty) fixed.add(cwDto);
     final recently = _buildRecentlyAddedRowFromAll(items);
     if (recently.items.isNotEmpty) fixed.add(_toDto(recently));
-    final favorites = _buildFavoritesRow(movies, rng);
-    if (favorites.items.isNotEmpty) fixed.add(_toDto(favorites));
+    final favoritesDto = _buildFavoritesRowDto(favorites, items);
+    if (favoritesDto.items.isNotEmpty) fixed.add(favoritesDto);
     final downloadedDto = _buildDownloadedRowDto(downloads, items, profile.id);
     if (downloadedDto.items.isNotEmpty) fixed.add(downloadedDto);
 
@@ -238,15 +241,37 @@ class CatalogApplicationService {
     return rows;
   }
 
-  // TODO(MVP): remplacer par le vrai repository lorsque la capability
-  // favorites existera (row alimentée par FavoritesRepository).
-  CatalogRow _buildFavoritesRow(List<Movie> movies, Random rng) {
-    final shuffled = _shuffled(movies, rng);
-    final slice = shuffled.length >= 3 ? shuffled.sublist(0, 3) : shuffled;
-    return CatalogRow(
-      label: 'Favoris',
-      type: CatalogRowType.favorites,
-      items: <CatalogItem>[...slice],
+  /// Build the "Ma liste" row from the active profile's [favorites].
+  ///
+  /// Items are sorted by `createdAt` desc — most recent favorites first.
+  /// Entries whose underlying media is not resolvable from the catalog
+  /// (soft-deleted, removed from the catalog after favoriting, or
+  /// filtered out by the age window) are silently skipped. The row is
+  /// hidden by the caller when the resulting items list is empty.
+  CatalogRowDto _buildFavoritesRowDto(
+    List<Favorite> favorites,
+    List<CatalogItem> catalog,
+  ) {
+    final byId = <String, CatalogItem>{for (final it in catalog) it.id: it};
+    final sorted = [...favorites]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final items = <CatalogItemDto>[];
+    for (final fav in sorted) {
+      final mediaId = switch (fav) {
+        MovieFavorite(:final movieId) => movieId,
+        SeriesFavorite(:final seriesId) => seriesId,
+      };
+      final item = byId[mediaId];
+      if (item == null) continue;
+      items.add(switch (item) {
+        Movie() => MovieDto.fromDomain(item),
+        Series() => SeriesDto.fromDomain(item),
+      });
+    }
+    return CatalogRowDto(
+      label: 'Ma liste',
+      type: CatalogRowType.favorites.name,
+      items: List.unmodifiable(items),
     );
   }
 

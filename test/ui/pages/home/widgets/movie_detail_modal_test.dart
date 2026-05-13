@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/core/domain/model/media.dart';
@@ -32,8 +33,11 @@ MovieDetailDto _detailWith({
   return MovieDetailDto.fromDomain(domain);
 }
 
-Widget _harness(Widget child) =>
-    MaterialApp(home: Scaffold(body: SingleChildScrollView(child: child)));
+Widget _harness(Widget child) => ProviderScope(
+      child: MaterialApp(
+        home: Scaffold(body: SingleChildScrollView(child: child)),
+      ),
+    );
 
 void main() {
   group('MovieDetailContent', () {

@@ -16,6 +16,7 @@ import 'package:kidflix/infrastructure/providers/watch_progress.repository_provi
 import 'package:kidflix/shared/duration_format.dart';
 import 'package:kidflix/shared/tmdb_image.dart';
 import 'package:kidflix/ui/pages/home/widgets/download_intent_button.widget.dart';
+import 'package:kidflix/ui/pages/home/widgets/favorite_button.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/resume_progress_bar.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/season_download_button.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/series/play_label.dart';
@@ -227,7 +228,14 @@ class _SeriesDetailContentState extends ConsumerState<SeriesDetailContent> {
                   ),
                 ],
                 const SizedBox(height: 12),
-                _MetaLine(series: catalogSeries),
+                Row(
+                  children: [
+                    Expanded(child: _MetaLine(series: catalogSeries)),
+                    FavoriteButton(
+                      target: SeriesFavoriteTarget(catalogSeries.id),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 16),
                 if (catalogSeries.synopsis.isNotEmpty)
                   Text(catalogSeries.synopsis,

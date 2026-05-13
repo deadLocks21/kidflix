@@ -2,6 +2,7 @@ import 'package:kidflix/core/application/dtos/catalog_row.dto.dart';
 import 'package:kidflix/core/application/dtos/profile.dto.dart';
 import 'package:kidflix/core/application/services/catalog_application.service.dart';
 import 'package:kidflix/core/domain/model/download_entry.dart';
+import 'package:kidflix/core/domain/model/favorite.dart';
 
 /// Builds the ordered list of homepage rows for a given [ProfileDto].
 ///
@@ -15,11 +16,13 @@ class ListHomeCatalogUseCase {
   Future<List<CatalogRowDto>> execute(
     ProfileDto profile, {
     List<DownloadEntry> downloads = const [],
+    List<Favorite> favorites = const [],
     int? shuffleSeed,
   }) {
     return _service.buildHomeRowsFor(
       profile,
       downloads: downloads,
+      favorites: favorites,
       shuffleSeed: shuffleSeed,
     );
   }

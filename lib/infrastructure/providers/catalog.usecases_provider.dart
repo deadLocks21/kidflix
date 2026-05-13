@@ -6,12 +6,14 @@ import 'package:kidflix/core/application/dtos/profile.dto.dart';
 import 'package:kidflix/core/application/session_state.dart';
 import 'package:kidflix/core/application/usecases/list_home_catalog.usecase.dart';
 import 'package:kidflix/core/application/usecases/refresh_download_snapshots.usecase.dart';
+import 'package:kidflix/core/domain/model/favorite.dart';
 import 'package:kidflix/infrastructure/providers/catalog.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/catalog.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/connectivity.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/download.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/download_management.usecases_provider.dart';
 import 'package:kidflix/infrastructure/providers/download_manifest_store.provider.dart';
+import 'package:kidflix/infrastructure/providers/favorites.controller_provider.dart';
 import 'package:kidflix/infrastructure/providers/offline_catalog.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/series.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
@@ -75,6 +77,13 @@ Future<List<CatalogRowDto>> homeCatalogRows(Ref ref) async {
   final profile = ProfileDto.fromDomain(state.profile);
   final inventory = await ref.watch(downloadInventoryProvider.future);
   final seed = ref.watch(homeShuffleSeedProvider);
+  // Favorites feed the "Ma liste" row. The controller is keepAlive so
+  // a transient AsyncLoading on startup is rare ; treat unresolved
+  // states as an empty list rather than blocking the whole home.
+  final favorites = ref.watch(favoritesControllerProvider).maybeWhen(
+        data: (v) => v,
+        orElse: () => const <Favorite>[],
+      );
   final online = ref.watch(connectivityProvider).maybeWhen(
         data: (v) => v,
         orElse: () => true,
@@ -84,6 +93,7 @@ Future<List<CatalogRowDto>> homeCatalogRows(Ref ref) async {
     return offline.execute(
       profile,
       downloads: inventory.downloads,
+      favorites: favorites,
       shuffleSeed: seed,
     );
   }
@@ -91,6 +101,7 @@ Future<List<CatalogRowDto>> homeCatalogRows(Ref ref) async {
   final rows = await useCase.execute(
     profile,
     downloads: inventory.downloads,
+    favorites: favorites,
     shuffleSeed: seed,
   );
   // Connectivity says online and the call succeeded — fire-and-forget
