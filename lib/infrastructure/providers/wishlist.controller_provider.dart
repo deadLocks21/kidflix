@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:kidflix/core/application/dtos/wishlist_entry.dto.dart';
 import 'package:kidflix/core/application/session_state.dart';
+import 'package:kidflix/core/domain/model/wishlist_entry.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/infrastructure/providers/wishlist.usecases_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -85,5 +86,40 @@ class WishlistController extends _$WishlistController {
     state = await AsyncValue.guard(
       () => ref.read(listWishlistUseCaseProvider).execute(),
     );
+  }
+
+  /// Adds a TMDB item to the wishlist (status `PLANNED`). Splices the
+  /// new entry into the local state immediately on success ; on
+  /// failure (including the typed `WishlistEntryAlreadyExistsException`
+  /// raised by the repo), the error is rethrown so the caller can
+  /// surface a contextual snackbar.
+  ///
+  /// Re-applies the use case's filter behaviour by re-fetching the
+  /// list rather than appending raw — the use case decides whether
+  /// the new entry survives the "à acquérir" filter (e.g. it could
+  /// already be in the catalog, in which case it stays hidden).
+  Future<void> add({
+    required int tmdbId,
+    required WishlistItemKind kind,
+  }) async {
+    final previous = state.value ?? const <WishlistEntryDto>[];
+    try {
+      await ref
+          .read(addToWishlistUseCaseProvider)
+          .execute(tmdbId: tmdbId, kind: kind);
+      // Re-fetch through the use case so the new entry shows up only
+      // if it passes the filter (planned + not in catalog).
+      state = AsyncData(
+        await ref.read(listWishlistUseCaseProvider).execute(),
+      );
+    } catch (e, st) {
+      debugPrint(
+        '[kidflix.wishlist] add failed (tmdbId=$tmdbId, kind=$kind)\n'
+        'error: $e\n'
+        '$st',
+      );
+      state = AsyncData(previous);
+      rethrow;
+    }
   }
 }

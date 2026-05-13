@@ -1,7 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:kidflix/core/application/dtos/remote_wishlist_entry.dto.dart';
+import 'package:kidflix/core/application/dtos/remote_wishlist_search_result.dto.dart';
+import 'package:kidflix/core/domain/exceptions/wishlist_entry_already_exists.exception.dart';
 import 'package:kidflix/core/domain/exceptions/wishlist_not_configured.exception.dart';
 import 'package:kidflix/core/domain/model/wishlist_entry.dart';
+import 'package:kidflix/core/domain/model/wishlist_search_result.dart';
 import 'package:kidflix/core/domain/services/wishlist.repository.dart';
 import 'package:kidflix/infrastructure/http/error_code.dart';
 
@@ -10,6 +13,8 @@ import 'package:kidflix/infrastructure/http/error_code.dart';
 /// Hits the endpoints documented in `WATCHARR_WISHLIST_FEATURE.md`:
 ///
 /// * `GET    /wishlist`
+/// * `GET    /wishlist/search?q=...`
+/// * `POST   /wishlist`
 /// * `PUT    /wishlist/{id}/status`
 /// * `DELETE /wishlist/{id}`
 ///
@@ -19,10 +24,15 @@ import 'package:kidflix/infrastructure/http/error_code.dart';
 /// callers get `403 main_profile_required`, surfaced here as a generic
 /// [DioException] for the application layer to handle.
 ///
-/// One typed mapping only: a `503 wishlist_not_configured` is
-/// translated to [WishlistNotConfiguredException] so the UI can render
-/// a dedicated empty state ("active la feature avec un compte
-/// Watcharr") rather than a generic retry banner.
+/// Two typed mappings are surfaced :
+///
+/// - `503 wishlist_not_configured` → [WishlistNotConfiguredException].
+///   The UI renders a dedicated empty state rather than a generic
+///   retry banner.
+/// - `409 wishlist_entry_exists` (upstream `403 watched entry exists`
+///   from Watcharr, normalised to a 409 by kidflix-api) →
+///   [WishlistEntryAlreadyExistsException]. The UI shows a friendly
+///   "déjà dans la liste" snackbar.
 class DioWishlistRepository implements WishlistRepository {
   final Dio _dio;
 
@@ -68,14 +78,53 @@ class DioWishlistRepository implements WishlistRepository {
     }
   }
 
+  @override
+  Future<List<WishlistSearchResult>> search(String query) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/wishlist/search',
+        queryParameters: {'q': query},
+      );
+      final items = (response.data!['items'] as List)
+          .cast<Map<String, dynamic>>();
+      return items
+          .map(RemoteWishlistSearchResultDto.fromJson)
+          .map((dto) => dto.toDomain())
+          .toList(growable: false);
+    } on DioException catch (e) {
+      _rethrowTyped(e);
+    }
+  }
+
+  @override
+  Future<WishlistEntry> add({
+    required int tmdbId,
+    required WishlistItemKind kind,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/wishlist',
+        data: {
+          'tmdb_id': tmdbId,
+          'kind': wishlistKindToWire(kind),
+        },
+      );
+      return RemoteWishlistEntryDto.fromJson(response.data!).toDomain();
+    } on DioException catch (e) {
+      _rethrowTyped(e);
+    }
+  }
+
   /// Maps the few typed error codes the UI cares about. Anything else
-  /// re-throws as-is (the surrounding `rethrow` in the caller bubbles
-  /// the original [DioException] up to the controller, which surfaces
-  /// a snackbar).
+  /// re-throws as-is (the original [DioException] bubbles up to the
+  /// controller, which surfaces a generic snackbar).
   Never _rethrowTyped(DioException e) {
-    if (e.response?.statusCode == 503 &&
-        readErrorCode(e.response) == 'wishlist_not_configured') {
+    final code = readErrorCode(e.response);
+    if (e.response?.statusCode == 503 && code == 'wishlist_not_configured') {
       throw const WishlistNotConfiguredException();
+    }
+    if (e.response?.statusCode == 409 && code == 'wishlist_entry_exists') {
+      throw const WishlistEntryAlreadyExistsException();
     }
     throw e;
   }

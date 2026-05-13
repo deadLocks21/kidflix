@@ -76,7 +76,7 @@ final class WishlistControllerProvider
 }
 
 String _$wishlistControllerHash() =>
-    r'78beb2df9c533f05598c526b912f6475d6c7e0fe';
+    r'4f0a91692e2b763df3b1c4d43f6a3911e8a69348';
 
 /// Central controller for the foyer's wishlist entries.
 ///

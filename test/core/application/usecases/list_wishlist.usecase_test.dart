@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kidflix/core/application/usecases/list_wishlist.usecase.dart';
 import 'package:kidflix/core/domain/model/wishlist_entry.dart';
+import 'package:kidflix/core/domain/model/wishlist_search_result.dart';
 import 'package:kidflix/core/domain/services/wishlist.repository.dart';
 
 class _StubRepository implements WishlistRepository {
@@ -19,6 +20,17 @@ class _StubRepository implements WishlistRepository {
 
   @override
   Future<void> remove(int watcharrId) => throw UnimplementedError();
+
+  @override
+  Future<List<WishlistSearchResult>> search(String query) =>
+      throw UnimplementedError();
+
+  @override
+  Future<WishlistEntry> add({
+    required int tmdbId,
+    required WishlistItemKind kind,
+  }) =>
+      throw UnimplementedError();
 }
 
 WishlistEntry _entry({

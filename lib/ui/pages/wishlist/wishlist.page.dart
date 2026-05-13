@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:kidflix/core/application/dtos/wishlist_entry.dto.dart';
 import 'package:kidflix/core/domain/exceptions/wishlist_not_configured.exception.dart';
 import 'package:kidflix/infrastructure/providers/wishlist.controller_provider.dart';
 import 'package:kidflix/ui/pages/wishlist/widgets/wishlist_card.widget.dart';
+import 'package:kidflix/ui/router/app_router.dart';
 
 /// Parent-only wishlist page, accessible from the home avatar menu →
 /// "Liste d'envies".
@@ -30,8 +32,21 @@ class WishlistPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncEntries = ref.watch(wishlistControllerProvider);
 
+    // FAB is hidden when the foyer has no Watcharr account
+    // provisioned — adding would 503 too. Otherwise (loading, data,
+    // generic error) we keep the FAB visible so the parent can start
+    // typing while we recover.
+    final hideFab = asyncEntries.hasError &&
+        asyncEntries.error is WishlistNotConfiguredException;
     return Scaffold(
       appBar: AppBar(title: const Text("Liste d'envies")),
+      floatingActionButton: hideFab
+          ? null
+          : FloatingActionButton.extended(
+              icon: const Icon(Icons.add),
+              label: const Text('Ajouter'),
+              onPressed: () => context.push(AppRoutes.settingsWishlistAdd),
+            ),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () => ref
