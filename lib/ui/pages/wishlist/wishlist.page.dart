@@ -10,32 +10,35 @@ import 'package:kidflix/ui/router/app_router.dart';
 /// Parent-only wishlist page, accessible from the home avatar menu →
 /// "Liste d'envies".
 ///
-/// Renders the foyer's "films à voir non encore disponibles" — the
-/// filter is applied by [ListWishlistUseCase] (movies, planned, not
-/// in the catalog). A single flat list, sorted alphabetically by
-/// title. Pull-to-refresh re-hits the proxy.
+/// Renders three sections, top to bottom, hiding the empty ones :
 ///
-/// Long-press on a row opens the bottom sheet to mark the entry as
-/// vu (FINISHED → drops out of the filter) or to retirer (DELETE →
-/// drops out for good).
+/// 1. **À télécharger** — entries that aren't in the local catalog
+///    yet. The parent uses this list to drive what to add to the
+///    kdrive médiathèque.
+/// 2. **À visionner** — entries in the catalog that nobody in the
+///    foyer has completed yet. Movies render a "Lire" affordance ;
+///    series sit here whenever they're available (no aggregate
+///    "watched" signal in v1).
+/// 3. **Déjà vu** — movies in the catalog that at least one profile
+///    has completed (any `MovieProgress.completed == true`).
 ///
-/// Edge cases handled inline:
+/// Long-press on a row opens a bottom sheet to mark the entry as
+/// watched (FINISHED on Watcharr → drops out of the filter) or to
+/// remove it from Watcharr entirely. Pull-to-refresh re-hits the
+/// proxy.
+///
+/// Edge cases handled inline :
 ///
 /// - `WishlistNotConfiguredException` (503) → dedicated empty state
 ///   telling the parent to provision a Watcharr account.
 /// - Other errors → generic error card with a refresh button.
-/// - Empty filter result → friendly placeholder pointing to Watcharr.
+/// - Empty buckets → friendly placeholder pointing to the search FAB.
 class WishlistPage extends ConsumerWidget {
   const WishlistPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncEntries = ref.watch(wishlistControllerProvider);
-
-    // FAB is hidden when the foyer has no Watcharr account
-    // provisioned — adding would 503 too. Otherwise (loading, data,
-    // generic error) we keep the FAB visible so the parent can start
-    // typing while we recover.
     final hideFab = asyncEntries.hasError &&
         asyncEntries.error is WishlistNotConfiguredException;
     return Scaffold(
@@ -60,7 +63,7 @@ class WishlistPage extends ConsumerWidget {
                   child: CircularProgressIndicator(),
                 ),
                 error: (e, _) => _ErrorView(error: e, ref: ref),
-                data: (entries) => _List(entries: entries),
+                data: (entries) => _Sections(entries: entries),
               ),
             ),
           ),
@@ -70,21 +73,86 @@ class WishlistPage extends ConsumerWidget {
   }
 }
 
-class _List extends StatelessWidget {
+class _Sections extends StatelessWidget {
   final List<WishlistEntryDto> entries;
 
-  const _List({required this.entries});
+  const _Sections({required this.entries});
 
   @override
   Widget build(BuildContext context) {
     if (entries.isEmpty) {
       return const _EmptyState();
     }
+    final toAcquire =
+        entries.where((e) => e.category == WishlistCategory.toAcquire).toList();
+    final toWatch =
+        entries.where((e) => e.category == WishlistCategory.toWatch).toList();
+    final watched =
+        entries.where((e) => e.category == WishlistCategory.watched).toList();
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        if (toAcquire.isNotEmpty)
+          _Section(
+            label: 'À télécharger',
+            entries: toAcquire,
+            keyPrefix: 'acquire',
+          ),
+        if (toWatch.isNotEmpty)
+          _Section(
+            label: 'À visionner',
+            entries: toWatch,
+            keyPrefix: 'watch',
+          ),
+        if (watched.isNotEmpty)
+          _Section(
+            label: 'Déjà vu',
+            entries: watched,
+            keyPrefix: 'watched',
+          ),
+      ],
+    );
+  }
+}
+
+class _Section extends StatelessWidget {
+  final String label;
+  final List<WishlistEntryDto> entries;
+  final String keyPrefix;
+
+  const _Section({
+    required this.label,
+    required this.entries,
+    required this.keyPrefix,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
+          child: Row(
+            children: [
+              Text(label, style: theme.textTheme.titleMedium),
+              const SizedBox(width: 8),
+              Text(
+                '(${entries.length})',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.hintColor,
+                ),
+              ),
+            ],
+          ),
+        ),
         for (final e in entries)
-          WishlistCard(key: ValueKey(e.watcharrId), entry: e),
+          WishlistCard(
+            key: ValueKey('$keyPrefix-${e.watcharrId}'),
+            entry: e,
+          ),
       ],
     );
   }
@@ -106,15 +174,14 @@ class _EmptyState extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Text(
-          "Aucune envie à acquérir",
+          "Ta liste d'envies est vide",
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: 8),
         Text(
-          "Ajoute des films ou séries depuis Watcharr — ils "
-          "apparaîtront ici tant qu'ils ne sont pas encore dans la "
-          "médiathèque.",
+          "Tape sur « Ajouter » en bas à droite pour rechercher un "
+          "film ou une série et l'ajouter à ta liste.",
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).hintColor,

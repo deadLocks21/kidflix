@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:kidflix/core/application/dtos/wishlist_entry.dto.dart';
 import 'package:kidflix/core/application/session_state.dart';
+import 'package:kidflix/core/domain/model/session.dart';
 import 'package:kidflix/core/domain/model/wishlist_entry.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/infrastructure/providers/wishlist.usecases_provider.dart';
@@ -30,8 +31,17 @@ class WishlistController extends _$WishlistController {
     if (session is! ProfileSelected || !session.profile.isMain) {
       return const [];
     }
-    return ref.read(listWishlistUseCaseProvider).execute();
+    return ref.read(listWishlistUseCaseProvider).execute(
+          profileIds: _foyerProfileIds(session.session),
+        );
   }
+
+  /// Every profile id of the foyer — used by the use case to
+  /// aggregate "watched" state across the family. Read at build
+  /// time only ; the controller `ref.watch`es the session so a
+  /// profile creation / deletion already invalidates this provider.
+  List<String> _foyerProfileIds(Session session) =>
+      session.profiles.map((p) => p.id).toList(growable: false);
 
   /// Marks the entry with [watcharrId] as `FINISHED`. The row is
   /// kept in the list (Watcharr doesn't drop FINISHED entries), but
@@ -82,9 +92,16 @@ class WishlistController extends _$WishlistController {
   /// Refetches the whole list from the repository. Bound to
   /// pull-to-refresh on the wishlist page.
   Future<void> refresh() async {
+    final session = ref.read(sessionControllerProvider);
+    if (session is! ProfileSelected) {
+      state = const AsyncData([]);
+      return;
+    }
     state = const AsyncLoading();
     state = await AsyncValue.guard(
-      () => ref.read(listWishlistUseCaseProvider).execute(),
+      () => ref.read(listWishlistUseCaseProvider).execute(
+            profileIds: _foyerProfileIds(session.session),
+          ),
     );
   }
 
@@ -103,14 +120,20 @@ class WishlistController extends _$WishlistController {
     required WishlistItemKind kind,
   }) async {
     final previous = state.value ?? const <WishlistEntryDto>[];
+    final session = ref.read(sessionControllerProvider);
+    final profileIds = session is ProfileSelected
+        ? _foyerProfileIds(session.session)
+        : const <String>[];
     try {
       await ref
           .read(addToWishlistUseCaseProvider)
           .execute(tmdbId: tmdbId, kind: kind);
       // Re-fetch through the use case so the new entry shows up only
-      // if it passes the filter (planned + not in catalog).
+      // if it passes the filter and the watch progress crossing.
       state = AsyncData(
-        await ref.read(listWishlistUseCaseProvider).execute(),
+        await ref.read(listWishlistUseCaseProvider).execute(
+              profileIds: profileIds,
+            ),
       );
     } catch (e, st) {
       debugPrint(

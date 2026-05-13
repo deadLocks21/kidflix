@@ -1,43 +1,121 @@
 import 'package:kidflix/core/application/dtos/wishlist_entry.dto.dart';
+import 'package:kidflix/core/domain/model/watch_progress.dart';
 import 'package:kidflix/core/domain/model/wishlist_entry.dart';
+import 'package:kidflix/core/domain/services/watch_progress.repository.dart';
 import 'package:kidflix/core/domain/services/wishlist.repository.dart';
 
-/// Fetches the foyer's wishlist, applies the parent-only "à acquérir"
-/// filter, and projects each survivor to its UI DTO.
+/// Fetches the foyer's wishlist, cross-references it against the
+/// foyer's watch progress, and projects each survivor to its UI DTO
+/// with a [WishlistCategory] bucket.
 ///
-/// The filter surfaces **films et séries à voir qui ne sont pas encore
-/// dans la médiathèque**. Everything else is noise for the parent's
-/// workflow:
+/// The filter is unchanged: only `status == PLANNED` entries survive —
+/// `WATCHING / HOLD / FINISHED / DROPPED` (Watcharr-side statuses) are
+/// non-actionable for this page. The new responsibility is to
+/// **bucket** the survivors into three categories based on the
+/// catalog crossing + the watch progress of every profile in the
+/// foyer.
 ///
-/// - `availableInCatalog == false` — once an item lands in the
-///   kdrive, kids can find it on the home like any other content ;
-///   keeping it here would duplicate the catalog.
-/// - `status == planned` — `watching` / `hold` / `finished` /
-///   `dropped` are non-actionable from this view. The parent keeps
-///   them in Watcharr for tracking, but the home menu shortcut
-///   focuses on the "à voir" backlog.
+/// Categorisation rule :
 ///
-/// Both `kind == movie` and `kind == series` pass through — a series
-/// the family wants in the médiathèque is just as relevant as a film.
+/// - Not in catalog → [WishlistCategory.toAcquire].
+/// - In catalog, kind = movie, at least one profile has a
+///   `MovieProgress` with `completed = true` for the resolved
+///   `catalogId` → [WishlistCategory.watched].
+/// - In catalog, kind = movie, otherwise → [WishlistCategory.toWatch].
+/// - In catalog, kind = series → [WishlistCategory.toWatch] (no
+///   aggregate "watched" signal for series in v1 — episode-level
+///   progress is granular but the wishlist tracks the series as a
+///   single unit).
 ///
-/// Result is sorted alphabetically by title (case-insensitive).
+/// Watch progress fetching is parallelised across profile ids — each
+/// profile yields a `listForProfile` call. A failure on any individual
+/// fetch makes the whole use case fail (caller surfaces an error
+/// banner) ; this is a coarse-grained policy that fits the keepAlive
+/// controller and the parent-only access pattern.
+///
+/// Sort: alphabetical by title within each bucket (case-insensitive).
+/// The page renders buckets in the order
+/// `toAcquire → toWatch → watched`, hiding empty ones.
 class ListWishlistUseCase {
-  final WishlistRepository _repo;
+  final WishlistRepository _wishlistRepo;
+  final WatchProgressRepository _progressRepo;
 
-  const ListWishlistUseCase(this._repo);
+  const ListWishlistUseCase({
+    required WishlistRepository wishlistRepo,
+    required WatchProgressRepository progressRepo,
+  })  : _wishlistRepo = wishlistRepo,
+        _progressRepo = progressRepo;
 
-  Future<List<WishlistEntryDto>> execute() async {
-    final entries = await _repo.list();
-    final filtered = entries.where(_keepEntry).toList()..sort(_compare);
-    return filtered
-        .map(WishlistEntryDto.fromDomain)
-        .toList(growable: false);
+  /// Fetches and categorises the wishlist.
+  ///
+  /// [profileIds] must list every profile in the active foyer (the
+  /// session controller has them under `session.profiles`). An empty
+  /// list short-circuits the progress lookup — all in-catalog entries
+  /// fall in [WishlistCategory.toWatch].
+  Future<List<WishlistEntryDto>> execute({
+    required List<String> profileIds,
+  }) async {
+    final entries = await _wishlistRepo.list();
+    final planned = entries
+        .where((e) => e.status == WatchedStatus.planned)
+        .toList()
+      ..sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+    if (planned.isEmpty) return const [];
+
+    final watchedMovieIds = await _resolveWatchedMovieIds(profileIds);
+
+    return planned.map((entry) {
+      return WishlistEntryDto(
+        watcharrId: entry.watcharrId,
+        tmdbId: entry.tmdbId,
+        kind: entry.kind,
+        title: entry.title,
+        year: entry.year,
+        posterUrl: entry.posterUrl,
+        status: entry.status,
+        rating: entry.rating,
+        availableInCatalog: entry.availableInCatalog,
+        catalogId: entry.catalogId,
+        category: _resolveCategory(entry, watchedMovieIds),
+      );
+    }).toList(growable: false);
   }
 
-  bool _keepEntry(WishlistEntry entry) =>
-      !entry.availableInCatalog &&
-      entry.status == WatchedStatus.planned;
+  /// Aggregates `(profile, movie) → completed` across every profile
+  /// in the foyer into a single set of `movieId`. A movie is
+  /// considered "watched" by the foyer as soon as **any** profile has
+  /// completed it.
+  Future<Set<String>> _resolveWatchedMovieIds(List<String> profileIds) async {
+    if (profileIds.isEmpty) return const {};
+    final perProfile = await Future.wait(
+      profileIds.map(_progressRepo.listForProfile),
+    );
+    final ids = <String>{};
+    for (final list in perProfile) {
+      for (final progress in list) {
+        if (progress is MovieProgress && progress.completed) {
+          ids.add(progress.movieId);
+        }
+      }
+    }
+    return ids;
+  }
 
-  int _compare(WishlistEntry a, WishlistEntry b) =>
-      a.title.toLowerCase().compareTo(b.title.toLowerCase());
+  WishlistCategory _resolveCategory(
+    WishlistEntry entry,
+    Set<String> watchedMovieIds,
+  ) {
+    if (!entry.availableInCatalog) {
+      return WishlistCategory.toAcquire;
+    }
+    if (entry.kind == WishlistItemKind.series) {
+      // No aggregate "watched" semantics for series in v1.
+      return WishlistCategory.toWatch;
+    }
+    final catalogId = entry.catalogId;
+    if (catalogId != null && watchedMovieIds.contains(catalogId)) {
+      return WishlistCategory.watched;
+    }
+    return WishlistCategory.toWatch;
+  }
 }

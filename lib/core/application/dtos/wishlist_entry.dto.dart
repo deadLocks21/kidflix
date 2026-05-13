@@ -2,15 +2,10 @@ import 'package:kidflix/core/domain/model/wishlist_entry.dart';
 
 /// UI-facing projection of a [WishlistEntry].
 ///
-/// Same fields as the Domain entity — the UI doesn't need extra
-/// derivations beyond what the Domain already exposes. The DTO exists
-/// only to keep the layered convention "UI never sees Domain entities"
-/// per `project_architecture` memory and the project README.
-///
-/// Two convenience getters live here: [isAvailable] and
-/// [showsPlayAction] — they are pure projections of fields already on
-/// the entity, kept in the DTO so the UI doesn't reach back into the
-/// Domain to compute them.
+/// Adds a [category] field on top of the Domain shape — the wishlist
+/// page renders three sections (à télécharger, à visionner, déjà vu)
+/// keyed on it. The use case is responsible for computing the
+/// category by cross-referencing the foyer's watch progress.
 class WishlistEntryDto {
   final int watcharrId;
   final int tmdbId;
@@ -22,6 +17,7 @@ class WishlistEntryDto {
   final int rating;
   final bool availableInCatalog;
   final String? catalogId;
+  final WishlistCategory category;
 
   const WishlistEntryDto({
     required this.watcharrId,
@@ -31,11 +27,15 @@ class WishlistEntryDto {
     required this.status,
     required this.rating,
     required this.availableInCatalog,
+    required this.category,
     this.year,
     this.posterUrl,
     this.catalogId,
   });
 
+  /// Convenience constructor used by call sites that don't enrich
+  /// against the watch progress (e.g. the `add` flow before the
+  /// next refresh). Defaults the category based on availability only.
   factory WishlistEntryDto.fromDomain(WishlistEntry entry) => WishlistEntryDto(
         watcharrId: entry.watcharrId,
         tmdbId: entry.tmdbId,
@@ -47,6 +47,9 @@ class WishlistEntryDto {
         rating: entry.rating,
         availableInCatalog: entry.availableInCatalog,
         catalogId: entry.catalogId,
+        category: entry.availableInCatalog
+            ? WishlistCategory.toWatch
+            : WishlistCategory.toAcquire,
       );
 
   /// `true` when the same TMDB item already ships in the local
@@ -58,4 +61,24 @@ class WishlistEntryDto {
   /// playable directly from the wishlist (movies). Series open the
   /// detail modal first, so the wishlist row still routes there.
   bool get showsPlayAction => isAvailable;
+}
+
+/// Bucket a wishlist entry falls in, displayed as a section on the
+/// wishlist page.
+///
+/// Computation rule (see [ListWishlistUseCase]) :
+///
+/// - `toAcquire` — not in the local catalog yet. The parent has
+///   flagged the title in Watcharr but kidflix-api's `/catalog`
+///   doesn't ship it.
+/// - `toWatch` — in the catalog, and nobody in the foyer has
+///   completed it yet. For series, all in-catalog entries land here
+///   (no aggregate "watched" signal for series in v1).
+/// - `watched` — movies only: in the catalog, and at least one
+///   profile of the foyer has a `MovieProgress` with
+///   `completed == true` for the resolved `catalogId`.
+enum WishlistCategory {
+  toAcquire,
+  toWatch,
+  watched,
 }
