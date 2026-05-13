@@ -97,7 +97,7 @@ final class FavoritesControllerProvider
 }
 
 String _$favoritesControllerHash() =>
-    r'2284a87dc3f7fc38677c961952bd126e7c399d60';
+    r'b679b0c0804714c0d03f54d44fa56ca36863c36c';
 
 /// Central controller for the active profile's "Ma liste" entries.
 ///

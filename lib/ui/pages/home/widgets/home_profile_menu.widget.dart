@@ -7,11 +7,12 @@ import 'package:kidflix/infrastructure/providers/session.controller_provider.dar
 import 'package:kidflix/ui/avatars/widgets/avatar_image.widget.dart';
 import 'package:kidflix/ui/router/app_router.dart';
 
-enum _HomeMenuAction { settings, switchProfile, manageProfiles }
+enum _HomeMenuAction { settings, wishlist, switchProfile, manageProfiles }
 
 /// Bouton avatar dans l'AppBar de la home : affiche le profil actif et
-/// ouvre un menu déroulant avec Paramètres / Quitter le profil / Gérer
-/// les profils.
+/// ouvre un menu déroulant avec Liste d'envies (profil principal) /
+/// Paramètres / Gérer les profils (profil principal) / Quitter le
+/// profil.
 class HomeProfileMenu extends ConsumerWidget {
   const HomeProfileMenu({super.key});
 
@@ -34,6 +35,16 @@ class HomeProfileMenu extends ConsumerWidget {
       position: PopupMenuPosition.under,
       onSelected: (action) => _onSelected(context, ref, action),
       itemBuilder: (_) => [
+        if (profile.isMain)
+          const PopupMenuItem(
+            value: _HomeMenuAction.wishlist,
+            child: ListTile(
+              leading: Icon(Icons.bookmark_outline),
+              title: Text("Liste d'envies"),
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+            ),
+          ),
         const PopupMenuItem(
           value: _HomeMenuAction.settings,
           child: ListTile(
@@ -83,6 +94,8 @@ class HomeProfileMenu extends ConsumerWidget {
     switch (action) {
       case _HomeMenuAction.settings:
         context.push(AppRoutes.settings);
+      case _HomeMenuAction.wishlist:
+        context.push(AppRoutes.settingsWishlist);
       case _HomeMenuAction.switchProfile:
         controller.deselectProfile();
       case _HomeMenuAction.manageProfiles:
