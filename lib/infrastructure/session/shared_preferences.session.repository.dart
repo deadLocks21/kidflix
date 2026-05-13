@@ -96,6 +96,9 @@ class SharedPreferencesSessionRepository implements SessionRepository {
     'pinHash': profile.pinHash,
     'avatarId': profile.avatarId,
     'isMain': profile.isMain,
+    'includedLowerAgeCategories': profile.includedLowerAgeCategories
+        .map((c) => c.name)
+        .toList(growable: false),
   };
 
   Profile _profileFromJson(Map<String, dynamic> json) => Profile(
@@ -109,5 +112,26 @@ class SharedPreferencesSessionRepository implements SessionRepository {
     // Backwards-compat: sessions persisted before `isMain` existed default
     // to false. The next successful login overwrites with correct data.
     isMain: json['isMain'] as bool? ?? false,
+    // Backwards-compat: sessions persisted before the opt-in landed
+    // default to an empty list. Settings edit immediately rewrites with
+    // the user's choice.
+    includedLowerAgeCategories: _parseIncludedLowerAges(
+      json['includedLowerAgeCategories'],
+    ),
   );
+
+  List<AgeCategory> _parseIncludedLowerAges(Object? raw) {
+    if (raw is! List) return const [];
+    final result = <AgeCategory>[];
+    for (final item in raw) {
+      if (item is! String) continue;
+      for (final c in AgeCategory.values) {
+        if (c.name == item) {
+          result.add(c);
+          break;
+        }
+      }
+    }
+    return List.unmodifiable(result);
+  }
 }

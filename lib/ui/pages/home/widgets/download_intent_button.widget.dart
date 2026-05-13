@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/core/application/session_state.dart';
+import 'package:kidflix/core/domain/model/cached_cast_member.dart';
 import 'package:kidflix/core/domain/model/download_kind.dart';
 import 'package:kidflix/core/domain/model/movie_download.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
@@ -36,10 +37,25 @@ class DownloadIntentButton extends ConsumerStatefulWidget {
   /// Optional metadata pre-known by the caller (movie/series modale).
   /// When provided, the manifest is enriched with these so the manager
   /// can resolve the title even if the parent's `/catalog` view does
-  /// not include this item (strict age filter — cf. design.md).
+  /// not include this item (strict age filter — cf. design.md), AND so
+  /// the offline home / detail modal can render from disk only.
   final String? title;
   final String? posterUrl;
   final String? parentSeriesTitle;
+  final String? originalTitle;
+  final int? year;
+  final int? durationSeconds;
+  final String? ageCategory;
+  final String? synopsis;
+  final String? tagline;
+  final String? backdropUrl;
+  final String? logoUrl;
+  final List<String>? genres;
+  final List<String>? director;
+  final List<CachedCastMember>? topCast;
+  final String? seriesId;
+  final int? seasonNumber;
+  final int? episodeNumber;
 
   const DownloadIntentButton({
     super.key,
@@ -48,6 +64,20 @@ class DownloadIntentButton extends ConsumerStatefulWidget {
     this.title,
     this.posterUrl,
     this.parentSeriesTitle,
+    this.originalTitle,
+    this.year,
+    this.durationSeconds,
+    this.ageCategory,
+    this.synopsis,
+    this.tagline,
+    this.backdropUrl,
+    this.logoUrl,
+    this.genres,
+    this.director,
+    this.topCast,
+    this.seriesId,
+    this.seasonNumber,
+    this.episodeNumber,
   });
 
   @override
@@ -142,9 +172,10 @@ class _DownloadIntentButtonState extends ConsumerState<DownloadIntentButton> {
     try {
       final allowed = await _kidsLockChallenge(context);
       if (!allowed) return;
-      // Capture title/poster on the manifest so the manager can show
+      // Capture full snapshot on the manifest so the manager can show
       // the item even if /catalog (age-filtered) won't return it from
-      // the parent's perspective.
+      // the parent's perspective, and so the offline home / detail
+      // modal can render from disk only.
       if (widget.title != null) {
         await ref.read(downloadRepositoryProvider).cacheMediaMetadata(
               mediaId: widget.mediaId,
@@ -152,6 +183,20 @@ class _DownloadIntentButtonState extends ConsumerState<DownloadIntentButton> {
               title: widget.title!,
               posterUrl: widget.posterUrl,
               parentSeriesTitle: widget.parentSeriesTitle,
+              originalTitle: widget.originalTitle,
+              year: widget.year,
+              durationSeconds: widget.durationSeconds,
+              ageCategory: widget.ageCategory,
+              synopsis: widget.synopsis,
+              tagline: widget.tagline,
+              backdropUrl: widget.backdropUrl,
+              logoUrl: widget.logoUrl,
+              genres: widget.genres,
+              director: widget.director,
+              topCast: widget.topCast,
+              seriesId: widget.seriesId,
+              seasonNumber: widget.seasonNumber,
+              episodeNumber: widget.episodeNumber,
             );
       }
       await ref.read(markAsDownloadUseCaseProvider).execute(

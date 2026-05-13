@@ -34,15 +34,23 @@ class CatalogApplicationService {
   final ResolveContinueWatchingUseCase? _continueWatching;
   final WatchProgressRepository? _watchProgress;
 
+  /// Per-row item-count gate applied to "dynamic" rows (genres,
+  /// "Jamais vus"). Online: `4` — avoids cluttering the home with
+  /// barely-populated rows from a large catalog. Offline: `0` —
+  /// downloads tend to be sparse and every row that *can* be shown
+  /// should be (cf. offline mode design).
+  final int _dynamicMinItems;
+
   const CatalogApplicationService(
     this._repository, {
     ResolveContinueWatchingUseCase? continueWatching,
     WatchProgressRepository? watchProgress,
+    int dynamicMinItems = 4,
   })  : _continueWatching = continueWatching,
-        _watchProgress = watchProgress;
+        _watchProgress = watchProgress,
+        _dynamicMinItems = dynamicMinItems;
 
   static const int _recentlyAddedCap = 20;
-  static const int _dynamicMinItems = 4;
 
   /// [shuffleSeed] keeps the row/items shuffle stable across rebuilds.
   /// Production wiring passes a session-scoped seed (cf.

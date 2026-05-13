@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:kidflix/core/domain/model/cached_cast_member.dart';
 import 'package:kidflix/core/domain/model/download_inventory_record.dart';
 import 'package:kidflix/core/domain/model/download_kind.dart';
 import 'package:kidflix/core/domain/model/episode_download.dart';
@@ -212,6 +213,20 @@ class DioDownloadRepository implements DownloadRepository {
     required String title,
     String? posterUrl,
     String? parentSeriesTitle,
+    String? originalTitle,
+    int? year,
+    int? durationSeconds,
+    String? ageCategory,
+    String? synopsis,
+    String? tagline,
+    String? backdropUrl,
+    String? logoUrl,
+    List<String>? genres,
+    List<String>? director,
+    List<CachedCastMember>? topCast,
+    String? seriesId,
+    int? seasonNumber,
+    int? episodeNumber,
   }) async {
     await inv.cacheMetadata(
       manifest: _manifest,
@@ -220,6 +235,58 @@ class DioDownloadRepository implements DownloadRepository {
       title: title,
       posterUrl: posterUrl,
       parentSeriesTitle: parentSeriesTitle,
+      originalTitle: originalTitle,
+      year: year,
+      durationSeconds: durationSeconds,
+      ageCategory: ageCategory,
+      synopsis: synopsis,
+      tagline: tagline,
+      backdropUrl: backdropUrl,
+      logoUrl: logoUrl,
+      genres: genres,
+      director: director,
+      topCast: topCast,
+      seriesId: seriesId,
+      seasonNumber: seasonNumber,
+      episodeNumber: episodeNumber,
+    );
+  }
+
+  @override
+  Future<void> cacheSeriesMetadata({
+    required String seriesId,
+    required String title,
+    String? posterUrl,
+    String? originalTitle,
+    int? year,
+    String? ageCategory,
+    String? synopsis,
+    String? tagline,
+    String? backdropUrl,
+    String? logoUrl,
+    List<String>? genres,
+    List<String>? director,
+    List<CachedCastMember>? topCast,
+    int? seasonsCount,
+    int? episodesCount,
+  }) async {
+    await inv.cacheSeriesSnapshot(
+      manifest: _manifest,
+      seriesId: seriesId,
+      title: title,
+      posterUrl: posterUrl,
+      originalTitle: originalTitle,
+      year: year,
+      ageCategory: ageCategory,
+      synopsis: synopsis,
+      tagline: tagline,
+      backdropUrl: backdropUrl,
+      logoUrl: logoUrl,
+      genres: genres,
+      director: director,
+      topCast: topCast,
+      seasonsCount: seasonsCount,
+      episodesCount: episodesCount,
     );
   }
 

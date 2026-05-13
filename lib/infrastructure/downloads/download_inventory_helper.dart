@@ -130,11 +130,15 @@ Future<void> markPlayed({
   );
 }
 
-/// Persists display metadata (title + poster + optional parent series
-/// title) on the manifest entry for the given media. Creates a fresh
-/// entry with `kind = cache` if absent. Existing entries are preserved
-/// (kind, dates, triggeredByProfileId) and only the cached display
-/// fields are overwritten.
+/// Persists display metadata on the manifest entry for the given media.
+/// Creates a fresh entry with `kind = cache` if absent. Existing entries
+/// are preserved (kind, dates, triggeredByProfileId) and only the cached
+/// display fields are overwritten.
+///
+/// Beyond the legacy `title` / `posterUrl` / `parentSeriesTitle`, accepts
+/// the full snapshot fields (year, duration, age category, synopsis,
+/// genres, cast, …) required to reconstruct a `MovieDetailDto` offline.
+/// All snapshot fields are optional — callers pass what they hold.
 Future<void> cacheMetadata({
   required DownloadManifestStore manifest,
   required String mediaId,
@@ -142,6 +146,20 @@ Future<void> cacheMetadata({
   required String title,
   String? posterUrl,
   String? parentSeriesTitle,
+  String? originalTitle,
+  int? year,
+  int? durationSeconds,
+  String? ageCategory,
+  String? synopsis,
+  String? tagline,
+  String? backdropUrl,
+  String? logoUrl,
+  List<String>? genres,
+  List<String>? director,
+  List<CachedCastMember>? topCast,
+  String? seriesId,
+  int? seasonNumber,
+  int? episodeNumber,
 }) async {
   final existing =
       await manifest.findFor(mediaId: mediaId, isEpisode: isEpisode);
@@ -154,25 +172,115 @@ Future<void> cacheMetadata({
         cachedTitle: title,
         cachedPosterUrl: posterUrl,
         cachedParentSeriesTitle: parentSeriesTitle,
+        cachedOriginalTitle: originalTitle,
+        cachedYear: year,
+        cachedDurationSeconds: durationSeconds,
+        cachedAgeCategory: ageCategory,
+        cachedSynopsis: synopsis,
+        cachedTagline: tagline,
+        cachedBackdropUrl: backdropUrl,
+        cachedLogoUrl: logoUrl,
+        cachedGenres: genres ?? const [],
+        cachedDirector: director ?? const [],
+        cachedTopCast: topCast ?? const [],
+        cachedSeriesId: seriesId,
+        cachedSeasonNumber: seasonNumber,
+        cachedEpisodeNumber: episodeNumber,
       ),
     );
     return;
   }
-  // Skip the write when nothing would change.
-  if (existing.cachedTitle == title &&
-      existing.cachedPosterUrl == posterUrl &&
-      existing.cachedParentSeriesTitle == parentSeriesTitle) {
-    return;
-  }
+  final next = existing.copyWith(
+    cachedTitle: title,
+    cachedPosterUrl: posterUrl,
+    cachedParentSeriesTitle: parentSeriesTitle,
+    cachedOriginalTitle: originalTitle,
+    cachedYear: year,
+    cachedDurationSeconds: durationSeconds,
+    cachedAgeCategory: ageCategory,
+    cachedSynopsis: synopsis,
+    cachedTagline: tagline,
+    cachedBackdropUrl: backdropUrl,
+    cachedLogoUrl: logoUrl,
+    cachedGenres: genres,
+    cachedDirector: director,
+    cachedTopCast: topCast,
+    cachedSeriesId: seriesId,
+    cachedSeasonNumber: seasonNumber,
+    cachedEpisodeNumber: episodeNumber,
+  );
+  if (next == existing) return;
   await manifest.upsert(
     mediaId: mediaId,
     isEpisode: isEpisode,
-    entry: existing.copyWith(
-      cachedTitle: title,
-      cachedPosterUrl: posterUrl,
-      cachedParentSeriesTitle: parentSeriesTitle,
-    ),
+    entry: next,
   );
+}
+
+/// Persists a full series snapshot under the dedicated `series/`
+/// namespace of the manifest. Used by the series detail modal so the
+/// offline catalog can rebuild the series card for any downloaded
+/// episode of this series. Idempotent at value level.
+Future<void> cacheSeriesSnapshot({
+  required DownloadManifestStore manifest,
+  required String seriesId,
+  required String title,
+  String? posterUrl,
+  String? originalTitle,
+  int? year,
+  String? ageCategory,
+  String? synopsis,
+  String? tagline,
+  String? backdropUrl,
+  String? logoUrl,
+  List<String>? genres,
+  List<String>? director,
+  List<CachedCastMember>? topCast,
+  int? seasonsCount,
+  int? episodesCount,
+}) async {
+  final existing = await manifest.findForSeries(seriesId);
+  if (existing == null) {
+    await manifest.upsertSeries(
+      seriesId,
+      DownloadManifestEntry(
+        kind: DownloadKind.cache,
+        cachedTitle: title,
+        cachedPosterUrl: posterUrl,
+        cachedOriginalTitle: originalTitle,
+        cachedYear: year,
+        cachedAgeCategory: ageCategory,
+        cachedSynopsis: synopsis,
+        cachedTagline: tagline,
+        cachedBackdropUrl: backdropUrl,
+        cachedLogoUrl: logoUrl,
+        cachedGenres: genres ?? const [],
+        cachedDirector: director ?? const [],
+        cachedTopCast: topCast ?? const [],
+        cachedSeasonsCount: seasonsCount,
+        cachedEpisodesCount: episodesCount,
+      ),
+    );
+    return;
+  }
+  final next = existing.copyWith(
+    cachedTitle: title,
+    cachedPosterUrl: posterUrl,
+    cachedOriginalTitle: originalTitle,
+    cachedYear: year,
+    cachedAgeCategory: ageCategory,
+    cachedSynopsis: synopsis,
+    cachedTagline: tagline,
+    cachedBackdropUrl: backdropUrl,
+    cachedLogoUrl: logoUrl,
+    cachedGenres: genres,
+    cachedDirector: director,
+    cachedTopCast: topCast,
+    cachedSeasonsCount: seasonsCount,
+    cachedEpisodesCount: episodesCount,
+  );
+  if (next == existing) return;
+  await manifest.upsertSeries(seriesId, next);
 }
 
 /// On a successful download completion, write `completedAt = now` to

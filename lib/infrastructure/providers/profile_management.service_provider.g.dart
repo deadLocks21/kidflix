@@ -57,4 +57,4 @@ final class ProfileManagementServiceProvider
 }
 
 String _$profileManagementServiceHash() =>
-    r'0d0787b5bf5576aa0c8d5b855ddaade764bdece4';
+    r'60aa1ee82482a5678f0ad4185a19b20deb8c958f';

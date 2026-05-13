@@ -57,6 +57,114 @@ final class ListHomeCatalogUseCaseProvider
 String _$listHomeCatalogUseCaseHash() =>
     r'663d9202b322f2f1bdc01a829470062cd368af14';
 
+@ProviderFor(refreshDownloadSnapshotsUseCase)
+final refreshDownloadSnapshotsUseCaseProvider =
+    RefreshDownloadSnapshotsUseCaseProvider._();
+
+final class RefreshDownloadSnapshotsUseCaseProvider
+    extends
+        $FunctionalProvider<
+          RefreshDownloadSnapshotsUseCase,
+          RefreshDownloadSnapshotsUseCase,
+          RefreshDownloadSnapshotsUseCase
+        >
+    with $Provider<RefreshDownloadSnapshotsUseCase> {
+  RefreshDownloadSnapshotsUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'refreshDownloadSnapshotsUseCaseProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$refreshDownloadSnapshotsUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<RefreshDownloadSnapshotsUseCase> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  RefreshDownloadSnapshotsUseCase create(Ref ref) {
+    return refreshDownloadSnapshotsUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(RefreshDownloadSnapshotsUseCase value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<RefreshDownloadSnapshotsUseCase>(
+        value,
+      ),
+    );
+  }
+}
+
+String _$refreshDownloadSnapshotsUseCaseHash() =>
+    r'c3518c9404c4f6bf23470beadd93bf917bc70105';
+
+/// Offline counterpart of [listHomeCatalogUseCaseProvider]. Same use
+/// case type, but wired on top of the manifest-backed catalog service.
+
+@ProviderFor(listOfflineHomeCatalogUseCase)
+final listOfflineHomeCatalogUseCaseProvider =
+    ListOfflineHomeCatalogUseCaseProvider._();
+
+/// Offline counterpart of [listHomeCatalogUseCaseProvider]. Same use
+/// case type, but wired on top of the manifest-backed catalog service.
+
+final class ListOfflineHomeCatalogUseCaseProvider
+    extends
+        $FunctionalProvider<
+          ListHomeCatalogUseCase,
+          ListHomeCatalogUseCase,
+          ListHomeCatalogUseCase
+        >
+    with $Provider<ListHomeCatalogUseCase> {
+  /// Offline counterpart of [listHomeCatalogUseCaseProvider]. Same use
+  /// case type, but wired on top of the manifest-backed catalog service.
+  ListOfflineHomeCatalogUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'listOfflineHomeCatalogUseCaseProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$listOfflineHomeCatalogUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<ListHomeCatalogUseCase> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ListHomeCatalogUseCase create(Ref ref) {
+    return listOfflineHomeCatalogUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ListHomeCatalogUseCase value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ListHomeCatalogUseCase>(value),
+    );
+  }
+}
+
+String _$listOfflineHomeCatalogUseCaseHash() =>
+    r'beb656b5d586090de366002c89aad110f0e5931b';
+
 /// Session-stable seed for the home shuffle. `keepAlive` so it survives
 /// across `homeCatalogRows` rebuilds — without this, every invalidation
 /// (e.g. `downloadInventoryProvider` after starting a download) would
@@ -116,8 +224,18 @@ String _$homeShuffleSeedHash() => r'e0ae0b309db17e191fe4589623432c83f869b68e';
 
 /// Builds the list of homepage rows for the active profile. Re-computes
 /// automatically when the session transitions to a different profile,
-/// and when the download inventory changes (new download, mark as
-/// cache, deletion) so the "Téléchargés" row stays in sync.
+/// when the download inventory changes (new download, mark as cache,
+/// deletion) so the "Téléchargés" row stays in sync, and when the
+/// connectivity state flips (online ↔ offline) so the source swaps.
+///
+/// Source selection:
+/// - **Online** → standard [listHomeCatalogUseCaseProvider], hits the
+///   backend. If the network call throws, we fall back to the offline
+///   use case so the user still sees their downloaded items rather than
+///   an error screen.
+/// - **Offline** → [listOfflineHomeCatalogUseCaseProvider], reconstructs
+///   rows from the download manifest. Movies only (cf.
+///   `ManifestBackedCatalogRepository` doc).
 ///
 /// Expects the session to be in [ProfileSelected] — the router ensures the
 /// home page is only mounted in that state.
@@ -127,8 +245,18 @@ final homeCatalogRowsProvider = HomeCatalogRowsProvider._();
 
 /// Builds the list of homepage rows for the active profile. Re-computes
 /// automatically when the session transitions to a different profile,
-/// and when the download inventory changes (new download, mark as
-/// cache, deletion) so the "Téléchargés" row stays in sync.
+/// when the download inventory changes (new download, mark as cache,
+/// deletion) so the "Téléchargés" row stays in sync, and when the
+/// connectivity state flips (online ↔ offline) so the source swaps.
+///
+/// Source selection:
+/// - **Online** → standard [listHomeCatalogUseCaseProvider], hits the
+///   backend. If the network call throws, we fall back to the offline
+///   use case so the user still sees their downloaded items rather than
+///   an error screen.
+/// - **Offline** → [listOfflineHomeCatalogUseCaseProvider], reconstructs
+///   rows from the download manifest. Movies only (cf.
+///   `ManifestBackedCatalogRepository` doc).
 ///
 /// Expects the session to be in [ProfileSelected] — the router ensures the
 /// home page is only mounted in that state.
@@ -145,8 +273,18 @@ final class HomeCatalogRowsProvider
         $FutureProvider<List<CatalogRowDto>> {
   /// Builds the list of homepage rows for the active profile. Re-computes
   /// automatically when the session transitions to a different profile,
-  /// and when the download inventory changes (new download, mark as
-  /// cache, deletion) so the "Téléchargés" row stays in sync.
+  /// when the download inventory changes (new download, mark as cache,
+  /// deletion) so the "Téléchargés" row stays in sync, and when the
+  /// connectivity state flips (online ↔ offline) so the source swaps.
+  ///
+  /// Source selection:
+  /// - **Online** → standard [listHomeCatalogUseCaseProvider], hits the
+  ///   backend. If the network call throws, we fall back to the offline
+  ///   use case so the user still sees their downloaded items rather than
+  ///   an error screen.
+  /// - **Offline** → [listOfflineHomeCatalogUseCaseProvider], reconstructs
+  ///   rows from the download manifest. Movies only (cf.
+  ///   `ManifestBackedCatalogRepository` doc).
   ///
   /// Expects the session to be in [ProfileSelected] — the router ensures the
   /// home page is only mounted in that state.
@@ -176,4 +314,4 @@ final class HomeCatalogRowsProvider
   }
 }
 
-String _$homeCatalogRowsHash() => r'3c24c94b8f1548bdb4faf1e8c2c8cfd1afecb3d3';
+String _$homeCatalogRowsHash() => r'b612f4019965759d87c2b8fbc4dd0dc40d23b656';

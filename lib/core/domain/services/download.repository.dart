@@ -1,3 +1,4 @@
+import 'package:kidflix/core/domain/model/cached_cast_member.dart';
 import 'package:kidflix/core/domain/model/download_inventory_record.dart';
 import 'package:kidflix/core/domain/model/download_kind.dart';
 import 'package:kidflix/core/domain/model/episode_download.dart';
@@ -113,21 +114,65 @@ abstract interface class DownloadRepository {
     required bool isEpisode,
   });
 
-  /// Caches display metadata (title, poster URL, optional parent
-  /// series title) on the manifest entry for the given media. Used by
-  /// callers that hold the `Movie` / `Episode` object at the moment a
-  /// download is initiated, to bypass the strict age filter on
-  /// `/catalog` (cf. `DownloadManifestEntry.cachedTitle` rationale).
+  /// Caches display metadata on the manifest entry for the given media.
+  /// Used by callers that hold the `Movie` / `Episode` object at the
+  /// moment a download is initiated, to bypass the strict age filter on
+  /// `/catalog` (cf. `DownloadManifestEntry.cachedTitle` rationale) AND
+  /// to feed the offline catalog reconstruction (cf. the full snapshot
+  /// fields documented on `DownloadManifestEntry`).
   ///
   /// Creates the manifest entry with `kind = cache` if absent. Other
   /// existing fields preserved. Idempotent at value level — calling
   /// twice with the same metadata is a no-op (no second manifest
   /// write) only if the entry already matches; otherwise an upsert.
+  ///
+  /// All snapshot fields beyond `title` are optional ; callers pass
+  /// what they hold.
   Future<void> cacheMediaMetadata({
     required String mediaId,
     required bool isEpisode,
     required String title,
     String? posterUrl,
     String? parentSeriesTitle,
+    String? originalTitle,
+    int? year,
+    int? durationSeconds,
+    String? ageCategory,
+    String? synopsis,
+    String? tagline,
+    String? backdropUrl,
+    String? logoUrl,
+    List<String>? genres,
+    List<String>? director,
+    List<CachedCastMember>? topCast,
+    String? seriesId,
+    int? seasonNumber,
+    int? episodeNumber,
+  });
+
+  /// Caches the full snapshot of a [Series] under the dedicated `series/`
+  /// namespace of the manifest. Used by the series detail modal so the
+  /// offline catalog can rebuild the parent series card for any
+  /// downloaded episode.
+  ///
+  /// Creates the entry if absent, replaces only the snapshot fields on
+  /// existing entries (preserves any unrelated metadata such as
+  /// `triggeredByProfileId` if a future feature stores it).
+  Future<void> cacheSeriesMetadata({
+    required String seriesId,
+    required String title,
+    String? posterUrl,
+    String? originalTitle,
+    int? year,
+    String? ageCategory,
+    String? synopsis,
+    String? tagline,
+    String? backdropUrl,
+    String? logoUrl,
+    List<String>? genres,
+    List<String>? director,
+    List<CachedCastMember>? topCast,
+    int? seasonsCount,
+    int? episodesCount,
   });
 }

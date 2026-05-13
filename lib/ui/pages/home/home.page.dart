@@ -7,6 +7,8 @@ import 'package:kidflix/core/application/session_state.dart';
 import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/infrastructure/providers/catalog.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/catalog.usecases_provider.dart';
+import 'package:kidflix/infrastructure/providers/connectivity.service_provider.dart';
+import 'package:kidflix/infrastructure/providers/offline_catalog.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/search.controller_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/ui/pages/home/widgets/catalog_row.widget.dart';
@@ -34,6 +36,10 @@ class HomePage extends ConsumerWidget {
     final isSearching = ref.watch(
       searchUiControllerProvider.select((s) => s.active),
     );
+    final online = ref.watch(connectivityProvider).maybeWhen(
+          data: (v) => v,
+          orElse: () => true,
+        );
     return Scaffold(
       appBar: isSearching
           ? const SearchAppBar()
@@ -51,15 +57,23 @@ class HomePage extends ConsumerWidget {
                 const SizedBox(width: 4),
               ],
             ),
-      body: IndexedStack(
-        index: isSearching ? 1 : 0,
+      body: Column(
         children: [
-          _HomeBody(
-            rows: rows,
-            onMovieTap: (movie) => _openDetail(context, ref, movie),
-            onSeriesTap: (series) => _openSeriesDetail(context, ref, series),
+          if (!online) const _OfflineBanner(),
+          Expanded(
+            child: IndexedStack(
+              index: isSearching ? 1 : 0,
+              children: [
+                _HomeBody(
+                  rows: rows,
+                  onMovieTap: (movie) => _openDetail(context, ref, movie),
+                  onSeriesTap: (series) =>
+                      _openSeriesDetail(context, ref, series),
+                ),
+                const SearchResults(),
+              ],
+            ),
           ),
-          const SearchResults(),
         ],
       ),
     );
@@ -70,11 +84,30 @@ class HomePage extends ConsumerWidget {
     WidgetRef ref,
     MovieDto movie,
   ) async {
-    final repository = ref.read(catalogRepositoryProvider);
     final state = ref.read(sessionControllerProvider);
     if (state is! ProfileSelected) return;
-    final pool = await repository.listCatalog();
-    final domain = pool.whereType<Movie>().firstWhere((m) => m.id == movie.id);
+    final online = ref.read(connectivityServiceProvider).isOnline;
+    final repository = online
+        ? ref.read(catalogRepositoryProvider)
+        : ref.read(offlineCatalogRepositoryProvider);
+    Movie? domain;
+    try {
+      final pool = await repository.listCatalog();
+      domain = pool.whereType<Movie>().cast<Movie?>().firstWhere(
+            (m) => m?.id == movie.id,
+            orElse: () => null,
+          );
+    } catch (_) {
+      // Network failure while nominally online — try the offline source
+      // so the modal still opens for a downloaded movie.
+      final pool =
+          await ref.read(offlineCatalogRepositoryProvider).listCatalog();
+      domain = pool.whereType<Movie>().cast<Movie?>().firstWhere(
+            (m) => m?.id == movie.id,
+            orElse: () => null,
+          );
+    }
+    if (domain == null) return;
     if (!context.mounted) return;
     await showMovieDetailModal(context, MovieDetailDto.fromDomain(domain));
   }
@@ -84,14 +117,68 @@ class HomePage extends ConsumerWidget {
     WidgetRef ref,
     SeriesDto series,
   ) async {
-    final repository = ref.read(catalogRepositoryProvider);
     final state = ref.read(sessionControllerProvider);
     if (state is! ProfileSelected) return;
-    final pool = await repository.listCatalog();
-    final domain =
-        pool.whereType<Series>().firstWhere((s) => s.id == series.id);
+    final online = ref.read(connectivityServiceProvider).isOnline;
+    final repository = online
+        ? ref.read(catalogRepositoryProvider)
+        : ref.read(offlineCatalogRepositoryProvider);
+    Series? domain;
+    try {
+      final pool = await repository.listCatalog();
+      domain = pool.whereType<Series>().cast<Series?>().firstWhere(
+            (s) => s?.id == series.id,
+            orElse: () => null,
+          );
+    } catch (_) {
+      // Network failure while nominally online — fall back to the
+      // manifest so a downloaded series still opens.
+      final pool =
+          await ref.read(offlineCatalogRepositoryProvider).listCatalog();
+      domain = pool.whereType<Series>().cast<Series?>().firstWhere(
+            (s) => s?.id == series.id,
+            orElse: () => null,
+          );
+    }
+    if (domain == null) return;
     if (!context.mounted) return;
     await showSeriesDetailModal(context, domain);
+  }
+}
+
+class _OfflineBanner extends StatelessWidget {
+  const _OfflineBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.errorContainer,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              Icon(
+                Icons.cloud_off,
+                size: 20,
+                color: theme.colorScheme.onErrorContainer,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Hors ligne — seuls les films téléchargés sont disponibles.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onErrorContainer,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

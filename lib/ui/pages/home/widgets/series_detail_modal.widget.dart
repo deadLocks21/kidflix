@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kidflix/core/application/session_state.dart';
 import 'package:kidflix/core/application/usecases/pick_next_shuffle_episode.usecase.dart';
+import 'package:kidflix/core/domain/model/cached_cast_member.dart';
 import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/watch_progress.dart';
 import 'package:kidflix/infrastructure/providers/download.repository_provider.dart';
@@ -103,7 +104,19 @@ class _SeriesDetailContentState extends ConsumerState<SeriesDetailContent> {
     final session = ref.read(sessionControllerProvider);
     final profileId =
         session is ProfileSelected ? session.profile.id : null;
-    final series = await seriesRepo.findById(widget.catalogSeries.id);
+    // When the catalog projection already carries the full seasons tree
+    // (offline catalog reconstructed from the manifest) we skip the
+    // network fetch entirely — `findById` would fail offline anyway.
+    final Series series;
+    if (widget.catalogSeries.seasons.isNotEmpty) {
+      series = widget.catalogSeries;
+    } else {
+      series = await seriesRepo.findById(widget.catalogSeries.id);
+    }
+    // Snapshot the full series under the manifest's `series/` namespace
+    // so the offline catalog can rebuild the series card and detail
+    // modal for any downloaded episode of this series. Best-effort.
+    unawaited(_persistSeriesSnapshot(series));
     EpisodeProgress? latest;
     var progressByEpisodeId = const <String, EpisodeProgress>{};
     if (profileId != null) {
@@ -124,6 +137,37 @@ class _SeriesDetailContentState extends ConsumerState<SeriesDetailContent> {
       latestProgress: latest,
       progressByEpisodeId: progressByEpisodeId,
     );
+  }
+
+  Future<void> _persistSeriesSnapshot(Series series) async {
+    try {
+      await ref.read(downloadRepositoryProvider).cacheSeriesMetadata(
+            seriesId: series.id,
+            title: series.title,
+            posterUrl: series.posterUrl,
+            originalTitle: series.originalTitle,
+            year: series.year,
+            ageCategory: series.ageCategory.name,
+            synopsis: series.synopsis,
+            tagline: series.tagline,
+            backdropUrl: series.backdropUrl,
+            logoUrl: series.logoUrl,
+            genres: series.genres,
+            director: series.director,
+            topCast: [
+              for (final c in series.cast.take(5))
+                CachedCastMember(
+                  name: c.name,
+                  role: c.role,
+                  photoUrl: c.photoUrl,
+                ),
+            ],
+            seasonsCount: series.seasonsCount,
+            episodesCount: series.episodesCount,
+          );
+    } catch (_) {
+      // Best-effort.
+    }
   }
 
   void _retry() {
@@ -504,10 +548,18 @@ class _EpisodeTile extends ConsumerWidget {
         title: '$epRef · ${episode.title}',
         posterUrl: episode.thumbUrl,
         parentSeriesTitle: parentSeriesTitle,
+        originalTitle: episode.originalTitle,
+        durationSeconds: episode.duration.inSeconds,
+        ageCategory: episode.ageCategory.name,
+        synopsis: episode.synopsis,
+        seriesId: episode.seriesId,
+        seasonNumber: episode.seasonNumber,
+        episodeNumber: episode.episodeNumber,
       ),
       onTap: () {
         // Pre-cache so the manager resolves this episode regardless
-        // of the parent's /catalog visibility.
+        // of the parent's /catalog visibility, AND so the offline
+        // series detail modal can rebuild the seasons tree.
         unawaited(
           ref.read(downloadRepositoryProvider).cacheMediaMetadata(
                 mediaId: episode.id,
@@ -515,6 +567,13 @@ class _EpisodeTile extends ConsumerWidget {
                 title: '$epRef · ${episode.title}',
                 posterUrl: episode.thumbUrl,
                 parentSeriesTitle: parentSeriesTitle,
+                originalTitle: episode.originalTitle,
+                durationSeconds: episode.duration.inSeconds,
+                ageCategory: episode.ageCategory.name,
+                synopsis: episode.synopsis,
+                seriesId: episode.seriesId,
+                seasonNumber: episode.seasonNumber,
+                episodeNumber: episode.episodeNumber,
               ),
         );
         Navigator.of(context).pop();

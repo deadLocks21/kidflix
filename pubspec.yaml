@@ -52,6 +52,7 @@ dependencies:
   disk_space_plus: ^0.2.4
   youtube_explode_dart: ^3.0.5
   flutter_cache_manager: ^3.4.1
+  connectivity_plus: ^6.1.0
 
 dev_dependencies:
   flutter_test:

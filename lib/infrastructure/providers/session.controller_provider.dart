@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:kidflix/core/application/session_state.dart';
 import 'package:kidflix/core/application/usecases/change_main_profile_pin.usecase.dart';
 import 'package:kidflix/core/application/usecases/change_profile_pin.usecase.dart';
@@ -23,6 +25,7 @@ import 'package:kidflix/infrastructure/providers/in_memory_accounts_store.provid
 import 'package:kidflix/infrastructure/providers/profile_management.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/refresh_profiles.usecase_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.repository_provider.dart';
+import 'package:kidflix/infrastructure/providers/watch_progress.repository_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'session.controller_provider.g.dart';
@@ -537,4 +540,21 @@ class SessionController extends _$SessionController {
 Future<void> bootstrap(Ref ref) async {
   await ref.read(apiBaseUrlProvider.notifier).load();
   await ref.read(sessionControllerProvider.notifier).restoreSession();
+  // Once the persisted session is back in memory, fire-and-forget a
+  // profile refresh against the auth repo so the latest server-side
+  // state (PIN updates, avatars, `includedLowerAgeCategories` opt-ins,
+  // …) overrides any stale locally-persisted profile data. Best-effort:
+  // failures (network down, anonymous state) keep the restored session
+  // intact.
+  final controller = ref.read(sessionControllerProvider.notifier);
+  final restoredState = ref.read(sessionControllerProvider);
+  if (restoredState is! Anonymous && restoredState is! OtpRequested) {
+    unawaited(
+      controller.refreshProfiles().catchError((Object _) {}),
+    );
+  }
+  // Start the watch-progress sync service. Subscribes to connectivity
+  // and drains any queued writes once we're online — silent if there
+  // is nothing to replay.
+  ref.read(watchProgressSyncServiceProvider).start();
 }
