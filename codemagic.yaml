@@ -101,7 +101,7 @@ workflows:
 
       email:
         recipients:
-          - timothe.hofmann@evaneos.com
+          - timothe@hofmann.fr
         notify:
           success: true
           failure: true
