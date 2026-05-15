@@ -49,7 +49,24 @@ workflows:
         - $HOME/Library/Caches/CocoaPods
 
     scripts:
-      - name: Set up code signing
+      - name: Initialize keychain
+        script: |
+          keychain initialize
+
+      - name: Fetch signing files (create if missing)
+        script: |
+          # `--create` autorise Codemagic à créer le certificat de distribution
+          # et le provisioning profile via l'API key si ils n'existent pas encore
+          # sur le compte Apple. Indispensable au tout premier build.
+          app-store-connect fetch-signing-files "fr.dtfh.kidflix" \
+            --type IOS_APP_STORE \
+            --create
+
+      - name: Add certificates to keychain
+        script: |
+          keychain add-certificates
+
+      - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
 
