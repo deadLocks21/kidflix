@@ -1,4 +1,6 @@
 PODS:
+  - connectivity_plus (0.0.1):
+    - Flutter
   - disk_space_plus (0.0.1):
     - Flutter
   - Flutter (1.0.0)
@@ -20,6 +22,7 @@ PODS:
     - Flutter
 
 DEPENDENCIES:
+  - connectivity_plus (from `.symlinks/plugins/connectivity_plus/ios`)
   - disk_space_plus (from `.symlinks/plugins/disk_space_plus/ios`)
   - Flutter (from `Flutter`)
   - media_kit_libs_ios_video (from `.symlinks/plugins/media_kit_libs_ios_video/ios`)
@@ -31,6 +34,8 @@ DEPENDENCIES:
   - wakelock_plus (from `.symlinks/plugins/wakelock_plus/ios`)
 
 EXTERNAL SOURCES:
+  connectivity_plus:
+    :path: ".symlinks/plugins/connectivity_plus/ios"
   disk_space_plus:
     :path: ".symlinks/plugins/disk_space_plus/ios"
   Flutter:
@@ -51,6 +56,7 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/wakelock_plus/ios"
 
 SPEC CHECKSUMS:
+  connectivity_plus: cb623214f4e1f6ef8fe7403d580fdad517d2f7dd
   disk_space_plus: a36391fb5f732dbdd29628b0bac5a1acbd43aaef
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   media_kit_libs_ios_video: 5a18affdb97d1f5d466dc79988b13eff6c5e2854
