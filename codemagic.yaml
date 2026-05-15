@@ -30,9 +30,11 @@ workflows:
       xcode: latest
       cocoapods: default
 
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: fr.dtfh.kidflix
+      # NB : pas de bloc `ios_signing` ici à dessein.
+      # Le signing est entièrement géré par les étapes explicites du `scripts:`
+      # (keychain initialize → fetch-signing-files --create → add-certificates →
+      # use-profiles). Réintroduire `ios_signing` créerait un double setup
+      # automatique qui fail avant que les scripts aient pu créer le profil.
 
       vars:
         # Apple ID de l'app dans App Store Connect (App Information → Apple ID).
