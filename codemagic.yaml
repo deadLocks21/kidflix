@@ -1,0 +1,107 @@
+# Codemagic configuration for Kidflix
+# Docs : https://docs.codemagic.io/yaml/yaml-getting-started/
+#
+# Déclenche un build iOS quand on pousse un tag `v*` (ex. `v1.0.0`),
+# signe l'IPA, l'upload sur TestFlight et notifie par email.
+
+workflows:
+  ios-testflight:
+    name: iOS → TestFlight
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    # Déclenchement : uniquement sur tag `v*` poussé sur main.
+    # Pour builder à la demande sans tag, lancer manuellement depuis l'UI Codemagic.
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: "v*"
+          include: true
+
+    # Intégration App Store Connect créée dans l'UI Codemagic (Team settings → Integrations).
+    # `dtfh_app_store` est l'API key partagée entre toutes les apps DTFH —
+    # le nom doit correspondre exactement au champ "Name" saisi dans Codemagic UI.
+    integrations:
+      app_store_connect: dtfh_app_store
+
+    environment:
+      flutter: 3.41.7
+      xcode: latest
+      cocoapods: default
+
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: fr.dtfh.kidflix
+
+      vars:
+        # Apple ID de l'app dans App Store Connect (App Information → Apple ID).
+        APP_STORE_APPLE_ID: 6769453662
+
+      groups:
+        # Optionnel : groupes de variables d'env définis dans Codemagic UI
+        # (utile si tu ajoutes des secrets type API keys plus tard).
+        - kidflix_secrets
+
+    cache:
+      cache_paths:
+        - $HOME/.pub-cache
+        - $HOME/Library/Caches/CocoaPods
+
+    scripts:
+      - name: Set up code signing
+        script: |
+          xcode-project use-profiles
+
+      - name: Get Flutter packages
+        script: |
+          flutter pub get
+
+      - name: Install CocoaPods dependencies
+        script: |
+          find . -name "Podfile" -execdir pod install \;
+
+      - name: Set build number from App Store Connect
+        script: |
+          # Récupère le dernier build number sur TestFlight, +1.
+          # Évite tout conflit "build number already exists".
+          LATEST_BUILD=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID")
+          BUILD_NUMBER=$((LATEST_BUILD + 1))
+          echo "Next build number: $BUILD_NUMBER"
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $CM_ENV
+
+      - name: Extract version from git tag
+        script: |
+          # Le tag `v1.2.3` devient version `1.2.3`.
+          VERSION=${CM_TAG#v}
+          echo "Building version: $VERSION"
+          echo "VERSION=$VERSION" >> $CM_ENV
+
+      - name: Build IPA
+        script: |
+          flutter build ipa --release \
+            --build-name="$VERSION" \
+            --build-number="$BUILD_NUMBER" \
+            --export-options-plist=/Users/builder/export_options.plist
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - flutter_drive.log
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        # Soumet directement aux testeurs internes (pas de review Apple requise).
+        submit_to_testflight: true
+        beta_groups:
+          - Kidflix Internal
+        # Si un build précédent est encore en review, l'expirer pour éviter le blocage.
+        expire_build_submitted_for_review: true
+
+      email:
+        recipients:
+          - timothe.hofmann@evaneos.com
+        notify:
+          success: true
+          failure: true
