@@ -1,0 +1,24 @@
+flutter_native_splash:
+  # Couleur de fond du splash screen (mode clair).
+  # On reprend la même teinte que `theme_color` dans flutter_launcher_icons.yaml
+  # pour la cohérence visuelle Kidflix.
+  color: "#171617"
+
+  # Image affichée au centre du splash (logo Kidflix sur fond transparent).
+  # Réutilise l'asset déjà présent pour les icônes Android adaptatives.
+  image: assets/icon/app_icon_foreground.png
+
+  # Plateformes cibles
+  android: true
+  ios: true
+  web: false
+
+  # Android 12+ : nouvelle API SplashScreen (icône + fond uni).
+  # Sans ce bloc, Android 12+ affiche une icône par défaut malgré la config legacy.
+  android_12:
+    color: "#171617"
+    image: assets/icon/app_icon_foreground.png
+
+  # iOS : génère LaunchImage.png, @2x.png, @3x.png et met à jour
+  # LaunchScreen.storyboard automatiquement.
+  ios_content_mode: center
