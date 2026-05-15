@@ -6,23 +6,39 @@ import 'package:kidflix/shared/text_normalization.dart';
 
 /// In-memory fake [CatalogRepository] used until the HTTP backend is ready.
 ///
+/// Every seeded title is rights-free — Blender Open Movies, all released
+/// under Creative Commons licences (CC-BY 2.5 → CC-BY 4.0) — so the
+/// bundled fixtures can ship to the public stores without IP exposure.
+/// The required CC-BY attribution is embedded in each [Movie.synopsis] so
+/// the credit travels with the metadata everywhere the title is displayed.
+///
 /// Stub data is crafted to exercise every row type:
 /// - At least 1 movie per [AgeCategory].
-/// - Two sagas in the `enfant` category (Astérix and Harry Potter), each
-///   with 2 movies, so the saga row assembly is exercised (≥ 2 threshold).
-/// - At least 4 distinct primary genres in `enfant` (Familial, Animation,
-///   Aventure, Fantastique) so several genre rows are produced.
+/// - Two sagas in the `enfant` category (Open Movies and Stylo 2D),
+///   each with ≥ 2 movies, so the saga row assembly is exercised.
+/// - Multiple distinct primary genres in `enfant` (Familial, Aventure,
+///   Action, Musique, Comédie) so several genre rows are produced.
 /// - Distinct [Movie.addedAt] dates so the "recently added" sort is
 ///   observable.
-/// - One movie (Astérix Empire du Milieu) with 7 cast members, exercising
-///   the top-5 cap applied by `MovieDetailDto.fromDomain`.
+/// - One movie (Tears of Steel) with 7 cast members, exercising the
+///   top-5 cap applied by `MovieDetailDto.fromDomain`.
 ///
-/// Posters and backdrops are real TMDB public URLs, fetched once during
-/// the MVP implementation and hard-coded here. Production posters will
-/// come from the kDrive proxy once phase 2 lands.
+/// Posters point to Wikimedia Commons URLs when an open-licence still is
+/// available there; otherwise `null` is used (the UI falls back to a
+/// neutral placeholder). The kDrive proxy will supply final artwork in
+/// phase 2.
 class InMemoryCatalogRepository implements CatalogRepository {
-  static const String _tmdbImageBase = 'https://image.tmdb.org/t/p/original';
-  static String _img(String hash) => '$_tmdbImageBase/$hash';
+  static const String _wmBase =
+      'https://upload.wikimedia.org/wikipedia/commons';
+  static String _wm(String path) => '$_wmBase/$path';
+
+  /// Standardised Blender Foundation attribution embedded in each
+  /// [Movie.synopsis] to satisfy the CC-BY licence's credit requirement.
+  /// Keeping it in the synopsis means the credit appears wherever the
+  /// description does (detail modal, accessibility text, etc.).
+  static String _credit(String projectUrl, String ccVersion) =>
+      '\n\nCrédits : © Blender Foundation — $projectUrl — '
+      'Licence Creative Commons CC-BY $ccVersion.';
 
   static final List<Movie> _movies = _seed();
 
@@ -89,283 +105,268 @@ class InMemoryCatalogRepository implements CatalogRepository {
     DateTime added(int daysAgo) => addedRef.subtract(Duration(days: daysAgo));
 
     return [
-      // enfant — saga Astérix (2 films)
+      // bebe — Big Buck Bunny (Blender Foundation, CC-BY 3.0)
       Movie(
-        id: 'asterix-empire-du-milieu',
-        title: 'Astérix & Obélix : L\'Empire du Milieu',
-        originalTitle: 'Astérix & Obélix : L\'Empire du Milieu',
-        year: 2023,
-        duration: const Duration(minutes: 112),
+        id: 'big-buck-bunny',
+        title: 'Big Buck Bunny',
+        originalTitle: 'Big Buck Bunny',
+        year: 2008,
+        duration: const Duration(minutes: 10),
         synopsis:
-            'Nous sommes en 50 avant J.C. L\'Impératrice de Chine est '
-            'emprisonnée suite à un coup d\'État fomenté par Deng Tsin '
-            'Quin, un prince félon. Aidée par Graindemaïs et Tat Han, la '
-            'princesse Fu-Yi s\'enfuit en Gaule pour demander l\'aide '
-            'd\'Astérix et Obélix.',
-        tagline: 'Il y a très très longtemps dans un pays lointain…',
-        posterUrl: _img('vchpiQLvXa4uyZhqdEwttrsFOOC.jpg'),
-        backdropUrl: _img('pYHnIePp56sQhonIJJ9RRfBmAPU.jpg'),
-        ageCategory: AgeCategory.enfant,
-        genres: const ['Familial', 'Comédie', 'Aventure', 'Fantastique'],
-        sagaId: 'asterix',
-        sagaLabel: 'Astérix',
-        director: const ['Guillaume Canet'],
-        cast: const [
-          CastMember(name: 'Guillaume Canet', role: 'Astérix'),
-          CastMember(name: 'Gilles Lellouche', role: 'Obélix'),
-          CastMember(name: 'Vincent Cassel', role: 'Jules César'),
-          CastMember(name: 'Jonathan Cohen', role: 'Graindemaïs'),
-          CastMember(name: 'Julie Chen', role: 'Princesse Fu Yi'),
-          CastMember(name: 'Marion Cotillard', role: 'Cléopâtre / Bibine'),
-          CastMember(name: 'Pierre Richard', role: 'Panoramix'),
-        ],
+            "Un grand lapin pacifique se promène dans une forêt idyllique "
+            "lorsque trois petits rongeurs ne cessent de l'embêter. "
+            "Sa patience a des limites — la vengeance approche. Court "
+            "métrage open-source de la Blender Foundation."
+            "${_credit('bigbuckbunny.org', '3.0')}",
+        tagline: 'Un lapin pacifique, trois rongeurs, une revanche.',
+        posterUrl: _wm('c/c5/Big_buck_bunny_poster_big.jpg'),
+        backdropUrl: _wm('c/c5/Big_buck_bunny_poster_big.jpg'),
+        ageCategory: AgeCategory.bebe,
+        genres: const ['Familial', 'Comédie', 'Animation'],
+        director: const ['Sacha Goedegebure'],
+        cast: const [],
         addedAt: added(2),
       ),
+
+      // enfant — saga "Open Movies" (Blender Foundation, CC-BY)
       Movie(
-        id: 'asterix-potion-magique',
-        title: 'Astérix : Le Secret de la Potion Magique',
-        year: 2018,
-        duration: const Duration(minutes: 85),
+        id: 'spring',
+        title: 'Spring',
+        originalTitle: 'Spring',
+        year: 2019,
+        duration: const Duration(minutes: 8),
         synopsis:
-            'À la suite d\'une chute lors de la cueillette du gui, le '
-            'druide Panoramix décide qu\'il est temps d\'assurer l\'avenir '
-            'du village. Accompagné d\'Astérix et Obélix, il entreprend '
-            'de parcourir le monde gaulois à la recherche d\'un jeune '
-            'druide talentueux à qui transmettre le Secret de la Potion '
-            'Magique.',
-        posterUrl: _img('jgu4HVfj9P2K4fByb90EivJg2AX.jpg'),
-        backdropUrl: _img('8sb4aBST28vN3rBz704XJczS0Ld.jpg'),
+            "Une jeune bergère et son chien fidèle réveillent l'esprit du "
+            "printemps à travers une vallée enneigée. Court métrage "
+            "Blender Studio en hommage à la nature."
+            "${_credit('studio.blender.org/projects/spring', '4.0')}",
+        tagline: "L'esprit du printemps s'éveille.",
+        posterUrl: _wm('0/05/Spring2019PillarPosterBlender.jpg'),
+        backdropUrl: _wm('0/05/Spring2019PillarPosterBlender.jpg'),
         ageCategory: AgeCategory.enfant,
-        genres: const ['Animation', 'Aventure', 'Comédie'],
-        sagaId: 'asterix',
-        sagaLabel: 'Astérix',
-        director: const ['Alexandre Astier', 'Louis Clichy'],
-        cast: const [
-          CastMember(name: 'Christian Clavier', role: 'Astérix'),
-          CastMember(name: 'Guillaume Briat', role: 'Obélix'),
-          CastMember(name: 'Alexandre Astier', role: 'Panoramix'),
-        ],
+        genres: const ['Aventure', 'Animation', 'Fantastique'],
+        sagaId: 'open-movies',
+        sagaLabel: 'Open Movies',
+        director: const ['Andy Goralczyk'],
+        cast: const [],
         addedAt: added(25),
       ),
-      // enfant — saga Harry Potter (2 films)
       Movie(
-        id: 'hp-ecole-des-sorciers',
-        title: 'Harry Potter à l\'école des sorciers',
-        originalTitle: 'Harry Potter and the Philosopher\'s Stone',
-        year: 2001,
-        duration: const Duration(minutes: 152),
+        id: 'sintel',
+        title: 'Sintel',
+        originalTitle: 'Sintel',
+        year: 2010,
+        duration: const Duration(minutes: 15),
         synopsis:
-            'Le jour de ses onze ans, Harry Potter, un orphelin élevé par '
-            'un oncle et une tante qui le détestent, voit son existence '
-            'bouleversée. Un géant vient le chercher pour l\'emmener dans '
-            'une école de sorcellerie, Poudlard.',
-        posterUrl: _img('fbxQ44VRdM2PVzHSNajUseUteem.jpg'),
-        backdropUrl: _img('1XAC6RPT01UX9EQGy2JVn5c8pgy.jpg'),
+            "Sintel, jeune guerrière solitaire, parcourt un monde "
+            "hostile à la recherche du dragonneau qu'elle a recueilli "
+            "puis perdu. Un récit épique signé Blender Foundation."
+            "${_credit('durian.blender.org', '3.0')}",
+        tagline: 'Un dragon, une promesse, un voyage sans retour.',
+        posterUrl: _wm('8/8f/Sintel_poster.jpg'),
+        backdropUrl: _wm('8/8f/Sintel_poster.jpg'),
         ageCategory: AgeCategory.enfant,
-        genres: const ['Fantastique', 'Aventure', 'Familial'],
-        sagaId: 'harry-potter',
-        sagaLabel: 'Harry Potter',
-        director: const ['Chris Columbus'],
+        genres: const ['Fantastique', 'Aventure', 'Animation', 'Drame'],
+        sagaId: 'open-movies',
+        sagaLabel: 'Open Movies',
+        director: const ['Colin Levy'],
         cast: const [
-          CastMember(name: 'Daniel Radcliffe', role: 'Harry Potter'),
-          CastMember(name: 'Rupert Grint', role: 'Ron Weasley'),
-          CastMember(name: 'Emma Watson', role: 'Hermione Granger'),
-          CastMember(name: 'Robbie Coltrane', role: 'Rubeus Hagrid'),
+          CastMember(name: 'Halina Reijn', role: 'Sintel'),
+          CastMember(name: 'Thom Hoffman', role: 'Le Chamane'),
         ],
-        addedAt: added(40),
+        addedAt: added(45),
       ),
+
+      // enfant — saga "Stylo 2D" (shorts dessinés à la Grease Pencil)
       Movie(
-        id: 'hp-chambre-des-secrets',
-        title: 'Harry Potter et la Chambre des Secrets',
-        originalTitle: 'Harry Potter and the Chamber of Secrets',
-        year: 2002,
-        duration: const Duration(minutes: 161),
+        id: 'coffee-run',
+        title: 'Coffee Run',
+        originalTitle: 'Coffee Run',
+        year: 2020,
+        duration: const Duration(minutes: 4),
         synopsis:
-            'Pendant les vacances d\'été, l\'elfe de maison Dobby rend '
-            'visite à Harry pour le mettre en garde : s\'il retourne à '
-            'Poudlard, il sera en grand danger. Mais Harry ignore la '
-            'menace et découvre bientôt les secrets de la Chambre.',
-        posterUrl: _img('8KpHRokGpiaqEGpjYe0rpywtvUx.jpg'),
-        backdropUrl: _img('jbe4gVSfRlbPTdESXhEKpornsfu.jpg'),
+            "Une course matinale pour un café, rythmée par une musique "
+            "entraînante. Court métrage 2D Blender entièrement dessiné "
+            "avec l'outil Grease Pencil."
+            "${_credit('studio.blender.org/projects/coffee-run', '4.0')}",
+        tagline: 'Une journée commence avec un sprint.',
+        posterUrl: _wm('a/a7/Coffee_Run-movie_poster.png'),
+        backdropUrl: _wm('a/a7/Coffee_Run-movie_poster.png'),
         ageCategory: AgeCategory.enfant,
-        genres: const ['Fantastique', 'Aventure', 'Familial'],
-        sagaId: 'harry-potter',
-        sagaLabel: 'Harry Potter',
-        director: const ['Chris Columbus'],
-        cast: const [
-          CastMember(name: 'Daniel Radcliffe', role: 'Harry Potter'),
-          CastMember(name: 'Rupert Grint', role: 'Ron Weasley'),
-          CastMember(name: 'Emma Watson', role: 'Hermione Granger'),
-        ],
-        addedAt: added(38),
-      ),
-      // enfant — standalones, genres variés
-      Movie(
-        id: 'nemo',
-        title: 'Le Monde de Nemo',
-        originalTitle: 'Finding Nemo',
-        year: 2003,
-        duration: const Duration(minutes: 100),
-        synopsis:
-            'Nemo, un jeune poisson-clown, est capturé et se retrouve dans '
-            'l\'aquarium d\'un dentiste de Sydney. Son père Marin '
-            'entreprend alors un périple à travers l\'océan pour le '
-            'retrouver.',
-        posterUrl: _img('8zR2vXoXfdlknEYjfHvCbb1rJbI.jpg'),
-        backdropUrl: _img('eCynaAOgYYiw5yN5lBwz3IxqvaW.jpg'),
-        ageCategory: AgeCategory.enfant,
-        genres: const ['Animation', 'Aventure', 'Familial'],
-        director: const ['Andrew Stanton'],
-        cast: const [
-          CastMember(name: 'Albert Brooks', role: 'Marin'),
-          CastMember(name: 'Ellen DeGeneres', role: 'Dory'),
-        ],
-        addedAt: added(10),
-      ),
-      Movie(
-        id: 'totoro',
-        title: 'Mon Voisin Totoro',
-        originalTitle: 'となりのトトロ',
-        year: 1988,
-        duration: const Duration(minutes: 86),
-        synopsis:
-            'Deux sœurs s\'installent à la campagne avec leur père pour '
-            'se rapprocher de leur mère hospitalisée. Elles découvrent la '
-            'présence d\'esprits de la forêt, dont le grand Totoro.',
-        posterUrl: _img('eEpy8IiR8N0S6mgkdAjDCMlMYQO.jpg'),
-        backdropUrl: _img('6O1mOoTXuc1WqjKd2R7MFQHZ7Eb.jpg'),
-        ageCategory: AgeCategory.enfant,
-        genres: const ['Animation', 'Familial', 'Fantastique'],
-        director: const ['Hayao Miyazaki'],
+        genres: const ['Musique', 'Animation', 'Drame'],
+        sagaId: 'stylo-2d',
+        sagaLabel: 'Stylo 2D',
+        director: const ['Hjalti Hjalmarsson'],
         cast: const [],
-        addedAt: added(5),
-      ),
-      Movie(
-        id: 'tintin-licorne',
-        title: 'Les Aventures de Tintin : Le Secret de la Licorne',
-        year: 2011,
-        duration: const Duration(minutes: 107),
-        synopsis:
-            'Tintin, jeune reporter, acquiert la maquette d\'un bateau, '
-            'la Licorne. Il ignore que ce modèle est convoité par un '
-            'dangereux collectionneur et qu\'il renferme le secret d\'un '
-            'fabuleux trésor.',
-        posterUrl: _img('qCoaNNfH6lS7qkZDYhWkQpiQpnM.jpg'),
-        backdropUrl: _img('4BS8tgBNWg2jPiDlBwM2iJe1xB7.jpg'),
-        ageCategory: AgeCategory.enfant,
-        genres: const ['Aventure', 'Animation', 'Familial'],
-        director: const ['Steven Spielberg'],
-        cast: const [
-          CastMember(name: 'Jamie Bell', role: 'Tintin'),
-          CastMember(name: 'Andy Serkis', role: 'Capitaine Haddock'),
-        ],
         addedAt: added(15),
       ),
       Movie(
-        id: 'kung-fu-panda',
-        title: 'Kung Fu Panda',
-        year: 2008,
-        duration: const Duration(minutes: 92),
+        id: 'hero',
+        title: 'Hero',
+        originalTitle: 'Hero',
+        year: 2018,
+        duration: const Duration(minutes: 4),
         synopsis:
-            'Po, un panda gaffeur, rêve de devenir un maître du kung-fu. '
-            'Désigné Guerrier Dragon, il doit faire ses preuves face au '
-            'redoutable Tai Lung, qui vient de s\'échapper de prison.',
-        posterUrl: _img('pxZNY88UWH0uic83QHBSh2yFEYL.jpg'),
-        backdropUrl: _img('qdthf9WrRDSaIkGVQGhhJ9pz1hn.jpg'),
+            "Un héros au style 2D s'élance à travers un univers dessiné "
+            "à la main, démonstration éclatante de l'outil Grease Pencil "
+            "de Blender."
+            "${_credit('studio.blender.org/projects/hero', '4.0')}",
+        tagline: 'Un trait de crayon, mille mouvements.',
+        posterUrl: null,
+        backdropUrl: null,
         ageCategory: AgeCategory.enfant,
-        genres: const ['Animation', 'Comédie', 'Aventure'],
-        director: const ['John Stevenson', 'Mark Osborne'],
-        cast: const [
-          CastMember(name: 'Jack Black', role: 'Po'),
-          CastMember(name: 'Dustin Hoffman', role: 'Maître Shifu'),
-        ],
+        genres: const ['Action', 'Animation'],
+        sagaId: 'stylo-2d',
+        sagaLabel: 'Stylo 2D',
+        director: const ['Daniel Martinez Lara'],
+        cast: const [],
+        addedAt: added(40),
+      ),
+      Movie(
+        id: 'glass-half',
+        title: 'Glass Half',
+        originalTitle: 'Glass Half',
+        year: 2019,
+        duration: const Duration(minutes: 4),
+        synopsis:
+            "Dans un musée, deux visiteurs se querellent sur la nature "
+            "d'un mystérieux artefact. Court métrage 2D Blender plein "
+            "d'humour absurde."
+            "${_credit('studio.blender.org/projects/glass-half', '4.0')}",
+        tagline: 'À moitié plein ou à moitié vide ?',
+        posterUrl: null,
+        backdropUrl: null,
+        ageCategory: AgeCategory.enfant,
+        genres: const ['Comédie', 'Animation', 'Drame'],
+        sagaId: 'stylo-2d',
+        sagaLabel: 'Stylo 2D',
+        director: const ['Beorn Leonard'],
+        cast: const [],
         addedAt: added(30),
       ),
-      // bebe
+
+      // enfant — standalone
       Movie(
-        id: 'shaun-le-mouton',
-        title: 'Shaun le mouton, le film',
-        originalTitle: 'Shaun the Sheep Movie',
-        year: 2015,
-        duration: const Duration(minutes: 85),
+        id: 'agent-327-barbershop',
+        title: 'Agent 327 : Opération Barbershop',
+        originalTitle: 'Agent 327: Operation Barbershop',
+        year: 2017,
+        duration: const Duration(minutes: 4),
         synopsis:
-            'Shaun et ses amis décident de s\'offrir une journée de '
-            'vacances loin de la ferme. Mais leur escapade tourne court '
-            'et ils se retrouvent bientôt en route pour la grande ville '
-            'à la recherche du fermier.',
-        posterUrl: _img('qmWlSdvzGp4tyJpI76JrEEmU0F2.jpg'),
-        backdropUrl: _img('9qxBNfI1QFbiZS62fsgaUd563t2.jpg'),
-        ageCategory: AgeCategory.bebe,
-        genres: const ['Animation', 'Familial'],
-        director: const ['Mark Burton', 'Richard Starzak'],
+            "Le célèbre espion néerlandais Agent 327 infiltre un salon "
+            "de coiffure pour confronter Boris Kloris. Démo technique "
+            "de Blender Studio pour un long métrage en préparation."
+            "${_credit('studio.blender.org/projects/agent-327', '4.0')}",
+        tagline: 'Mission : éviter une mauvaise coupe.',
+        posterUrl: null,
+        backdropUrl: null,
+        ageCategory: AgeCategory.enfant,
+        genres: const ['Action', 'Comédie', 'Animation'],
+        director: const ['Colin Levy', 'Hjalti Hjalmarsson'],
         cast: const [],
-        addedAt: added(20),
+        addedAt: added(12),
       ),
+
       // ado
       Movie(
-        id: 'goonies',
-        title: 'Les Goonies',
-        originalTitle: 'The Goonies',
-        year: 1985,
-        duration: const Duration(minutes: 114),
+        id: 'tears-of-steel',
+        title: 'Tears of Steel',
+        originalTitle: 'Tears of Steel',
+        year: 2012,
+        duration: const Duration(minutes: 12),
         synopsis:
-            'Pour sauver leur quartier d\'une démolition, une bande '
-            'd\'adolescents part à la recherche d\'un trésor enfoui '
-            'autrefois par un pirate légendaire.',
-        posterUrl: _img('7EcRgdCjQriST92SzIenogw77kJ.jpg'),
-        backdropUrl: _img('jbe4gVSfRlbPTdESXhEKpornsfu.jpg'),
+            "Dans un futur dystopique, un groupe de combattants tente "
+            "de sauver le monde des machines en intervenant dans le "
+            "passé du créateur des androïdes. Court métrage VFX "
+            "Blender Foundation."
+            "${_credit('mango.blender.org', '3.0')}",
+        tagline: 'Le passé est notre dernière chance.',
+        posterUrl: _wm('7/70/Tos-poster.png'),
+        backdropUrl: _wm('7/70/Tos-poster.png'),
         ageCategory: AgeCategory.ado,
-        genres: const ['Aventure', 'Comédie', 'Familial'],
-        director: const ['Richard Donner'],
+        genres: const ['Science-fiction', 'Action'],
+        director: const ['Ian Hubert'],
         cast: const [
-          CastMember(name: 'Sean Astin', role: 'Mikey'),
-          CastMember(name: 'Josh Brolin', role: 'Brand'),
+          CastMember(name: 'Derek de Lint', role: 'Thom'),
+          CastMember(name: 'Sergio Hasselbaink', role: 'Sergio'),
+          CastMember(name: 'Vanja Rukavina', role: 'Janot'),
+          CastMember(name: 'Jody Bhe', role: 'Jody'),
+          CastMember(name: 'Rogier Schippers', role: 'Rogier'),
+          CastMember(name: 'Chris Haley', role: 'Voix androïde'),
+          CastMember(name: 'Ben Dair', role: 'Ben'),
         ],
-        addedAt: added(50),
+        addedAt: added(55),
       ),
+
       // jeuneAdulte
       Movie(
-        id: 'inception',
-        title: 'Inception',
-        year: 2010,
-        duration: const Duration(minutes: 148),
+        id: 'cosmos-laundromat',
+        title: 'Cosmos Laundromat : Premier Cycle',
+        originalTitle: 'Cosmos Laundromat: First Cycle',
+        year: 2015,
+        duration: const Duration(minutes: 12),
         synopsis:
-            'Dom Cobb est un voleur expérimenté, spécialisé dans '
-            'l\'extraction de secrets enfouis au plus profond du '
-            'subconscient pendant le rêve. Une dernière mission lui '
-            'permettra peut-être de retrouver sa vie d\'avant.',
-        posterUrl: _img('aej3LRUga5rhgkmRP6XMFw3ejbl.jpg'),
-        backdropUrl: _img('8ZTVqvKDQ8emSGUEMjsS4yHAwrp.jpg'),
+            "Franck, un mouton mélancolique sur une île désolée, "
+            "rencontre Victor, un vendeur de réalités alternatives qui "
+            "va bouleverser son existence. Pilote du premier long "
+            "métrage open-source de Blender."
+            "${_credit('studio.blender.org/projects/cosmos-laundromat', '4.0')}",
+        tagline: 'Une seconde chance, à n\'importe quel prix.',
+        posterUrl: _wm('c/c5/CosmosLaundromatPoster.jpg'),
+        backdropUrl: _wm('c/c5/CosmosLaundromatPoster.jpg'),
         ageCategory: AgeCategory.jeuneAdulte,
-        genres: const ['Science-fiction', 'Action', 'Thriller'],
-        director: const ['Christopher Nolan'],
+        genres: const ['Drame', 'Animation', 'Comédie'],
+        director: const ['Mathieu Auvray'],
         cast: const [
-          CastMember(name: 'Leonardo DiCaprio', role: 'Cobb'),
-          CastMember(name: 'Joseph Gordon-Levitt', role: 'Arthur'),
+          CastMember(name: 'Pierre Bokma', role: 'Victor'),
+          CastMember(name: 'Reinout Scholten van Aschat', role: 'Franck'),
         ],
         addedAt: added(60),
       ),
-      // adulte
       Movie(
-        id: 'le-parrain',
-        title: 'Le Parrain',
-        originalTitle: 'The Godfather',
-        year: 1972,
-        duration: const Duration(minutes: 175),
+        id: 'elephants-dream',
+        title: 'Elephants Dream',
+        originalTitle: 'Elephants Dream',
+        year: 2006,
+        duration: const Duration(minutes: 11),
         synopsis:
-            'En 1945, à New York, les Corleone sont une des cinq plus '
-            'puissantes familles de la mafia. Don Vito Corleone « parrain '
-            '» de cette famille, marie sa fille à Carlo Rizzi.',
-        posterUrl: _img('k3uIbYtiuK8pwbCcbma29nTqmgG.jpg'),
-        backdropUrl: _img('tSPT36ZKlP2WVHJLM4cQPLSzv3b.jpg'),
-        ageCategory: AgeCategory.adulte,
-        genres: const ['Drame', 'Crime'],
-        director: const ['Francis Ford Coppola'],
+            "Proog et Emo arpentent une étrange machinerie aux décors "
+            "kafkaïens, dans le tout premier court métrage entièrement "
+            "produit par la Blender Foundation avec des logiciels libres."
+            "${_credit('orange.blender.org', '4.0')}",
+        tagline: 'Un voyage dans une machine sans fin.',
+        posterUrl: _wm('0/0c/ElephantsDreamPoster.jpg'),
+        backdropUrl: _wm('0/0c/ElephantsDreamPoster.jpg'),
+        ageCategory: AgeCategory.jeuneAdulte,
+        genres: const ['Animation', 'Science-fiction', 'Drame'],
+        director: const ['Bassam Kurdali'],
         cast: const [
-          CastMember(name: 'Marlon Brando', role: 'Don Vito Corleone'),
-          CastMember(name: 'Al Pacino', role: 'Michael Corleone'),
+          CastMember(name: 'Tygo Gernandt', role: 'Proog'),
+          CastMember(name: 'Cas Jansen', role: 'Emo'),
         ],
         addedAt: added(70),
+      ),
+
+      // adulte
+      Movie(
+        id: 'sprite-fright',
+        title: 'Sprite Fright',
+        originalTitle: 'Sprite Fright',
+        year: 2021,
+        duration: const Duration(minutes: 10),
+        synopsis:
+            "Un groupe d'adolescents en randonnée dans la forêt anglaise "
+            "tombe sur de mystérieuses petites créatures. Hommage "
+            "horrifique aux films des années 1980 par Blender Studio."
+            "${_credit('studio.blender.org/projects/sprite-fright', '4.0')}",
+        tagline: 'Ne jamais sous-estimer les petites créatures.',
+        posterUrl: _wm('e/e5/Sprite_Fright-movie_poster.jpg'),
+        backdropUrl: _wm('e/e5/Sprite_Fright-movie_poster.jpg'),
+        ageCategory: AgeCategory.adulte,
+        genres: const ['Horreur', 'Comédie', 'Animation'],
+        director: const ['Matthew Luhn'],
+        cast: const [],
+        addedAt: added(50),
       ),
     ];
   }

@@ -4,16 +4,20 @@ import 'package:kidflix/core/domain/services/series.repository.dart';
 
 /// In-memory fake [SeriesRepository] used until the HTTP backend is ready.
 ///
-/// Seeds a single fictional series — Pingu — with two regular seasons
-/// (5 episodes each) plus a Specials season (2 episodes) so the modal
-/// detail UX is exercisable without a backend.
+/// Seeds a single rights-free series — Caminandes — assembled from the
+/// open-licence Blender Foundation shorts (CC-BY) about Koro the llama.
+/// One regular season groups the three released episodes (Llama Drama,
+/// Gran Dillama, Llamigos) and a Specials season carries the 2020 bonus
+/// short "¡Oh, Deer!", so the modal detail UX is exercisable without a
+/// backend.
 ///
-/// `findById` returns the seed when the id matches, throws
-/// [StateError] otherwise. No age filter is applied (consistent with
-/// the in-memory `CatalogRepository`'s posture).
+/// `findById` returns the seed when the id matches, throws [StateError]
+/// otherwise. No age filter is applied (consistent with the in-memory
+/// `CatalogRepository`'s posture).
 class InMemorySeriesRepository implements SeriesRepository {
-  static const String _tmdbImageBase = 'https://image.tmdb.org/t/p/original';
-  static String _img(String hash) => '$_tmdbImageBase/$hash';
+  static const String _wmBase =
+      'https://upload.wikimedia.org/wikipedia/commons';
+  static String _wm(String path) => '$_wmBase/$path';
 
   static final List<Series> _series = _seed();
 
@@ -37,252 +41,131 @@ class InMemorySeriesRepository implements SeriesRepository {
   Future<Series> findByIdForProfile(String seriesId, String profileId) =>
       findById(seriesId);
 
+  /// Standardised Blender Foundation attribution embedded in the series
+  /// [Series.synopsis] to satisfy the CC-BY licence's credit requirement.
+  static const String _credit =
+      '\n\nCrédits : © Blender Foundation — caminandes.com — '
+      'Licence Creative Commons CC-BY 3.0 / 4.0.';
+
   static List<Series> _seed() {
     final addedRef = DateTime(2026, 5, 4);
     DateTime added(int daysAgo) => addedRef.subtract(Duration(days: daysAgo));
 
-    final pinguEpisodes = <Episode>[
-      // Season 1 — 5 episodes
+    // NOTE: the Llama Drama cover thumbnail
+    // (`6/61/Pablo_Vazquez_-_Caminandes_-_Episode_1_-_Llama_Drama_-_Cover_thumbnail.png`)
+    // is flagged on Wikimedia as having an undocumented source. We rely on
+    // the unambiguous Gran Dillama still (CC-BY 3.0, no dispute) as the
+    // Episode 1 thumbnail so every shipped image has clean provenance.
+    const granDillamaCover =
+        'a/a8/Blender_Foundation_-_Caminandes_-_Episode_2_-_Gran_Dillama_-_Cover_thumbnail.png';
+    const llamigosCover =
+        'a/aa/Blender_Foundation_-_Caminandes_-_Episode_3_-_Llamigos_-_Cover_thumbnail.png';
+    const granDillamaStill = '1/14/Caminandes_gran_dillama.png';
+
+    final caminandesSeason1Episodes = <Episode>[
       Episode(
-        id: 'pingu-s1e1',
-        seriesId: 'pingu',
+        id: 'caminandes-s1e1',
+        seriesId: 'caminandes',
         seasonNumber: 1,
         episodeNumber: 1,
-        title: 'Hello Pingu',
-        synopsis: 'Pingu se présente.',
-        duration: const Duration(minutes: 5),
-        thumbUrl: _img('pingu_s1e1_thumb.jpg'),
-        airedAt: DateTime.utc(1990, 4, 13),
+        title: 'Llama Drama',
+        originalTitle: 'Caminandes: Llama Drama',
+        synopsis:
+            "Koro le lama tente de traverser une route déserte de "
+            "Patagonie sans se faire renverser.",
+        duration: const Duration(minutes: 2),
+        // Vignette : still Gran Dillama (Koro) — la cover Llama Drama
+        // d'origine est sous CC-BY 3.0 mais signalée pour source
+        // incomplète sur Wikimedia, on l'évite par prudence.
+        thumbUrl: _wm(granDillamaStill),
+        airedAt: DateTime.utc(2013, 4, 30),
         ageCategory: AgeCategory.enfant,
-        addedAt: added(2),
+        addedAt: added(60),
       ),
       Episode(
-        id: 'pingu-s1e2',
-        seriesId: 'pingu',
+        id: 'caminandes-s1e2',
+        seriesId: 'caminandes',
         seasonNumber: 1,
         episodeNumber: 2,
-        title: 'Pingu se promène',
-        synopsis: 'Pingu se balade dans la banquise.',
-        duration: const Duration(minutes: 5),
-        thumbUrl: _img('pingu_s1e2_thumb.jpg'),
-        airedAt: DateTime.utc(1990, 4, 20),
+        title: 'Gran Dillama',
+        originalTitle: 'Caminandes: Gran Dillama',
+        synopsis:
+            "Koro découvre une herbe verdoyante de l'autre côté d'une "
+            "clôture électrique. Il faudra plus qu'un peu de courant pour "
+            "le décourager.",
+        duration: const Duration(minutes: 3),
+        thumbUrl: _wm(granDillamaCover),
+        airedAt: DateTime.utc(2013, 11, 12),
         ageCategory: AgeCategory.enfant,
-        addedAt: added(2),
+        addedAt: added(30),
       ),
       Episode(
-        id: 'pingu-s1e3',
-        seriesId: 'pingu',
+        id: 'caminandes-s1e3',
+        seriesId: 'caminandes',
         seasonNumber: 1,
         episodeNumber: 3,
-        title: 'Pingu joue',
-        synopsis: 'Pingu joue avec ses amis.',
-        duration: const Duration(minutes: 5),
-        thumbUrl: _img('pingu_s1e3_thumb.jpg'),
-        airedAt: DateTime.utc(1990, 4, 27),
+        title: 'Llamigos',
+        originalTitle: 'Caminandes: Llamigos',
+        synopsis:
+            "Sur les hauteurs enneigées des Andes, Koro se lie d'amitié "
+            "avec Oti le manchot. Ensemble ils défient l'hiver et la "
+            "faim.",
+        duration: const Duration(minutes: 3),
+        thumbUrl: _wm(llamigosCover),
+        airedAt: DateTime.utc(2016, 2, 8),
         ageCategory: AgeCategory.enfant,
-        addedAt: added(2),
-      ),
-      Episode(
-        id: 'pingu-s1e4',
-        seriesId: 'pingu',
-        seasonNumber: 1,
-        episodeNumber: 4,
-        title: 'Pingu pêche',
-        synopsis: 'Pingu apprend à pêcher.',
-        duration: const Duration(minutes: 5),
-        thumbUrl: _img('pingu_s1e4_thumb.jpg'),
-        airedAt: DateTime.utc(1990, 5, 4),
-        ageCategory: AgeCategory.enfant,
-        addedAt: added(2),
-      ),
-      Episode(
-        id: 'pingu-s1e5',
-        seriesId: 'pingu',
-        seasonNumber: 1,
-        episodeNumber: 5,
-        title: 'Pingu danse',
-        synopsis: 'Pingu danse avec sa sœur.',
-        duration: const Duration(minutes: 5),
-        thumbUrl: _img('pingu_s1e5_thumb.jpg'),
-        airedAt: DateTime.utc(1990, 5, 11),
-        ageCategory: AgeCategory.enfant,
-        addedAt: added(2),
+        addedAt: added(10),
       ),
     ];
 
-    final pinguSeason2Episodes = <Episode>[
+    final caminandesSpecials = <Episode>[
       Episode(
-        id: 'pingu-s2e1',
-        seriesId: 'pingu',
-        seasonNumber: 2,
-        episodeNumber: 1,
-        title: 'Pingu et le bonhomme de neige',
-        synopsis: 'Pingu construit un bonhomme de neige.',
-        duration: const Duration(minutes: 5),
-        thumbUrl: _img('pingu_s2e1_thumb.jpg'),
-        airedAt: DateTime.utc(1992, 1, 5),
-        ageCategory: AgeCategory.enfant,
-        addedAt: added(2),
-      ),
-      Episode(
-        id: 'pingu-s2e2',
-        seriesId: 'pingu',
-        seasonNumber: 2,
-        episodeNumber: 2,
-        title: 'Pingu et le poisson',
-        synopsis: 'Pingu observe les poissons sous la glace.',
-        duration: const Duration(minutes: 5),
-        thumbUrl: _img('pingu_s2e2_thumb.jpg'),
-        airedAt: DateTime.utc(1992, 1, 12),
-        ageCategory: AgeCategory.enfant,
-        addedAt: added(2),
-      ),
-      Episode(
-        id: 'pingu-s2e3',
-        seriesId: 'pingu',
-        seasonNumber: 2,
-        episodeNumber: 3,
-        title: 'Pingu fait du toboggan',
-        synopsis: 'Pingu glisse sur la banquise.',
-        duration: const Duration(minutes: 5),
-        thumbUrl: _img('pingu_s2e3_thumb.jpg'),
-        airedAt: DateTime.utc(1992, 1, 19),
-        ageCategory: AgeCategory.enfant,
-        addedAt: added(2),
-      ),
-      Episode(
-        id: 'pingu-s2e4',
-        seriesId: 'pingu',
-        seasonNumber: 2,
-        episodeNumber: 4,
-        title: 'Pingu et l\'igloo',
-        synopsis: 'Pingu rénove son igloo.',
-        duration: const Duration(minutes: 5),
-        thumbUrl: _img('pingu_s2e4_thumb.jpg'),
-        airedAt: DateTime.utc(1992, 1, 26),
-        ageCategory: AgeCategory.enfant,
-        addedAt: added(2),
-      ),
-      Episode(
-        id: 'pingu-s2e5',
-        seriesId: 'pingu',
-        seasonNumber: 2,
-        episodeNumber: 5,
-        title: 'Pingu fête son anniversaire',
-        synopsis: 'Pingu invite ses amis à son anniversaire.',
-        duration: const Duration(minutes: 5),
-        thumbUrl: _img('pingu_s2e5_thumb.jpg'),
-        airedAt: DateTime.utc(1992, 2, 2),
-        ageCategory: AgeCategory.enfant,
-        addedAt: added(2),
-      ),
-    ];
-
-    final pinguSpecials = <Episode>[
-      Episode(
-        id: 'pingu-special-1',
-        seriesId: 'pingu',
+        id: 'caminandes-special-1',
+        seriesId: 'caminandes',
         seasonNumber: 0,
         episodeNumber: 1,
-        title: "Pingu's Lost Christmas",
-        synopsis: 'Pingu cherche son cadeau de Noël perdu.',
-        duration: const Duration(minutes: 25),
-        thumbUrl: _img('pingu_special_1_thumb.jpg'),
-        airedAt: DateTime.utc(1996, 12, 25),
+        title: '¡Oh, Deer!',
+        originalTitle: 'Caminandes: ¡Oh, Deer!',
+        synopsis:
+            "Court métrage bonus dans lequel Koro croise la route "
+            "d'un cerf imprévisible dans la pampa.",
+        duration: const Duration(minutes: 2),
+        thumbUrl: _wm(granDillamaStill),
+        airedAt: DateTime.utc(2020, 12, 1),
         ageCategory: AgeCategory.enfant,
-        addedAt: added(2),
-      ),
-      Episode(
-        id: 'pingu-special-2',
-        seriesId: 'pingu',
-        seasonNumber: 0,
-        episodeNumber: 2,
-        title: 'Pingu fête le nouvel an',
-        synopsis: 'Pingu fête le nouvel an avec sa famille.',
-        duration: const Duration(minutes: 15),
-        thumbUrl: _img('pingu_special_2_thumb.jpg'),
-        airedAt: DateTime.utc(1997, 1, 1),
-        ageCategory: AgeCategory.enfant,
-        addedAt: added(2),
+        addedAt: added(5),
       ),
     ];
 
-    final pingu = Series(
-      id: 'pingu',
-      title: 'Pingu',
-      originalTitle: 'Pingu',
-      year: 1990,
+    final caminandes = Series(
+      id: 'caminandes',
+      title: 'Caminandes',
+      originalTitle: 'Caminandes',
+      year: 2013,
       synopsis:
-          "Les aventures d'un manchot espiègle dans une famille pleine "
-          "de tendresse, sur la banquise.",
+          "Les aventures de Koro, un lama au caractère bien trempé, dans "
+          "les paysages grandioses de la Patagonie. Série de courts "
+          "métrages 3D produits par Blender Studio sous licence "
+          "Creative Commons.$_credit",
       tagline: null,
-      posterUrl: _img('pingu_poster.jpg'),
-      backdropUrl: _img('pingu_backdrop.jpg'),
+      posterUrl: _wm(llamigosCover),
+      backdropUrl: _wm(granDillamaStill),
       ageCategory: AgeCategory.enfant,
-      genres: const ['Animation', 'Familial'],
+      genres: const ['Animation', 'Comédie', 'Familial'],
       sagaId: null,
       sagaLabel: null,
-      director: const [],
+      director: const ['Pablo Vázquez'],
       cast: const [],
-      addedAt: added(2),
-      seasonsCount: 3, // 2 regular + Specials
+      addedAt: added(10),
+      seasonsCount: 2,
       episodesCount:
-          pinguEpisodes.length +
-          pinguSeason2Episodes.length +
-          pinguSpecials.length,
+          caminandesSeason1Episodes.length + caminandesSpecials.length,
       seasons: [
-        const Season(
-          seasonNumber: 0,
-          name: 'Specials',
-          posterUrl: null,
-          synopsis: null,
-          episodes: [],
-        ),
-        const Season(
-          seasonNumber: 1,
-          name: null,
-          posterUrl: null,
-          synopsis: null,
-          episodes: [],
-        ),
-        const Season(
-          seasonNumber: 2,
-          name: null,
-          posterUrl: null,
-          synopsis: null,
-          episodes: [],
-        ),
+        Season(seasonNumber: 0, name: 'Specials', episodes: caminandesSpecials),
+        Season(seasonNumber: 1, episodes: caminandesSeason1Episodes),
       ],
     );
 
-    // Re-build the series with episodes injected into their seasons.
-    // (The `Season` model's `episodes` is final, so we construct the
-    // `Series` once with finished seasons.)
-    return [
-      Series(
-        id: pingu.id,
-        title: pingu.title,
-        originalTitle: pingu.originalTitle,
-        year: pingu.year,
-        synopsis: pingu.synopsis,
-        tagline: pingu.tagline,
-        posterUrl: pingu.posterUrl,
-        backdropUrl: pingu.backdropUrl,
-        ageCategory: pingu.ageCategory,
-        genres: pingu.genres,
-        sagaId: pingu.sagaId,
-        sagaLabel: pingu.sagaLabel,
-        director: pingu.director,
-        cast: pingu.cast,
-        addedAt: pingu.addedAt,
-        seasonsCount: pingu.seasonsCount,
-        episodesCount: pingu.episodesCount,
-        seasons: [
-          Season(seasonNumber: 0, name: 'Specials', episodes: pinguSpecials),
-          Season(seasonNumber: 1, episodes: pinguEpisodes),
-          Season(seasonNumber: 2, episodes: pinguSeason2Episodes),
-        ],
-      ),
-    ];
+    return [caminandes];
   }
 }

@@ -25,10 +25,9 @@ class InMemoryWishlistRepository implements WishlistRepository {
   /// not in this map is rendered as "not yet in the catalog". Kept
   /// private — callers should never reach into this fixture.
   static const Map<int, _CatalogHit> _availableCatalogIds = {
-    // Pretend "Astérix & Obélix : L'Empire du Milieu" (tmdb 631842) is
-    // already in the kdrive catalog — matches the catalog seed in
-    // `InMemoryCatalogRepository`.
-    631842: _CatalogHit(WishlistItemKind.movie, 'asterix-empire-du-milieu'),
+    // Pretend "Big Buck Bunny" (tmdb 10378) is already in the kdrive
+    // catalog — matches the catalog seed in `InMemoryCatalogRepository`.
+    10378: _CatalogHit(WishlistItemKind.movie, 'big-buck-bunny'),
   };
 
   final List<WishlistEntry> _entries = _seed();
@@ -132,50 +131,50 @@ class InMemoryWishlistRepository implements WishlistRepository {
     return <WishlistEntry>[
       _entry(
         watcharrId: 101,
-        tmdbId: 631842,
+        tmdbId: 10378,
         kind: WishlistItemKind.movie,
-        title: "Astérix & Obélix : L'Empire du Milieu",
-        year: 2023,
+        title: 'Big Buck Bunny',
+        year: 2008,
         posterUrl:
-            'https://image.tmdb.org/t/p/w500/vchpiQLvXa4uyZhqdEwttrsFOOC.jpg',
+            'https://upload.wikimedia.org/wikipedia/commons/c/c5/Big_buck_bunny_poster_big.jpg',
         status: WatchedStatus.planned,
       ),
       _entry(
         watcharrId: 102,
-        tmdbId: 22,
+        tmdbId: 45745,
         kind: WishlistItemKind.movie,
-        title: 'Pirates des Caraïbes : La Malédiction du Black Pearl',
-        year: 2003,
+        title: 'Sintel',
+        year: 2010,
         posterUrl:
-            'https://image.tmdb.org/t/p/w500/k6F5MQzN3WFolXcS9bdW1ZUaPxq.jpg',
+            'https://upload.wikimedia.org/wikipedia/commons/8/8f/Sintel_poster.jpg',
         status: WatchedStatus.planned,
       ),
       _entry(
         watcharrId: 103,
-        tmdbId: 11216,
+        tmdbId: 357441,
         kind: WishlistItemKind.movie,
-        title: 'Cinema Paradiso',
-        year: 1988,
+        title: 'Cosmos Laundromat : Premier Cycle',
+        year: 2015,
         posterUrl:
-            'https://image.tmdb.org/t/p/w500/wIxNVQqlbiZcCWjk2DlH50sxieO.jpg',
+            'https://upload.wikimedia.org/wikipedia/commons/c/c5/CosmosLaundromatPoster.jpg',
         status: WatchedStatus.planned,
       ),
       _entry(
         watcharrId: 104,
-        tmdbId: 1399,
+        tmdbId: 372058,
         kind: WishlistItemKind.series,
-        title: 'Game of Thrones',
-        year: 2011,
+        title: 'Caminandes',
+        year: 2013,
         posterUrl:
-            'https://image.tmdb.org/t/p/w500/u3bZgnGQ9T01sWNhyveQz0wH0Hl.jpg',
+            'https://upload.wikimedia.org/wikipedia/commons/a/aa/Blender_Foundation_-_Caminandes_-_Episode_3_-_Llamigos_-_Cover_thumbnail.png',
         status: WatchedStatus.planned,
       ),
       _entry(
         watcharrId: 105,
         tmdbId: 12345,
         kind: WishlistItemKind.movie,
-        title: 'Un vieux classique vu il y a longtemps',
-        year: 1995,
+        title: 'Un court métrage open-source vu il y a longtemps',
+        year: 2006,
         posterUrl: null,
         status: WatchedStatus.finished,
       ),
@@ -237,59 +236,59 @@ class _SearchFixture {
 
 const List<_SearchFixture> _searchFixtures = [
   _SearchFixture(
-    tmdbId: 631842,
+    tmdbId: 10378,
     kind: WishlistItemKind.movie,
-    title: "Astérix & Obélix : L'Empire du Milieu",
-    year: 2023,
-    posterUrl:
-        'https://image.tmdb.org/t/p/w500/vchpiQLvXa4uyZhqdEwttrsFOOC.jpg',
-  ),
-  _SearchFixture(
-    tmdbId: 22,
-    kind: WishlistItemKind.movie,
-    title: 'Pirates des Caraïbes : La Malédiction du Black Pearl',
-    year: 2003,
-    posterUrl:
-        'https://image.tmdb.org/t/p/w500/k6F5MQzN3WFolXcS9bdW1ZUaPxq.jpg',
-  ),
-  _SearchFixture(
-    tmdbId: 11216,
-    kind: WishlistItemKind.movie,
-    title: 'Cinema Paradiso',
-    year: 1988,
-    posterUrl:
-        'https://image.tmdb.org/t/p/w500/wIxNVQqlbiZcCWjk2DlH50sxieO.jpg',
-  ),
-  _SearchFixture(
-    tmdbId: 1399,
-    kind: WishlistItemKind.series,
-    title: 'Game of Thrones',
-    year: 2011,
-    posterUrl:
-        'https://image.tmdb.org/t/p/w500/u3bZgnGQ9T01sWNhyveQz0wH0Hl.jpg',
-  ),
-  _SearchFixture(
-    tmdbId: 13,
-    kind: WishlistItemKind.movie,
-    title: 'Forrest Gump',
-    year: 1994,
-    posterUrl:
-        'https://image.tmdb.org/t/p/w500/arw2vcBveWOVZr6pxd9XTd1TdQa.jpg',
-  ),
-  _SearchFixture(
-    tmdbId: 1396,
-    kind: WishlistItemKind.series,
-    title: 'Breaking Bad',
+    title: 'Big Buck Bunny',
     year: 2008,
     posterUrl:
-        'https://image.tmdb.org/t/p/w500/3xnWaLQjelJDDF7LT1WBo6f4BRe.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/c/c5/Big_buck_bunny_poster_big.jpg',
   ),
   _SearchFixture(
-    tmdbId: 27205,
+    tmdbId: 45745,
     kind: WishlistItemKind.movie,
-    title: 'Inception',
+    title: 'Sintel',
     year: 2010,
     posterUrl:
-        'https://image.tmdb.org/t/p/w500/9gk7adHYeDvHkCSEqAvQNLV5Uge.jpg',
+        'https://upload.wikimedia.org/wikipedia/commons/8/8f/Sintel_poster.jpg',
+  ),
+  _SearchFixture(
+    tmdbId: 9761,
+    kind: WishlistItemKind.movie,
+    title: 'Elephants Dream',
+    year: 2006,
+    posterUrl:
+        'https://upload.wikimedia.org/wikipedia/commons/0/0c/ElephantsDreamPoster.jpg',
+  ),
+  _SearchFixture(
+    tmdbId: 372058,
+    kind: WishlistItemKind.series,
+    title: 'Caminandes',
+    year: 2013,
+    posterUrl:
+        'https://upload.wikimedia.org/wikipedia/commons/a/aa/Blender_Foundation_-_Caminandes_-_Episode_3_-_Llamigos_-_Cover_thumbnail.png',
+  ),
+  _SearchFixture(
+    tmdbId: 133701,
+    kind: WishlistItemKind.movie,
+    title: 'Tears of Steel',
+    year: 2012,
+    posterUrl:
+        'https://upload.wikimedia.org/wikipedia/commons/7/70/Tos-poster.png',
+  ),
+  _SearchFixture(
+    tmdbId: 357441,
+    kind: WishlistItemKind.movie,
+    title: 'Cosmos Laundromat : Premier Cycle',
+    year: 2015,
+    posterUrl:
+        'https://upload.wikimedia.org/wikipedia/commons/c/c5/CosmosLaundromatPoster.jpg',
+  ),
+  _SearchFixture(
+    tmdbId: 581537,
+    kind: WishlistItemKind.movie,
+    title: 'Spring',
+    year: 2019,
+    posterUrl:
+        'https://upload.wikimedia.org/wikipedia/commons/0/05/Spring2019PillarPosterBlender.jpg',
   ),
 ];

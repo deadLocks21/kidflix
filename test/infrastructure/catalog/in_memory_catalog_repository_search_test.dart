@@ -7,31 +7,34 @@ void main() {
     final repo = InMemoryCatalogRepository();
 
     test('case-insensitive match on title', () async {
-      final results = await repo.searchCatalog(query: 'TOTORO');
-      expect(results.map((m) => m.id), contains('totoro'));
+      final results = await repo.searchCatalog(query: 'SINTEL');
+      expect(results.map((m) => m.id), contains('sintel'));
     });
 
     test('accent-insensitive match (query without accents matches title with)',
         () async {
-      final results = await repo.searchCatalog(query: 'asterix');
+      // "Agent 327 : Opération Barbershop" carries an accent on "é".
+      final results = await repo.searchCatalog(query: 'operation');
       expect(
         results.map((m) => m.id),
-        containsAll(['asterix-empire-du-milieu', 'asterix-potion-magique']),
+        contains('agent-327-barbershop'),
       );
     });
 
     test('accent-insensitive match (query with accents matches title without)',
         () async {
-      final results = await repo.searchCatalog(query: 'Astérix');
+      // Original English title "Operation Barbershop" has no accent —
+      // querying with one should still match.
+      final results = await repo.searchCatalog(query: 'Opération');
       expect(
         results.map((m) => m.id),
-        containsAll(['asterix-empire-du-milieu', 'asterix-potion-magique']),
+        contains('agent-327-barbershop'),
       );
     });
 
     test('matches on originalTitle', () async {
-      final results = await repo.searchCatalog(query: 'finding');
-      expect(results.map((m) => m.id), contains('nemo'));
+      final results = await repo.searchCatalog(query: 'tears');
+      expect(results.map((m) => m.id), contains('tears-of-steel'));
     });
 
     test('returns matches across all age categories (no hierarchy filter)',

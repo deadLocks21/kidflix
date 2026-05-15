@@ -16,10 +16,11 @@ void main() {
       expect(categories, equals(AgeCategory.values.toSet()));
     });
 
-    test('seed contains at least 2 Astérix films (saga threshold)', () async {
+    test('seed contains at least 2 Stylo 2D films (saga threshold)', () async {
       final movies = await repo.listCatalog();
-      final asterix = movies.where((m) => m.sagaId == 'asterix').toList();
-      expect(asterix.length, greaterThanOrEqualTo(2));
+      final styloShorts =
+          movies.where((m) => m.sagaId == 'stylo-2d').toList();
+      expect(styloShorts.length, greaterThanOrEqualTo(2));
     });
 
     test('enfant bucket has at least 3 distinct primary genres', () async {
