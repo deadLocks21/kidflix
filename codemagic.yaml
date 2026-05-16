@@ -57,11 +57,15 @@ workflows:
 
       - name: Fetch signing files (create if missing)
         script: |
-          # `--create` autorise Codemagic à créer le certificat de distribution
-          # et le provisioning profile via l'API key si ils n'existent pas encore
-          # sur le compte Apple. Indispensable au tout premier build.
+          # `--certificate-key` : clé privée RSA fournie via la variable
+          # CERTIFICATE_PRIVATE_KEY (groupe `kidflix_secrets`). Sans elle,
+          # Codemagic ne peut pas créer un nouveau certif de distribution :
+          # Apple stocke la partie publique mais pas la clé privée.
+          # `--create` : crée le certificat ET le provisioning profile s'ils
+          # n'existent pas déjà sur le compte Apple.
           app-store-connect fetch-signing-files "fr.dtfh.kidflix" \
             --type IOS_APP_STORE \
+            --certificate-key=@env:CERTIFICATE_PRIVATE_KEY \
             --create
 
       - name: Add certificates to keychain
