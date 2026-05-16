@@ -86,9 +86,11 @@ workflows:
 
       - name: Set build number from App Store Connect
         script: |
-          # Récupère le dernier build number sur TestFlight, +1.
-          # Évite tout conflit "build number already exists".
-          LATEST_BUILD=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID")
+          # `get-latest-build-number` voit TOUS les builds (App Store + TestFlight
+          # + en cours de processing), contrairement à `get-latest-app-store-build-number`
+          # qui ne voit que les versions publiées sur l'App Store. C'est la bonne
+          # commande pour un workflow TestFlight où on incrémente à chaque upload.
+          LATEST_BUILD=$(app-store-connect get-latest-build-number "$APP_STORE_APPLE_ID")
           BUILD_NUMBER=$((LATEST_BUILD + 1))
           echo "Next build number: $BUILD_NUMBER"
           echo "BUILD_NUMBER=$BUILD_NUMBER" >> $CM_ENV
