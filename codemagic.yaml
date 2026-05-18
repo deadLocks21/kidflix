@@ -123,28 +123,10 @@ workflows:
           - Kidflix Internal
         # Si un build précédent est encore en review, l'expirer pour éviter le blocage.
         expire_build_submitted_for_review: true
-
-        # Renseigne automatiquement le champ "Éléments à tester" / "What to Test"
-        # de TestFlight pour chaque build, évitant le passage manuel sur
-        # App Store Connect quand on monte de version marketing.
-        # Le `locale` doit correspondre à la langue principale de l'app dans
-        # App Store Connect (Information sur l'app → Langue principale).
-        beta_build_localizations:
-          - locale: fr-FR
-            whats_new: |
-              Bienvenue dans la bêta familiale de Kidflix !
-
-              Vous pouvez utiliser l'application comme une app classique —
-              explorez toutes les sections, créez ou modifiez des profils,
-              lancez la lecture de n'importe quel film, testez la recherche,
-              bref, faites comme chez vous.
-
-              Si quelque chose ne fonctionne pas comme prévu, vous semble
-              bizarre, ou si vous avez une suggestion, signalez-le moi via
-              le bouton « Send Beta Feedback » de l'application TestFlight
-              (idéalement avec une capture d'écran si c'est visuel).
-
-              Merci !
+        # Le champ "Éléments à tester" / "What to Test" est renseigné via le
+        # fichier `release_notes.json` à la racine du repo, automatiquement
+        # détecté par Codemagic. Permet de ne plus toucher à App Store Connect
+        # même lors d'un changement de version marketing.
 
       email:
         recipients:
