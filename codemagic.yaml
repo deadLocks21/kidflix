@@ -134,3 +134,134 @@ workflows:
         notify:
           success: true
           failure: true
+
+  android-playstore:
+    name: Android → Play Store (Production)
+    max_build_duration: 60
+    # Même instance que le workflow iOS (mac_mini_m2 est garanti dispo
+    # sur le plan actuel). `linux_x2` serait moins cher mais nécessite
+    # un plan supérieur. `linux` (basique) peut aussi être tenté si tu
+    # veux optimiser le coût plus tard.
+    instance_type: mac_mini_m2
+
+    # Déclenchement : même tag `v*` que le workflow iOS, les deux workflows
+    # tournent en parallèle quand un tag est poussé.
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: "v*"
+          include: true
+
+    environment:
+      flutter: 3.41.7
+
+      # Référence de la keystore upload, à uploader dans Codemagic UI
+      # (Team settings → Code signing identities → Android keystores).
+      # Le nom doit correspondre exactement au champ "Reference name".
+      # Codemagic expose ensuite $CM_KEYSTORE_PATH, $CM_KEYSTORE_PASSWORD,
+      # $CM_KEY_ALIAS, $CM_KEY_PASSWORD pendant le build.
+      android_signing:
+        - kidflix_keystore
+
+      vars:
+        # Doit matcher `applicationId` dans android/app/build.gradle.kts
+        # et le package name déclaré dans Google Play Console.
+        PACKAGE_NAME: "fr.dtfh.kidflix"
+
+      groups:
+        # Doit contenir GCLOUD_SERVICE_ACCOUNT_CREDENTIALS : le JSON complet
+        # (en clair) du service account GCP ayant accès à l'API Google Play
+        # Developer, et invité comme utilisateur dans Google Play Console
+        # avec droits "Release manager" / "Admin".
+        - kidflix_secrets
+
+    cache:
+      cache_paths:
+        - $HOME/.pub-cache
+        - $HOME/.gradle/caches
+
+    scripts:
+      - name: Set up key.properties
+        script: |
+          # Le plugin Flutter Android lit `android/key.properties` pour la
+          # signing config release (voir android/app/build.gradle.kts).
+          # En CI, on génère le fichier à la volée depuis les variables
+          # d'env injectées par `android_signing:` ci-dessus.
+          cat <<EOF > "$CM_BUILD_DIR/android/key.properties"
+          storePassword=$CM_KEYSTORE_PASSWORD
+          keyPassword=$CM_KEY_PASSWORD
+          keyAlias=$CM_KEY_ALIAS
+          storeFile=$CM_KEYSTORE_PATH
+          EOF
+
+      - name: Get Flutter packages
+        script: |
+          flutter pub get
+
+      - name: Set build number from Google Play
+        script: |
+          # Récupère le plus grand versionCode toutes pistes confondues
+          # (production + beta + alpha + internal). Google Play exige un
+          # versionCode strictement croissant à chaque upload, quelle que
+          # soit la piste. `|| echo 0` couvre le tout premier upload où
+          # l'app n'a encore aucun build sur le Play Store.
+          LATEST_BUILD=$(google-play get-latest-build-number \
+            --package-name "$PACKAGE_NAME" \
+            --credentials "@env:GCLOUD_SERVICE_ACCOUNT_CREDENTIALS" \
+            --tracks production beta alpha internal 2>/dev/null || echo 0)
+          BUILD_NUMBER=$((${LATEST_BUILD:-0} + 1))
+          echo "Next build number: $BUILD_NUMBER"
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $CM_ENV
+
+      - name: Extract version from git tag
+        script: |
+          # Le tag `v1.2.3` devient version `1.2.3`.
+          VERSION=${CM_TAG#v}
+          echo "Building version: $VERSION"
+          echo "VERSION=$VERSION" >> $CM_ENV
+
+      - name: Build App Bundle (.aab)
+        script: |
+          # AAB plutôt que APK : format requis pour les nouvelles apps sur
+          # Google Play, permet le delivery optimisé par device.
+          flutter build appbundle --release \
+            --build-name="$VERSION" \
+            --build-number="$BUILD_NUMBER"
+
+    artifacts:
+      - build/app/outputs/bundle/release/*.aab
+      - build/app/outputs/mapping/release/mapping.txt
+      - flutter_drive.log
+
+    publishing:
+      google_play:
+        # JSON du service account GCP, stocké dans le groupe kidflix_secrets.
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        # Temporairement `alpha` (closed testing) pour :
+        #  1. satisfaire la règle Google "14j + 12 testeurs" si applicable
+        #  2. valider la pipeline CI dans des conditions proches de prod
+        #     (review léger, store listing complet, signature, distribution
+        #     par pays — tout ce qui crashera plus tard en prod sera attrapé)
+        # Une fois la 1re release prod publiée manuellement via la Console,
+        # basculer sur `track: production` pour le push auto aux users.
+        track: alpha
+        # `submit_as_draft: false` + pas de `rollout_fraction` = rollout à
+        # 100 % immédiatement pour tous les users.
+        # Pour un rollout progressif, ajouter par ex. `rollout_fraction: 0.1`
+        # (10 %) puis promouvoir manuellement depuis le Play Console.
+        submit_as_draft: false
+        # NB : si "Managed publishing" est activé dans Google Play Console
+        # (Settings → Publishing overview), Google met quand même la release
+        # en attente d'une publication manuelle malgré le push automatique.
+        # Désactiver Managed publishing pour que les users reçoivent la
+        # mise à jour sans intervention.
+        # Le champ "Notes de version" est lu depuis le même
+        # `release_notes.json` que TestFlight (locale fr-FR).
+
+      email:
+        recipients:
+          - timothe@hofmann.fr
+        notify:
+          success: true
+          failure: true
