@@ -24,6 +24,18 @@
 		<string>????</string>
 		<key>CFBundleVersion</key>
 		<string>$(FLUTTER_BUILD_NUMBER)</string>
+		<!--
+			Export Compliance : déclare que l'app n'utilise PAS de chiffrement
+			non-exempt. Kidflix se limite à du chiffrement standard exempté par
+			Apple : HTTPS (dio, cached_network_image, youtube_explode_dart) et
+			bcrypt qui est un algo de hachage pour l'auth, pas du chiffrement
+			de données. Tant que l'app n'ajoute pas de crypto custom, garder
+			false évite l'écran "Informations manquantes" sur TestFlight à chaque
+			upload.
+			Doc : https://developer.apple.com/documentation/security/complying_with_encryption_export_regulations
+		-->
+		<key>ITSAppUsesNonExemptEncryption</key>
+		<false/>
 		<key>LSRequiresIPhoneOS</key>
 		<true/>
 		<key>NSAppTransportSecurity</key>
