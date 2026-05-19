@@ -1,0 +1,44 @@
+# GitLab CI pour Kidflix
+#
+# Une seule étape : versioning automatique sur push `main`.
+# Le build & publish iOS/Android est géré par Codemagic, déclenché par le
+# tag `v*` que cette étape pousse.
+#
+# Flow complet :
+#   1. Dev pousse des commits conventionnels sur main (feat:, fix:, ...)
+#   2. semantic-release lit les commits depuis le dernier tag
+#   3. Bump `version:` dans pubspec.yaml + commit `chore(release): X.Y.Z [skip ci]`
+#   4. Crée et pousse le tag `vX.Y.Z`
+#   5. Codemagic détecte le tag → lance les workflows iOS + Android
+#
+# Pré-requis GitLab :
+#   - Variable CI/CD `GITLAB_TOKEN` : Project Access Token avec scope
+#     `write_repository` et rôle `Maintainer` (Settings → Access Tokens).
+#   - Si la branche `main` est protégée : ajouter le bot/token aux
+#     utilisateurs autorisés à push + autoriser le push de tags `v*`
+#     (Settings → Repository → Protected branches / Protected tags).
+
+stages:
+  - release
+
+semantic-release:
+  stage: release
+  image: node:22
+  variables:
+    # `clone` + depth 0 : semantic-release a besoin de tout l'historique
+    # et de tous les tags pour calculer le prochain numéro de version.
+    GIT_STRATEGY: clone
+    GIT_DEPTH: 0
+  before_script:
+    - npm ci --cache .npm --prefer-offline
+    - git config --global user.name "GitLab CI Bot"
+    - git config --global user.email "ci@gitlab.com"
+    # On réécrit l'origine avec le token pour pouvoir push commit + tag.
+    - git remote set-url origin "https://oauth2:${GITLAB_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git"
+    - git fetch --tags
+  script:
+    - npx semantic-release
+  rules:
+    # Uniquement sur push direct main (pas sur MR, pas sur tag : éviter
+    # la boucle infinie quand le job lui-même pousse un commit + tag).
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
