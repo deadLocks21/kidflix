@@ -55,7 +55,7 @@ final class ListWishlistUseCaseProvider
 }
 
 String _$listWishlistUseCaseHash() =>
-    r'4cb3f3513cc139cb13e71f6e6cd98a520d1cc8f1';
+    r'6a1458e86e706d70623136bd72d60195a9877249';
 
 @ProviderFor(markWishlistAsWatchedUseCase)
 final markWishlistAsWatchedUseCaseProvider =

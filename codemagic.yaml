@@ -104,9 +104,24 @@ workflows:
 
       - name: Build IPA
         script: |
+          # `--dart-define` injects compile-time constants read by
+          # `lib/infrastructure/providers/logger.service_provider.dart`:
+          #
+          # - SIGNOZ_INGEST_URL      OTLP HTTP logs endpoint (required to enable Signoz).
+          # - SIGNOZ_INGESTION_KEY   Signoz Cloud access token (omit for self-hosted).
+          # - APP_VERSION            Reported as `service.version` in Signoz so logs
+          #                          are filterable per release.
+          #
+          # SIGNOZ_INGEST_URL / SIGNOZ_INGESTION_KEY come from the
+          # `kidflix_secrets` group declared above; both must be added in
+          # Codemagic UI → Environment variables. An empty SIGNOZ_INGEST_URL
+          # silently disables Signoz (the logger falls back to console-only).
           flutter build ipa --release \
             --build-name="$VERSION" \
             --build-number="$BUILD_NUMBER" \
+            --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
+            --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
+            --dart-define=APP_VERSION="$VERSION+$BUILD_NUMBER" \
             --export-options-plist=/Users/builder/export_options.plist
 
     artifacts:
@@ -225,9 +240,15 @@ workflows:
         script: |
           # AAB plutôt que APK : format requis pour les nouvelles apps sur
           # Google Play, permet le delivery optimisé par device.
+          #
+          # `--dart-define` : voir le commentaire détaillé dans le workflow
+          # ios-testflight. Mêmes variables, même groupe `kidflix_secrets`.
           flutter build appbundle --release \
             --build-name="$VERSION" \
-            --build-number="$BUILD_NUMBER"
+            --build-number="$BUILD_NUMBER" \
+            --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
+            --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
+            --dart-define=APP_VERSION="$VERSION+$BUILD_NUMBER"
 
     artifacts:
       - build/app/outputs/bundle/release/*.aab
