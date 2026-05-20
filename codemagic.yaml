@@ -259,14 +259,16 @@ workflows:
       google_play:
         # JSON du service account GCP, stocké dans le groupe kidflix_secrets.
         credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
-        # Temporairement `alpha` (closed testing) pour :
-        #  1. satisfaire la règle Google "14j + 12 testeurs" si applicable
-        #  2. valider la pipeline CI dans des conditions proches de prod
-        #     (review léger, store listing complet, signature, distribution
-        #     par pays — tout ce qui crashera plus tard en prod sera attrapé)
-        # Une fois la 1re release prod publiée manuellement via la Console,
-        # basculer sur `track: production` pour le push auto aux users.
-        track: alpha
+        # Temporairement `internal` (internal testing) pour itérer rapidement
+        # sans review Google et sans contrainte "14j + 12 testeurs". Les
+        # testeurs internes (jusqu'à 100, ajoutés dans Play Console → Testing
+        # → Internal testing) reçoivent la build en quelques minutes.
+        # Étapes suivantes prévues :
+        #  1. passer à `alpha` (closed testing) pour valider la pipeline en
+        #     conditions proches de prod (review léger, store listing, etc.)
+        #  2. une fois la 1re release prod publiée manuellement via la Console,
+        #     basculer sur `track: production` pour le push auto aux users.
+        track: internal
         # `submit_as_draft: false` + pas de `rollout_fraction` = rollout à
         # 100 % immédiatement pour tous les users.
         # Pour un rollout progressif, ajouter par ex. `rollout_fraction: 0.1`
