@@ -7,9 +7,14 @@
 # Flow complet :
 #   1. Dev pousse des commits conventionnels sur main (feat:, fix:, ...)
 #   2. semantic-release lit les commits depuis le dernier tag
-#   3. Bump `version:` dans pubspec.yaml + commit `chore(release): X.Y.Z [skip ci]`
+#   3. Bump `version:` dans pubspec.yaml + commit `chore(release): X.Y.Z`
 #   4. Crée et pousse le tag `vX.Y.Z`
 #   5. Codemagic détecte le tag → lance les workflows iOS + Android
+#
+# Note : on n'utilise PAS `[skip ci]` dans le message de release. GitHub Actions
+# interprète ce marqueur sur le tag mirroré et skip notre smoke test côté
+# GitHub. À la place, on casse la boucle GitLab via une `rules:` qui ignore
+# les commits dont le titre commence par `chore(release)`.
 #
 # Pré-requis GitLab :
 #   - Variable CI/CD `GITLAB_TOKEN` : Project Access Token avec scope
@@ -39,6 +44,11 @@ semantic-release:
   script:
     - npx semantic-release
   rules:
-    # Uniquement sur push direct main (pas sur MR, pas sur tag : éviter
-    # la boucle infinie quand le job lui-même pousse un commit + tag).
+    # Garde anti-boucle : le commit de release que ce job produit a pour
+    # titre `chore(release): X.Y.Z`. Sans cette règle on bouclerait à
+    # l'infini (le push du commit re-déclenche le job, qui repousse, etc.).
+    # Remplace `[skip ci]` dans le message — voir l'en-tête du fichier.
+    - if: '$CI_COMMIT_TITLE =~ /^chore\(release\)/'
+      when: never
+    # Uniquement sur push direct main (pas sur MR, pas sur tag).
     - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
