@@ -1,0 +1,806 @@
+# Workflow de release consolidé, déclenché sur push d'un tag `v*`.
+# Couvre 5 plateformes en parallèle + uploads stores + création GitHub Release.
+#
+# Pipeline en 3 étages "fail-fast au build, atomic à la publish/release" :
+#
+#   1) prepare        Calcule la version (depuis le tag ou pubspec.yaml).
+#
+#   2) Builds parallèle (gate strict) :
+#        build-ios      → IPA signé (artifact, pas encore publié)
+#        build-android  → AAB signé (artifact, pas encore publié)
+#        build-macos    → .pkg signé (artifact, pas encore publié)
+#        build-windows  → .zip non signé
+#        build-linux    → .AppImage
+#      Si UN SEUL plante, aucun upload store n'est tenté.
+#
+#   3) build-gate     Job sentinelle qui vérifie que les 5 builds sont verts.
+#
+#   4) Publishes parallèle (déclenchés après build-gate) :
+#        publish-ios     → TestFlight "Kidflix Internal"
+#        publish-android → Play Store piste "internal"
+#        publish-macos   → TestFlight macOS (groupe partagé via Universal Purchase)
+#      Windows et Linux n'ont pas de store dans ce pipeline (artifacts only).
+#
+#   5) release        Crée la GitHub Release avec les 6 assets attachés.
+#                     Skippée si workflow_dispatch (pas de tag) — pour tester
+#                     l'ensemble du pipeline sans polluer les Releases GitHub.
+#
+# Secrets requis (Settings → Secrets and variables → Actions) :
+#   APP_STORE_CONNECT_KEY_IDENTIFIER, APP_STORE_CONNECT_ISSUER_ID,
+#   APP_STORE_CONNECT_PRIVATE_KEY, CERTIFICATE_PRIVATE_KEY,
+#   MAC_INSTALLER_CERTIFICATE_P12_BASE64, MAC_INSTALLER_CERTIFICATE_PASSWORD,
+#   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
+#   ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD,
+#   GCLOUD_SERVICE_ACCOUNT_CREDENTIALS,
+#   SIGNOZ_INGESTION_KEY
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+# Configuration Signoz partagée entre toutes les plateformes. Injectée dans
+# chaque binaire via `--dart-define` à la compilation (cf.
+# `lib/infrastructure/providers/logger.service_provider.dart` qui lit
+# `String.fromEnvironment('SIGNOZ_INGEST_URL')`). Sans ces valeurs, l'app
+# retombe sur ConsoleLoggerService → pas de remontée Signoz côté users.
+env:
+  SIGNOZ_INGEST_URL: "https://ingest.eu.signoz.cloud:443/v1/logs"
+  SIGNOZ_ENV: "production"
+
+jobs:
+  prepare:
+    name: Compute version
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extrait la version depuis le tag (ou pubspec.yaml)
+        # Tag `v1.2.3` → 1.2.3. Pour `workflow_dispatch` (lancement manuel
+        # sans tag), on retombe sur la version de `pubspec.yaml`.
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: *//;s/+.*//')
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building version: $VERSION"
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # BUILDS — Compilation + signature + upload artifact (pas de publish)
+  # ═══════════════════════════════════════════════════════════════════════
+
+  build-ios:
+    name: Build iOS (${{ needs.prepare.outputs.version }})
+    needs: prepare
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    env:
+      APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+      CERTIFICATE_PRIVATE_KEY: ${{ secrets.CERTIFICATE_PRIVATE_KEY }}
+      BUNDLE_ID: "fr.dtfh.kidflix"
+      APP_STORE_APPLE_ID: "6769453662"
+      VERSION: ${{ needs.prepare.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26.3 (iOS 26 SDK)
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.3.app/Contents/Developer
+          xcodebuild -version
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.7"
+          channel: stable
+          cache: true
+
+      - name: Setup Python (requis par codemagic-cli-tools)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install codemagic-cli-tools
+        run: pip install codemagic-cli-tools
+
+      - name: Initialize keychain
+        run: keychain initialize
+
+      - name: Fetch signing files (create if missing)
+        run: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --certificate-key=@env:CERTIFICATE_PRIVATE_KEY \
+            --create
+
+      - name: Add certificates to keychain
+        run: keychain add-certificates
+
+      - name: Set up code signing on Xcode project
+        run: xcode-project use-profiles
+
+      - run: flutter pub get
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            ios/Pods
+            ~/Library/Caches/CocoaPods
+          key: pods-${{ runner.os }}-${{ hashFiles('ios/Podfile.lock') }}
+          restore-keys: pods-${{ runner.os }}-
+
+      - name: Install CocoaPods dependencies
+        run: find . -name "Podfile" -execdir pod install \;
+
+      - name: Compute build number from App Store Connect
+        id: build-number
+        run: |
+          LATEST_BUILD=$(app-store-connect get-latest-build-number "$APP_STORE_APPLE_ID")
+          BUILD_NUMBER=$((LATEST_BUILD + 1))
+          echo "Next iOS build number: $BUILD_NUMBER"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Build IPA
+        env:
+          SIGNOZ_INGESTION_KEY: ${{ secrets.SIGNOZ_INGESTION_KEY }}
+        run: |
+          flutter build ipa --release \
+            --build-name="$VERSION" \
+            --build-number="${{ steps.build-number.outputs.build_number }}" \
+            --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
+            --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
+            --dart-define=SIGNOZ_ENV="$SIGNOZ_ENV" \
+            --export-options-plist="$HOME/export_options.plist"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kidflix-ios
+          path: build/ios/ipa/*.ipa
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Upload xcodebuild logs (debug)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-logs-ios
+          path: /tmp/xcodebuild_logs/*.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+  build-android:
+    name: Build Android (${{ needs.prepare.outputs.version }})
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      PACKAGE_NAME: "fr.dtfh.kidflix"
+      GCLOUD_SERVICE_ACCOUNT_CREDENTIALS: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_CREDENTIALS }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java (Temurin 17)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.7"
+          channel: stable
+          cache: true
+
+      - name: Setup Python (requis par codemagic-cli-tools)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install codemagic-cli-tools
+        run: pip install codemagic-cli-tools
+
+      - name: Décoder le keystore upload
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/android/upload-keystore.jks"
+
+      - name: Écrire android/key.properties
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          cat > "$GITHUB_WORKSPACE/android/key.properties" <<EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=$GITHUB_WORKSPACE/android/upload-keystore.jks
+          EOF
+
+      - run: flutter pub get
+
+      - name: Compute build number from Google Play
+        id: build-number
+        run: |
+          LATEST_BUILD=$(google-play get-latest-build-number \
+            --package-name "$PACKAGE_NAME" \
+            --credentials "@env:GCLOUD_SERVICE_ACCOUNT_CREDENTIALS" \
+            --tracks production beta alpha internal 2>/dev/null || echo 0)
+          BUILD_NUMBER=$((${LATEST_BUILD:-0} + 1))
+          echo "Next Android build number: $BUILD_NUMBER"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Build App Bundle (.aab)
+        env:
+          SIGNOZ_INGESTION_KEY: ${{ secrets.SIGNOZ_INGESTION_KEY }}
+        run: |
+          flutter build appbundle --release \
+            --build-name="$VERSION" \
+            --build-number="${{ steps.build-number.outputs.build_number }}" \
+            --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
+            --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
+            --dart-define=SIGNOZ_ENV="$SIGNOZ_ENV"
+
+      - name: Upload AAB + mapping artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kidflix-android
+          path: |
+            build/app/outputs/bundle/release/*.aab
+            build/app/outputs/mapping/release/mapping.txt
+          retention-days: 14
+          if-no-files-found: error
+
+  build-macos:
+    name: Build macOS (${{ needs.prepare.outputs.version }})
+    needs: prepare
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    env:
+      APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+      CERTIFICATE_PRIVATE_KEY: ${{ secrets.CERTIFICATE_PRIVATE_KEY }}
+      MAC_INSTALLER_CERTIFICATE_P12_BASE64: ${{ secrets.MAC_INSTALLER_CERTIFICATE_P12_BASE64 }}
+      MAC_INSTALLER_CERTIFICATE_PASSWORD: ${{ secrets.MAC_INSTALLER_CERTIFICATE_PASSWORD }}
+      BUNDLE_ID: "fr.dtfh.kidflix"
+      APP_STORE_APPLE_ID: "6769453662"
+      VERSION: ${{ needs.prepare.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 26.3
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.3.app/Contents/Developer
+          xcodebuild -version
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.7"
+          channel: stable
+          cache: true
+
+      - name: Enable macOS desktop support
+        run: flutter config --enable-macos-desktop
+
+      - name: Setup Python (requis par codemagic-cli-tools)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install codemagic-cli-tools
+        run: pip install codemagic-cli-tools
+
+      - name: Initialize keychain
+        run: keychain initialize
+
+      - name: Fetch Mac App Store signing files (create if missing)
+        run: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type MAC_APP_STORE \
+            --certificate-key=@env:CERTIFICATE_PRIVATE_KEY \
+            --create
+
+      - name: Add Mac App Distribution certificate to keychain
+        run: keychain add-certificates
+
+      - name: Add Mac Installer Distribution certificate to keychain
+        # Cert installer account-wide, injecté depuis secret base64 (pas généré
+        # par fetch-signing-files qui ne couvre que les certs liés à un bundle ID).
+        run: |
+          INSTALLER_P12="$RUNNER_TEMP/mac_installer.p12"
+          echo "$MAC_INSTALLER_CERTIFICATE_P12_BASE64" | base64 --decode > "$INSTALLER_P12"
+          keychain add-certificates \
+            -c "$INSTALLER_P12" \
+            --certificate-password=@env:MAC_INSTALLER_CERTIFICATE_PASSWORD
+
+      - name: Verify keychain contents (debug)
+        # 2 identités obligatoires : "Apple Distribution" (signe le .app) +
+        # "3rd Party Mac Developer Installer" (signe le .pkg).
+        run: |
+          security find-identity -v -p basic
+          N=$(security find-identity -v -p basic | tail -1 | grep -oE '[0-9]+' | head -1)
+          if [ "${N:-0}" -lt 2 ]; then
+            echo "ERROR: expected at least 2 identities, got ${N:-0}"
+            exit 1
+          fi
+
+      - name: Set up code signing on macOS Xcode project
+        run: xcode-project use-profiles --project macos/Runner.xcodeproj
+
+      - run: flutter pub get
+
+      - name: Cache CocoaPods (macOS)
+        uses: actions/cache@v4
+        with:
+          path: |
+            macos/Pods
+            ~/Library/Caches/CocoaPods
+          key: pods-macos-${{ runner.os }}-${{ hashFiles('macos/Podfile.lock') }}
+          restore-keys: pods-macos-${{ runner.os }}-
+
+      - name: Install CocoaPods dependencies (macOS)
+        run: |
+          cd macos
+          pod install
+
+      - name: Compute build number from App Store Connect (macOS)
+        # `--platform MAC_OS` CRUCIAL : build number macOS séparé d'iOS
+        # malgré Universal Purchase.
+        id: build-number
+        run: |
+          LATEST_BUILD=$(app-store-connect get-latest-build-number \
+            "$APP_STORE_APPLE_ID" \
+            --platform MAC_OS)
+          BUILD_NUMBER=$((LATEST_BUILD + 1))
+          echo "Next macOS build number: $BUILD_NUMBER"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Build macOS release
+        env:
+          SIGNOZ_INGESTION_KEY: ${{ secrets.SIGNOZ_INGESTION_KEY }}
+        run: |
+          flutter build macos --release \
+            --build-name="$VERSION" \
+            --build-number="${{ steps.build-number.outputs.build_number }}" \
+            --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
+            --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
+            --dart-define=SIGNOZ_ENV="$SIGNOZ_ENV"
+
+      - name: Package .app into signed .pkg
+        # productbuild (création) + productsign (signature) séparés pour avoir
+        # un message d'erreur précis. `--timestamp=none` évite l'appel
+        # timestamp.apple.com qui peut hang. `< /dev/null` ferme stdin.
+        run: |
+          set -euo pipefail
+
+          APP_PATH=$(find build/macos/Build/Products/Release -maxdepth 1 -name "*.app" -type d | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app bundle found"
+            ls -la build/macos/Build/Products/Release/ || true
+            exit 1
+          fi
+
+          INSTALLER_IDENTITY=$(security find-identity -v -p basic \
+            | grep "3rd Party Mac Developer Installer" \
+            | head -1 \
+            | sed -E 's/^[[:space:]]*[0-9]+\)[[:space:]]+[A-F0-9]+[[:space:]]+"(.*)"$/\1/')
+          if [ -z "$INSTALLER_IDENTITY" ]; then
+            echo "ERROR: no installer identity found"
+            security find-identity -v
+            exit 1
+          fi
+
+          PKG_NAME="kidflix-${VERSION}-${{ steps.build-number.outputs.build_number }}.pkg"
+          UNSIGNED_PKG="$RUNNER_TEMP/unsigned.pkg"
+
+          productbuild --component "$APP_PATH" /Applications "$UNSIGNED_PKG"
+          productsign \
+            --sign "$INSTALLER_IDENTITY" \
+            --timestamp=none \
+            "$UNSIGNED_PKG" "$PKG_NAME" < /dev/null
+          pkgutil --check-signature "$PKG_NAME"
+          echo "PKG_PATH=$PWD/$PKG_NAME" >> "$GITHUB_ENV"
+
+      - name: Upload .pkg artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kidflix-macos
+          path: ${{ env.PKG_PATH }}
+          retention-days: 14
+          if-no-files-found: error
+
+  build-windows:
+    name: Build Windows (${{ needs.prepare.outputs.version }})
+    needs: prepare
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.7"
+          channel: stable
+          cache: true
+
+      - name: Enable Windows desktop support
+        run: flutter config --enable-windows-desktop
+
+      - run: flutter pub get
+
+      - name: Build Windows release
+        shell: pwsh
+        env:
+          SIGNOZ_INGESTION_KEY: ${{ secrets.SIGNOZ_INGESTION_KEY }}
+        run: |
+          flutter build windows --release `
+            --build-name="$env:VERSION" `
+            --build-number="${{ github.run_number }}" `
+            --dart-define=SIGNOZ_INGEST_URL="$env:SIGNOZ_INGEST_URL" `
+            --dart-define=SIGNOZ_INGESTION_KEY="$env:SIGNOZ_INGESTION_KEY" `
+            --dart-define=SIGNOZ_ENV="$env:SIGNOZ_ENV"
+
+      - name: Zip Windows build output
+        # Le .exe dépend des DLL Flutter et du dossier `data/` côte à côte
+        # → on zippe tout le dossier Release pour un archive autonome.
+        shell: pwsh
+        run: |
+          $zipName = "kidflix-windows-$env:VERSION-${{ github.run_number }}.zip"
+          $sourceDir = "build/windows/x64/runner/Release"
+          if (-not (Test-Path $sourceDir)) {
+            Write-Error "Build output directory not found: $sourceDir"
+            exit 1
+          }
+          Compress-Archive -Path "$sourceDir/*" -DestinationPath $zipName
+          "ZIP_NAME=$zipName" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kidflix-windows
+          path: ${{ env.ZIP_NAME }}
+          retention-days: 14
+          if-no-files-found: error
+
+  build-linux:
+    name: Build Linux (${{ needs.prepare.outputs.version }})
+    needs: prepare
+    # ubuntu-22.04 (glibc 2.35) plutôt que ubuntu-latest (24.04 / glibc 2.39)
+    # pour rester compatible avec les distros utilisateur un peu plus anciennes.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Flutter Linux desktop build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            ninja-build \
+            libgtk-3-dev \
+            clang \
+            cmake \
+            pkg-config \
+            liblzma-dev \
+            libasound2-dev \
+            libmpv-dev
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.7"
+          channel: stable
+          cache: true
+
+      - name: Enable Linux desktop support
+        run: flutter config --enable-linux-desktop
+
+      - run: flutter pub get
+
+      - name: Build Linux release
+        env:
+          SIGNOZ_INGESTION_KEY: ${{ secrets.SIGNOZ_INGESTION_KEY }}
+        run: |
+          flutter build linux --release \
+            --build-name="$VERSION" \
+            --build-number="${{ github.run_number }}" \
+            --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
+            --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
+            --dart-define=SIGNOZ_ENV="$SIGNOZ_ENV"
+
+      - name: Assemble AppDir
+        run: |
+          BUNDLE_DIR="build/linux/x64/release/bundle"
+          APPDIR="AppDir"
+          mkdir -p "$APPDIR/usr/bin"
+          cp -r "$BUNDLE_DIR"/* "$APPDIR/usr/bin/"
+
+          cat > "$APPDIR/AppRun" <<'EOF'
+          #!/bin/bash
+          HERE="$(dirname "$(readlink -f "${0}")")"
+          export LD_LIBRARY_PATH="$HERE/usr/bin/lib:${LD_LIBRARY_PATH}"
+          cd "$HERE/usr/bin" && exec ./kidflix "$@"
+          EOF
+          chmod +x "$APPDIR/AppRun"
+
+          cat > "$APPDIR/kidflix.desktop" <<EOF
+          [Desktop Entry]
+          Type=Application
+          Name=Kidflix
+          Comment=Kidflix — visionnage familial
+          Exec=kidflix
+          Icon=kidflix
+          Categories=AudioVideo;Video;Player;
+          Terminal=false
+          StartupWMClass=fr.dtfh.kidflix
+          EOF
+
+          cp assets/icon/app_icon.png "$APPDIR/kidflix.png"
+
+      - name: Download appimagetool
+        run: |
+          wget -q -O appimagetool \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+
+      - name: Build AppImage
+        # `--appimage-extract-and-run` : appimagetool est lui-même un AppImage
+        # qui requiert FUSE2 pour s'auto-monter. Sur GHA, FUSE n'est pas dispo.
+        run: |
+          APPIMAGE_NAME="Kidflix-${VERSION}-${{ github.run_number }}-x86_64.AppImage"
+          ARCH=x86_64 ./appimagetool --appimage-extract-and-run AppDir "$APPIMAGE_NAME"
+          echo "APPIMAGE_NAME=$APPIMAGE_NAME" >> "$GITHUB_ENV"
+
+      - name: Upload Linux AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kidflix-linux
+          path: ${{ env.APPIMAGE_NAME }}
+          retention-days: 14
+          if-no-files-found: error
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # BUILD GATE — Sentinelle qui valide que les 5 builds sont verts
+  # ═══════════════════════════════════════════════════════════════════════
+
+  build-gate:
+    name: All builds passed
+    needs: [build-ios, build-android, build-macos, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - run: echo "✓ All 5 platform builds succeeded — proceeding to store uploads"
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # PUBLISHES — Uploads stores (déclenchés après build-gate uniquement)
+  # ═══════════════════════════════════════════════════════════════════════
+
+  publish-ios:
+    name: Publish iOS to TestFlight
+    needs: [prepare, build-gate]
+    # macos-15 obligatoire : `app-store-connect publish` utilise `altool`
+    # qui ne tourne que sur macOS (composant de Xcode).
+    # 120 min de timeout pour couvrir : upload (~5 min) + Apple processing
+    # (5-90 min selon les jours) + assignation au beta group (~10s).
+    runs-on: macos-15
+    timeout-minutes: 120
+
+    env:
+      APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+      # Bumpe le timeout interne de `app-store-connect publish` qui attend
+      # la fin du processing Apple AVANT d'assigner au beta group. Default
+      # codemagic-cli-tools = 20 min, insuffisant les jours où la file
+      # d'attente App Store Connect est saturée. À 90 min on couvre 99 %
+      # des cas observés.
+      APP_STORE_CONNECT_MAX_FIND_BUILD_WAIT: "90"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python (requis par codemagic-cli-tools)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install codemagic-cli-tools
+        run: pip install codemagic-cli-tools
+
+      - name: Download iOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: kidflix-ios
+          path: artifacts/
+
+      - name: Publish to TestFlight (internal beta group)
+        run: |
+          WHATS_NEW=$(jq -r '.[] | select(.language=="fr-FR") | .text' release_notes.json)
+          IPA_PATH=$(find artifacts -type f -name '*.ipa' | head -1)
+          echo "Uploading: $IPA_PATH"
+          app-store-connect publish \
+            --path "$IPA_PATH" \
+            --testflight \
+            --beta-group "Kidflix Internal" \
+            --expire-build-submitted-for-review \
+            --locale fr-FR \
+            --whats-new "$WHATS_NEW" \
+            --max-find-build-wait 90
+
+  publish-android:
+    name: Publish Android to Play Store
+    needs: [prepare, build-gate]
+    # ubuntu-latest : `google-play bundles publish` utilise l'API Google
+    # directement (pas de dépendance macOS).
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      GCLOUD_SERVICE_ACCOUNT_CREDENTIALS: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_CREDENTIALS }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python (requis par codemagic-cli-tools)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install codemagic-cli-tools
+        run: pip install codemagic-cli-tools
+
+      - name: Download Android artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: kidflix-android
+          path: artifacts/
+
+      - name: Publish to Play Store (internal track)
+        run: |
+          AAB_PATH=$(find artifacts -type f -name '*.aab' | head -1)
+          echo "Uploading: $AAB_PATH"
+          google-play bundles publish \
+            --credentials "@env:GCLOUD_SERVICE_ACCOUNT_CREDENTIALS" \
+            --bundle "$AAB_PATH" \
+            --track internal \
+            --release-notes "@file:release_notes_android.json"
+
+  publish-macos:
+    name: Publish macOS to TestFlight
+    needs: [prepare, build-gate]
+    # 120 min de timeout : même justification que publish-ios. Le processing
+    # Apple pour les .pkg macOS est souvent plus lent que pour les .ipa.
+    runs-on: macos-15
+    timeout-minutes: 120
+
+    env:
+      APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+      APP_STORE_CONNECT_MAX_FIND_BUILD_WAIT: "90"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python (requis par codemagic-cli-tools)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install codemagic-cli-tools
+        run: pip install codemagic-cli-tools
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: kidflix-macos
+          path: artifacts/
+
+      - name: Publish to TestFlight (internal beta group, macOS)
+        # Même groupe "Kidflix Internal" que iOS — Universal Purchase, les
+        # testeurs avec un Mac voient le build macOS dans leur TestFlight.
+        run: |
+          WHATS_NEW=$(jq -r '.[] | select(.language=="fr-FR") | .text' release_notes.json)
+          PKG_PATH=$(find artifacts -type f -name '*.pkg' | head -1)
+          echo "Uploading: $PKG_PATH"
+          app-store-connect publish \
+            --path "$PKG_PATH" \
+            --testflight \
+            --beta-group "Kidflix Internal" \
+            --expire-build-submitted-for-review \
+            --locale fr-FR \
+            --whats-new "$WHATS_NEW" \
+            --max-find-build-wait 90
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # GITHUB RELEASE — Tous les artifacts attachés, après publishes verts
+  # ═══════════════════════════════════════════════════════════════════════
+
+  release:
+    name: Create GitHub Release
+    needs: [prepare, publish-ios, publish-android, publish-macos]
+    # TEMPORAIRE : condition `if: startsWith(github.ref, 'refs/tags/v')`
+    # désactivée pour pouvoir tester le job release via workflow_dispatch
+    # sans avoir à tagger. À RESTAURER une fois la validation faite.
+    # if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Create GitHub Release
+        run: |
+          BODY=$(jq -r '.[] | select(.language=="fr-FR") | .text' release_notes.json)
+          IPA=$(find artifacts -type f -name '*.ipa' | head -1)
+          AAB=$(find artifacts -type f -name '*.aab' | head -1)
+          MAPPING=$(find artifacts -type f -name 'mapping.txt' | head -1)
+          PKG=$(find artifacts -type f -name '*.pkg' | head -1)
+          WIN_ZIP=$(find artifacts -type f -name '*.zip' | head -1)
+          APPIMAGE=$(find artifacts -type f -name '*.AppImage' | head -1)
+
+          echo "Releasing assets:"
+          echo "  iOS IPA     : $IPA"
+          echo "  Android AAB : $AAB"
+          echo "  Mapping     : $MAPPING"
+          echo "  macOS PKG   : $PKG"
+          echo "  Windows ZIP : $WIN_ZIP"
+          echo "  Linux AppImg: $APPIMAGE"
+
+          # Tag name : `v<version>` si on est sur un tag, sinon nom synthétique
+          # avec run_number pour éviter toute collision avec un tag git existant
+          # et pour ne pas créer une release tagged sur un nom de branche
+          # (ce qui serait invalide / source de confusion).
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            RELEASE_TAG="$GITHUB_REF_NAME"
+          else
+            RELEASE_TAG="dispatch-v${VERSION}-${{ github.run_number }}"
+          fi
+          echo "Release tag: $RELEASE_TAG"
+
+          gh release create "$RELEASE_TAG" \
+            --title "Kidflix v$VERSION" \
+            --notes "$BODY" \
+            "$IPA" "$AAB" "$MAPPING" "$PKG" "$WIN_ZIP" "$APPIMAGE"
