@@ -63,6 +63,27 @@ void main() {
       expect(File('${tempDir.path}/movies/abc.mp4').existsSync(), isTrue);
     });
 
+    test('saves an MKV source with a .mkv extension', () async {
+      const totalBytes = 3 * 1024 * 1024;
+      final adapter = _FakeAdapter(
+        totalBytes: totalBytes,
+        contentType: 'video/x-matroska',
+      );
+      final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
+      final repo = DioDownloadRepository(
+        dio: dio,
+        manifest: _newManifest(tempDir),
+        downloadsDirectory: tempDir,
+      );
+
+      final events = await repo.downloadMovie('abc').toList();
+
+      expect(events.last.status, DownloadStatus.complete);
+      expect(events.last.localPath, endsWith('abc.mkv'));
+      expect(File('${tempDir.path}/movies/abc.mkv').existsSync(), isTrue);
+      expect(File('${tempDir.path}/movies/abc.mp4').existsSync(), isFalse);
+    });
+
     test('two concurrent download() calls share the same network request', () async {
       const totalBytes = 3 * 1024 * 1024;
       final adapter = _FakeAdapter(totalBytes: totalBytes);
@@ -171,6 +192,26 @@ void main() {
       expect(result!.status, DownloadStatus.complete);
       expect(adapter.requestCount, 0);
     });
+
+    test('returns complete for an existing .mkv without HTTP', () async {
+      final file = File('${tempDir.path}/movies/abc.mkv');
+      await file.writeAsBytes(Uint8List(50 * 1024 * 1024));
+
+      final adapter = _FakeAdapter(totalBytes: 0);
+      final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
+      final repo = DioDownloadRepository(
+        dio: dio,
+        manifest: _newManifest(tempDir),
+        downloadsDirectory: tempDir,
+      );
+
+      final result = await repo.findForMovie('abc');
+
+      expect(result, isNotNull);
+      expect(result!.status, DownloadStatus.complete);
+      expect(result.localPath, endsWith('abc.mkv'));
+      expect(adapter.requestCount, 0);
+    });
   });
 
   group('DioDownloadRepository.cancel / delete', () {
@@ -243,6 +284,26 @@ void main() {
           .where((r) => r.method == 'DELETE')
           .toList();
       expect(deleteRequests, isEmpty);
+    });
+
+    test('delete() removes a .mkv artifact regardless of extension', () async {
+      final finalFile = File('${tempDir.path}/movies/abc.mkv');
+      final partialFile = File('${tempDir.path}/movies/abc.mkv.partial');
+      await finalFile.writeAsBytes(Uint8List(100));
+      await partialFile.writeAsBytes(Uint8List(50));
+
+      final adapter = _FakeAdapter(totalBytes: 0);
+      final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
+      final repo = DioDownloadRepository(
+        dio: dio,
+        manifest: _newManifest(tempDir),
+        downloadsDirectory: tempDir,
+      );
+
+      await repo.deleteMovie('abc');
+
+      expect(finalFile.existsSync(), isFalse);
+      expect(partialFile.existsSync(), isFalse);
     });
   });
 
@@ -320,6 +381,7 @@ class _FakeAdapter implements HttpClientAdapter {
     this.honorRange = false,
     this.statusCodeOverride,
     this.chunkDelay,
+    this.contentType,
   });
 
   final int totalBytes;
@@ -327,6 +389,7 @@ class _FakeAdapter implements HttpClientAdapter {
   final bool honorRange;
   final int? statusCodeOverride;
   final Duration? chunkDelay;
+  final String? contentType;
 
   int requestCount = 0;
   RequestOptions? lastRequest;
@@ -378,6 +441,7 @@ class _FakeAdapter implements HttpClientAdapter {
 
     final headers = <String, List<String>>{
       Headers.contentLengthHeader: [remaining.toString()],
+      if (contentType != null) Headers.contentTypeHeader: [contentType!],
       if (statusCode == 206)
         'content-range': ['bytes $start-${totalBytes - 1}/$totalBytes'],
     };

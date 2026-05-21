@@ -8,6 +8,7 @@ import 'package:kidflix/core/domain/model/download_kind.dart';
 import 'package:kidflix/core/domain/model/episode_download.dart';
 import 'package:kidflix/core/domain/model/movie_download.dart';
 import 'package:kidflix/core/domain/services/download.repository.dart';
+import 'package:kidflix/infrastructure/downloads/download_file_naming.dart';
 import 'package:kidflix/infrastructure/downloads/download_inventory_helper.dart'
     as inv;
 import 'package:kidflix/infrastructure/downloads/http_download_stream.dart';
@@ -94,10 +95,7 @@ class InMemoryDownloadRepository implements DownloadRepository {
   Future<void> deleteMovie(String movieId) async {
     await cancelMovie(movieId);
     final dir = await _resolveMoviesDir();
-    final finalFile = File('${dir.path}/$movieId.mp4');
-    if (await finalFile.exists()) await finalFile.delete();
-    final partialFile = File('${dir.path}/$movieId.mp4.partial');
-    if (await partialFile.exists()) await partialFile.delete();
+    await deleteMediaArtifacts(dir, movieId);
     await _manifest.remove(mediaId: movieId, isEpisode: false);
   }
 
@@ -147,10 +145,7 @@ class InMemoryDownloadRepository implements DownloadRepository {
   Future<void> deleteEpisode(String episodeId) async {
     await cancelEpisode(episodeId);
     final dir = await _resolveEpisodesDir();
-    final finalFile = File('${dir.path}/$episodeId.mp4');
-    if (await finalFile.exists()) await finalFile.delete();
-    final partialFile = File('${dir.path}/$episodeId.mp4.partial');
-    if (await partialFile.exists()) await partialFile.delete();
+    await deleteMediaArtifacts(dir, episodeId);
     await _manifest.remove(mediaId: episodeId, isEpisode: true);
   }
 
@@ -176,7 +171,7 @@ class InMemoryDownloadRepository implements DownloadRepository {
       mediaId: movieId,
       isEpisode: false,
       kind: kind,
-      mediaFileForCreate: File('${dir.path}/$movieId.mp4'),
+      mediaFileForCreate: await findCompletedMediaFile(dir, movieId),
     );
   }
 
@@ -188,7 +183,7 @@ class InMemoryDownloadRepository implements DownloadRepository {
       mediaId: episodeId,
       isEpisode: true,
       kind: kind,
-      mediaFileForCreate: File('${dir.path}/$episodeId.mp4'),
+      mediaFileForCreate: await findCompletedMediaFile(dir, episodeId),
     );
   }
 

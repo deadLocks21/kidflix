@@ -50,6 +50,57 @@ void main() {
       },
     );
 
+    test('derives .mkv from a video/x-matroska Content-Type', () async {
+      const totalBytes = 3 * 1024 * 1024;
+      final adapter = _FakeAdapter(
+        totalBytes: totalBytes,
+        contentType: 'video/x-matroska',
+      );
+      final dio = _newDio(adapter);
+
+      final events = await streamHttpDownload(
+        dio: dio,
+        url: 'https://example.test/abc',
+        movieId: 'abc',
+        downloadsDir: tempDir,
+        cancelToken: CancelToken(),
+        isCancelled: () => false,
+      ).toList();
+
+      expect(events.last.status, DownloadStatus.complete);
+      expect(events.last.localPath, endsWith('abc.mkv'));
+      expect(File('${tempDir.path}/abc.mkv').existsSync(), isTrue);
+      expect(File('${tempDir.path}/abc.mp4').existsSync(), isFalse);
+      expect(File('${tempDir.path}/abc.mkv.partial').existsSync(), isFalse);
+    });
+
+    test('resumes an existing .mkv.partial keeping its extension', () async {
+      final partialFile = File('${tempDir.path}/abc.mkv.partial');
+      await partialFile.writeAsBytes(Uint8List(1024 * 1024));
+
+      const totalBytes = 3 * 1024 * 1024;
+      final adapter = _FakeAdapter(
+        totalBytes: totalBytes,
+        honorRange: true,
+        contentType: 'video/x-matroska',
+      );
+      final dio = _newDio(adapter);
+
+      final events = await streamHttpDownload(
+        dio: dio,
+        url: 'https://example.test/abc',
+        movieId: 'abc',
+        downloadsDir: tempDir,
+        cancelToken: CancelToken(),
+        isCancelled: () => false,
+      ).toList();
+
+      expect(adapter.lastRequest!.headers['range'], 'bytes=1048576-');
+      expect(events.last.status, DownloadStatus.complete);
+      expect(File('${tempDir.path}/abc.mkv').existsSync(), isTrue);
+      expect(File('${tempDir.path}/abc.mkv.partial').existsSync(), isFalse);
+    });
+
     test('resumes from existing .partial via Range header', () async {
       final partialFile = File('${tempDir.path}/abc.mp4.partial');
       await partialFile.writeAsBytes(Uint8List(1024 * 1024)); // 1 MiB
@@ -306,6 +357,7 @@ class _FakeAdapter implements HttpClientAdapter {
     this.chunkDelay,
     this.forceStatusCode,
     this.forceContentRangeStart,
+    this.contentType,
   });
 
   final int totalBytes;
@@ -315,6 +367,7 @@ class _FakeAdapter implements HttpClientAdapter {
   final Duration? chunkDelay;
   final int? forceStatusCode;
   final int? forceContentRangeStart;
+  final String? contentType;
 
   int requestCount = 0;
   RequestOptions? lastRequest;
@@ -363,6 +416,7 @@ class _FakeAdapter implements HttpClientAdapter {
 
     final headers = <String, List<String>>{
       Headers.contentLengthHeader: [remaining.toString()],
+      if (contentType != null) Headers.contentTypeHeader: [contentType!],
       if (statusCode == 206)
         'content-range': [
           'bytes $reportedStart-${totalBytes - 1}/$totalBytes',

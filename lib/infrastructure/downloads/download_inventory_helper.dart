@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:kidflix/core/domain/model/download_inventory_record.dart';
 import 'package:kidflix/core/domain/model/download_kind.dart';
+import 'package:kidflix/infrastructure/downloads/download_file_naming.dart';
 import 'package:kidflix/infrastructure/downloads/download_manifest_entry.dart';
 import 'package:kidflix/infrastructure/downloads/manifest_store.dart';
 
@@ -10,12 +11,12 @@ import 'package:kidflix/infrastructure/downloads/manifest_store.dart';
 /// filesystem scan / kind-flip logic exists in exactly one place.
 ///
 /// Layout assumed:
-/// * `${rootDir}/movies/<id>.mp4` and `<id>.mp4.partial` for movies.
-/// * `${rootDir}/episodes/<id>.mp4` and `<id>.mp4.partial` for episodes.
+/// * `${rootDir}/movies/<id>.<ext>` and `<id>.<ext>.partial` for movies.
+/// * `${rootDir}/episodes/<id>.<ext>` and `<id>.<ext>.partial` for episodes.
 
 /// Enumerates every download present on disk under [rootDir],
-/// deduplicating per-id (`.mp4` + `.partial` for the same id appear as
-/// one record with combined `bytesOnDisk`), and joins each with its
+/// deduplicating per-id (the media file + its `.partial` for the same id
+/// appear as one record with combined `bytesOnDisk`), and joins each with its
 /// manifest entry. When no manifest entry exists, falls back to safe
 /// defaults: `kind = cache`, `lastPlayedAt = file.lastModified`.
 Future<List<DownloadInventoryRecord>> listAllDownloads({
@@ -40,7 +41,7 @@ Future<List<DownloadInventoryRecord>> listAllDownloads({
   return results;
 }
 
-/// Sum of `.mp4` and `.partial` file sizes under
+/// Sum of every media-file and `.partial` size under
 /// `${rootDir}/{movies,episodes}/`. Returns `0` when [rootDir] is
 /// absent. Never throws.
 Future<int> totalBytesOnDisk(Directory rootDir) async {
@@ -51,8 +52,7 @@ Future<int> totalBytesOnDisk(Directory rootDir) async {
     if (!await dir.exists()) continue;
     await for (final entity in dir.list(followLinks: false)) {
       if (entity is File &&
-          (entity.path.endsWith('.mp4') ||
-              entity.path.endsWith('.mp4.partial'))) {
+          parseMediaFileName(entity.uri.pathSegments.last) != null) {
         try {
           total += await entity.length();
         } catch (_) {
@@ -68,7 +68,7 @@ Future<int> totalBytesOnDisk(Directory rootDir) async {
 /// Sets [kind] on the manifest entry for `(mediaId, isEpisode)`.
 /// Idempotent: when the existing entry already has the same kind,
 /// returns without writing. Creates a fresh entry when none exists,
-/// using [mediaFileForCreate] (the on-disk `.mp4` if present) to seed
+/// using [mediaFileForCreate] (the on-disk media file if present) to seed
 /// `lastPlayedAt` from the file's `lastModified`.
 Future<void> setKind({
   required DownloadManifestStore manifest,
@@ -335,19 +335,14 @@ Future<List<DownloadInventoryRecord>> _scanKind({
 }) async {
   if (!await kindDir.exists()) return const [];
 
-  // Aggregate by media id: a `.mp4` and a `.mp4.partial` for the same
+  // Aggregate by media id: the media file and its `.partial` for the same
   // id contribute to a single record with summed bytes.
   final byId = <String, _Aggregate>{};
   await for (final entity in kindDir.list(followLinks: false)) {
     if (entity is! File) continue;
-    final fileName = entity.uri.pathSegments.last;
-    String? mediaId;
-    if (fileName.endsWith('.mp4.partial')) {
-      mediaId = fileName.substring(0, fileName.length - '.mp4.partial'.length);
-    } else if (fileName.endsWith('.mp4')) {
-      mediaId = fileName.substring(0, fileName.length - '.mp4'.length);
-    }
-    if (mediaId == null || mediaId.isEmpty) continue;
+    final parsed = parseMediaFileName(entity.uri.pathSegments.last);
+    if (parsed == null) continue;
+    final mediaId = parsed.mediaId;
 
     final agg = byId.putIfAbsent(mediaId, _Aggregate.new);
     try {

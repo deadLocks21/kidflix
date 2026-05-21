@@ -11,8 +11,8 @@ import 'package:kidflix/core/domain/model/movie_download.dart';
 /// rather than a polymorphic API: the call sites always know statically
 /// whether they handle a movie or an episode (the player layer
 /// dispatches via the sealed `PlayableMedia`), and the local filesystem
-/// paths are inherently namespaced (`/downloads/movies/<id>.mp4` vs
-/// `/downloads/episodes/<id>.mp4`).
+/// paths are inherently namespaced (`/downloads/movies/<id>.<ext>` vs
+/// `/downloads/episodes/<id>.<ext>`).
 ///
 /// For each pipeline the contract is:
 ///
@@ -55,8 +55,9 @@ abstract interface class DownloadRepository {
   /// file. No-op when no download is active.
   Future<void> cancelMovie(String movieId);
 
-  /// Removes all local artifacts for [movieId] (`.mp4` and `.partial`)
-  /// AND its manifest entry. Cancels any in-flight download. Idempotent.
+  /// Removes all local artifacts for [movieId] (the media file and any
+  /// `.partial`) AND its manifest entry. Cancels any in-flight download.
+  /// Idempotent.
   Future<void> deleteMovie(String movieId);
 
   // ── Episode pipeline ──────────────────────────────────────────────
@@ -73,22 +74,23 @@ abstract interface class DownloadRepository {
   /// file. No-op when no download is active.
   Future<void> cancelEpisode(String episodeId);
 
-  /// Removes all local artifacts for [episodeId] (`.mp4` and `.partial`)
-  /// AND its manifest entry. Cancels any in-flight download. Idempotent.
+  /// Removes all local artifacts for [episodeId] (the media file and any
+  /// `.partial`) AND its manifest entry. Cancels any in-flight download.
+  /// Idempotent.
   Future<void> deleteEpisode(String episodeId);
 
   // ── Inventory & manifest surface ──────────────────────────────────
 
   /// Enumerates every downloaded item present on disk under
   /// `${documents}/downloads/{movies,episodes}/`. Returns one record
-  /// per media id, with its `bytesOnDisk` (sum of `.mp4` + any
+  /// per media id, with its `bytesOnDisk` (sum of the media file + any
   /// `.partial`) and its manifest metadata. Default `kind = cache`,
   /// `lastPlayedAt = file.lastModified`, others `null` when no
   /// manifest entry exists. Returns an empty list when the directory
   /// is empty or absent. Order is implementation-defined.
   Future<List<DownloadInventoryRecord>> listAll();
 
-  /// Returns the total byte count of all `.mp4` and `.partial` files
+  /// Returns the total byte count of all media and `.partial` files
   /// under the downloads directory. Returns `0` when empty/absent.
   /// Never throws.
   Future<int> totalBytesOnDisk();
@@ -97,7 +99,7 @@ abstract interface class DownloadRepository {
   ///
   /// Idempotent: re-setting to the current value is a no-op (no
   /// manifest write). Creates a manifest entry if absent (with
-  /// `lastPlayedAt = file.lastModified` when a `.mp4` exists).
+  /// `lastPlayedAt = file.lastModified` when the media file exists).
   /// Other manifest fields (`completedAt`, `lastPlayedAt`,
   /// `triggeredByProfileId`) are preserved verbatim when an entry
   /// already exists.

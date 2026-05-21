@@ -1,7 +1,7 @@
 import 'package:kidflix/core/domain/services/download.repository.dart';
 
-/// Deletes every local artifact of an episode download (`.partial` +
-/// `.mp4`) and cancels any in-flight download. Idempotent.
+/// Deletes every local artifact of an episode download (the media file +
+/// any `.partial`) and cancels any in-flight download. Idempotent.
 class DeleteEpisodeDownloadUseCase {
   final DownloadRepository _repository;
 

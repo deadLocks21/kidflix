@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:kidflix/core/domain/model/movie_download.dart';
+import 'package:kidflix/infrastructure/downloads/download_file_naming.dart';
 
 /// Shared download streaming primitive used by every [DownloadRepository]
 /// implementation.
@@ -11,9 +12,11 @@ import 'package:kidflix/core/domain/model/movie_download.dart';
 /// third-party URL without leaking auth headers, while a backend-bound
 /// repo can hit a relative path under `dio.options.baseUrl` and rely on
 /// the registered `AuthInterceptor`. The helper is the single source of
-/// truth for the `.partial` → `.mp4` rename, the 2 MiB + 3% `readyToPlay`
+/// truth for the `.partial` → final-file rename, the 2 MiB + 3% `readyToPlay`
 /// threshold, the 4 Hz progress throttling, and the `Range` resume
-/// semantics.
+/// semantics. The final file's extension is derived from the response
+/// `Content-Type` via [download_file_naming.dart] (e.g. `video/x-matroska`
+/// → `.mkv`).
 ///
 /// The returned stream is single-subscription — callers that need a
 /// broadcast stream wrap it in their own `StreamController.broadcast()`.
@@ -44,16 +47,17 @@ Stream<MovieDownload> streamHttpDownload({
 
 /// Inspects the filesystem for a previously-completed or interrupted
 /// download of [movieId] and returns a synthetic [MovieDownload]
-/// snapshot if a `.mp4` (complete) or `.mp4.partial` (cancelled) is
-/// found on disk. Returns `null` when neither file exists.
+/// snapshot if a completed `<id>.<ext>` or an interrupted
+/// `<id>.<ext>.partial` is found on disk (any known extension). Returns
+/// `null` when neither exists.
 ///
 /// Issues no HTTP request and depends on no in-process state.
 Future<MovieDownload?> inspectDownloadOnDisk({
   required String movieId,
   required Directory downloadsDir,
 }) async {
-  final finalFile = File(_finalPath(movieId, downloadsDir));
-  if (await finalFile.exists()) {
+  final finalFile = await findCompletedMediaFile(downloadsDir, movieId);
+  if (finalFile != null) {
     final size = await finalFile.length();
     return MovieDownload(
       movieId: movieId,
@@ -64,8 +68,8 @@ Future<MovieDownload?> inspectDownloadOnDisk({
       updatedAt: await finalFile.lastModified(),
     );
   }
-  final partialFile = File(_partialPath(movieId, downloadsDir));
-  if (await partialFile.exists()) {
+  final partialFile = await findPartialMediaFile(downloadsDir, movieId);
+  if (partialFile != null) {
     final size = await partialFile.length();
     return MovieDownload(
       movieId: movieId,
@@ -82,12 +86,6 @@ const _readyThresholdBytes = 2 * 1024 * 1024;
 const _readyThresholdFraction = 0.03;
 const _throttleInterval = Duration(milliseconds: 250);
 
-String _finalPath(String movieId, Directory dir) =>
-    '${dir.path}/$movieId.mp4';
-
-String _partialPath(String movieId, Directory dir) =>
-    '${dir.path}/$movieId.mp4.partial';
-
 Future<void> _runDownload({
   required StreamController<MovieDownload> controller,
   required Dio dio,
@@ -102,16 +100,17 @@ Future<void> _runDownload({
       await downloadsDir.create(recursive: true);
     }
 
-    final finalFile = File(_finalPath(movieId, downloadsDir));
-    if (await finalFile.exists()) {
-      final size = await finalFile.length();
+    // Already completed on a previous run? Short-circuit with no HTTP.
+    final existingFinal = await findCompletedMediaFile(downloadsDir, movieId);
+    if (existingFinal != null) {
+      final size = await existingFinal.length();
       controller.add(
         MovieDownload(
           movieId: movieId,
           status: DownloadStatus.complete,
           bytesReceived: size,
           bytesTotal: size,
-          localPath: finalFile.path,
+          localPath: existingFinal.path,
           updatedAt: DateTime.now(),
         ),
       );
@@ -119,10 +118,14 @@ Future<void> _runDownload({
       return;
     }
 
-    final partialFile = File(_partialPath(movieId, downloadsDir));
-    final initialBytes = await partialFile.exists()
-        ? await partialFile.length()
-        : 0;
+    // Resume from an interrupted `.partial` when present. Its extension was
+    // chosen by the run that created it, so we reuse it on an accepted range.
+    final existingPartial = await findPartialMediaFile(downloadsDir, movieId);
+    final resumeExt = existingPartial == null
+        ? null
+        : parseMediaFileName(existingPartial.uri.pathSegments.last)?.ext;
+    final initialBytes =
+        existingPartial != null ? await existingPartial.length() : 0;
 
     final Response<ResponseBody> response;
     try {
@@ -141,9 +144,14 @@ Future<void> _runDownload({
       );
     } on DioException catch (e) {
       if (isCancelled() || CancelToken.isCancel(e)) {
-        await _emitCancelled(controller, movieId, partialFile, initialBytes);
+        await _emitCancelled(controller, movieId, existingPartial, initialBytes);
       } else {
-        await _emitFailed(controller, movieId, e.message ?? 'Download failed', partialFile);
+        await _emitFailed(
+          controller,
+          movieId,
+          e.message ?? 'Download failed',
+          existingPartial,
+        );
       }
       return;
     }
@@ -158,9 +166,24 @@ Future<void> _runDownload({
     final serverAcceptedRange =
         statusCode == 206 && actualRangeStart == initialBytes;
 
+    // On an accepted resume keep the `.partial`'s existing extension;
+    // otherwise (fresh download or restart-from-0) derive the real container
+    // from the response `Content-Type` so MKV sources land as `.mkv`.
+    final ext = serverAcceptedRange && resumeExt != null
+        ? resumeExt
+        : extensionForContentType(
+            response.headers.value(Headers.contentTypeHeader),
+          );
+    final finalFile =
+        File('${downloadsDir.path}/${mediaFileName(movieId, ext)}');
+    final partialFile =
+        File('${downloadsDir.path}/${partialFileName(movieId, ext)}');
+
     var bytesReceived = serverAcceptedRange ? initialBytes : 0;
-    if (!serverAcceptedRange && await partialFile.exists()) {
-      await partialFile.delete();
+    if (!serverAcceptedRange && existingPartial != null) {
+      // Range rejected (or restart-from-0): drop the stale partial, which may
+      // even carry a different extension than the one we just derived.
+      await existingPartial.delete();
     }
     if (!await partialFile.exists()) {
       await partialFile.create(recursive: true);
@@ -302,15 +325,19 @@ bool _meetsReadyThreshold(int received, int? total) {
 Future<void> _emitCancelled(
   StreamController<MovieDownload> controller,
   String movieId,
-  File partialFile,
+  File? partialFile,
   int bytes,
 ) async {
+  String? path;
+  if (partialFile != null && await partialFile.exists()) {
+    path = partialFile.path;
+  }
   controller.add(
     MovieDownload(
       movieId: movieId,
       status: DownloadStatus.cancelled,
       bytesReceived: bytes,
-      localPath: await partialFile.exists() ? partialFile.path : null,
+      localPath: path,
       updatedAt: DateTime.now(),
     ),
   );
@@ -321,15 +348,20 @@ Future<void> _emitFailed(
   StreamController<MovieDownload> controller,
   String movieId,
   String message,
-  File partialFile,
+  File? partialFile,
 ) async {
-  final bytes = await partialFile.exists() ? await partialFile.length() : 0;
+  var bytes = 0;
+  String? path;
+  if (partialFile != null && await partialFile.exists()) {
+    bytes = await partialFile.length();
+    path = partialFile.path;
+  }
   controller.add(
     MovieDownload(
       movieId: movieId,
       status: DownloadStatus.failed,
       bytesReceived: bytes,
-      localPath: await partialFile.exists() ? partialFile.path : null,
+      localPath: path,
       errorMessage: message,
       updatedAt: DateTime.now(),
     ),
