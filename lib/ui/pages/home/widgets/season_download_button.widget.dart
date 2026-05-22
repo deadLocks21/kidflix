@@ -6,6 +6,7 @@ import 'package:kidflix/core/application/session_state.dart';
 import 'package:kidflix/core/application/usecases/download_season.usecase.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/infrastructure/providers/download_management.usecases_provider.dart';
+import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/profile_pin.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/ui/pages/player/widgets/unlock_pin_dialog.widget.dart';
@@ -181,6 +182,7 @@ class _SeasonDownloadButtonState extends ConsumerState<SeasonDownloadButton> {
       context,
       mainProfile: mainProfile,
       pinService: ref.read(profilePinServiceProvider),
+      logger: ref.read(loggerProvider),
     );
   }
 }

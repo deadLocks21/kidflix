@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/domain/model/download_kind.dart';
 import 'package:kidflix/core/domain/model/episode_download.dart';
 import 'package:kidflix/core/domain/model/media.dart';
@@ -37,12 +38,15 @@ class DownloadSeasonProgress {
 class DownloadSeasonUseCase {
   final SeriesRepository _series;
   final DownloadRepository _downloads;
+  final LoggerApplicationService _logger;
 
   const DownloadSeasonUseCase({
     required SeriesRepository series,
     required DownloadRepository downloads,
+    required LoggerApplicationService logger,
   }) : _series = series,
-       _downloads = downloads;
+       _downloads = downloads,
+       _logger = logger;
 
   Stream<DownloadSeasonProgress> execute({
     required String seriesId,
@@ -60,6 +64,17 @@ class DownloadSeasonUseCase {
         await _downloads.cancelEpisode(activeEpisodeId!);
       }
     };
+
+    unawaited(
+      _logger.info(
+        'download.started',
+        attrs: {
+          'content.id': seriesId,
+          'content.type': 'season',
+          'season.number': seasonNumber,
+        },
+      ),
+    );
 
     Future<void> run() async {
       try {
@@ -103,6 +118,18 @@ class DownloadSeasonUseCase {
           }
         }
       } catch (e, st) {
+        unawaited(
+          _logger.error(
+            'download.failed',
+            attrs: {
+              'content.id': seriesId,
+              'content.type': 'season',
+              'season.number': seasonNumber,
+            },
+            error: e,
+            stack: st,
+          ),
+        );
         controller.addError(e, st);
       } finally {
         if (!controller.isClosed) await controller.close();

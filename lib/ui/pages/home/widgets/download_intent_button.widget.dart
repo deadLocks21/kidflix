@@ -9,6 +9,7 @@ import 'package:kidflix/core/domain/model/movie_download.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/infrastructure/providers/download.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/download_management.usecases_provider.dart';
+import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/profile_pin.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/ui/pages/home/widgets/download_progress_button.widget.dart';
@@ -330,6 +331,7 @@ class _DownloadIntentButtonState extends ConsumerState<DownloadIntentButton> {
       context,
       mainProfile: mainProfile,
       pinService: ref.read(profilePinServiceProvider),
+      logger: ref.read(loggerProvider),
     );
   }
 }

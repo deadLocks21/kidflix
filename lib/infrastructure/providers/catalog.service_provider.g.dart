@@ -54,4 +54,4 @@ final class CatalogServiceProvider
   }
 }
 
-String _$catalogServiceHash() => r'1226f8f04c0c17c4833688f630af44729001d57e';
+String _$catalogServiceHash() => r'43e0e89f8bdb1bd54f369ef192c84742e5158739';

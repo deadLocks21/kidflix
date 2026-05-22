@@ -1,6 +1,7 @@
 import 'package:kidflix/core/application/usecases/dismiss_continue_watching.usecase.dart';
 import 'package:kidflix/core/application/usecases/get_watch_progress.usecase.dart';
 import 'package:kidflix/core/application/usecases/save_watch_progress.usecase.dart';
+import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/watch_progress.repository_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -13,7 +14,10 @@ GetWatchProgressUseCase getWatchProgressUseCase(Ref ref) {
 
 @Riverpod(keepAlive: true)
 SaveWatchProgressUseCase saveWatchProgressUseCase(Ref ref) {
-  return SaveWatchProgressUseCase(ref.watch(watchProgressRepositoryProvider));
+  return SaveWatchProgressUseCase(
+    ref.watch(watchProgressRepositoryProvider),
+    ref.watch(loggerProvider),
+  );
 }
 
 @Riverpod(keepAlive: true)

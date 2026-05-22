@@ -10,6 +10,7 @@ import 'package:kidflix/infrastructure/providers/catalog.repository_provider.dar
 import 'package:kidflix/infrastructure/providers/device_storage_probe.provider.dart';
 import 'package:kidflix/infrastructure/providers/download.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/download_cleanup.service_provider.dart';
+import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/series.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -22,6 +23,7 @@ ListDownloadsUseCase listDownloadsUseCase(Ref ref) {
     repository: ref.watch(downloadRepositoryProvider),
     catalog: ref.watch(catalogRepositoryProvider),
     series: ref.watch(seriesRepositoryProvider),
+    logger: ref.watch(loggerProvider),
   );
 }
 
@@ -40,6 +42,7 @@ GetStorageSummaryUseCase getStorageSummaryUseCase(Ref ref) {
   return GetStorageSummaryUseCase(
     probe: ref.watch(deviceStorageProbeProvider),
     repository: ref.watch(downloadRepositoryProvider),
+    logger: ref.watch(loggerProvider),
   );
 }
 
@@ -48,6 +51,7 @@ DownloadSeasonUseCase downloadSeasonUseCase(Ref ref) {
   return DownloadSeasonUseCase(
     series: ref.watch(seriesRepositoryProvider),
     downloads: ref.watch(downloadRepositoryProvider),
+    logger: ref.watch(loggerProvider),
   );
 }
 
@@ -56,6 +60,7 @@ RunStartupCacheCleanupUseCase runStartupCacheCleanupUseCase(Ref ref) {
   return RunStartupCacheCleanupUseCase(
     service: ref.watch(downloadCleanupServiceProvider),
     preferences: ref.watch(cacheCleanupPreferencesProvider),
+    logger: ref.watch(loggerProvider),
   );
 }
 

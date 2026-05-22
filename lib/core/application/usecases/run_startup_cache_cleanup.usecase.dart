@@ -1,6 +1,5 @@
-import 'dart:developer' as developer;
-
 import 'package:kidflix/core/application/preferences/cache_cleanup_preferences.dart';
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/domain/services/download_cleanup.service.dart';
 
 const Duration cacheRetention = Duration(days: 30);
@@ -12,12 +11,15 @@ const Duration cacheRetention = Duration(days: 30);
 class RunStartupCacheCleanupUseCase {
   final DownloadCleanupService _service;
   final CacheCleanupPreferences _preferences;
+  final LoggerApplicationService _logger;
 
   const RunStartupCacheCleanupUseCase({
     required DownloadCleanupService service,
     required CacheCleanupPreferences preferences,
+    required LoggerApplicationService logger,
   }) : _service = service,
-       _preferences = preferences;
+       _preferences = preferences,
+       _logger = logger;
 
   /// Returns the number of items deleted in this pass. Always
   /// completes; never throws.
@@ -30,19 +32,13 @@ class RunStartupCacheCleanupUseCase {
         olderThan: cacheRetention,
         now: DateTime.now(),
       );
-      developer.log(
-        'cache cleanup: removed $removed items older than ${cacheRetention.inDays} days',
-        name: 'kidflix.downloads.cleanup',
+      await _logger.info(
+        'cache.cleanup.done',
+        attrs: {'removed': removed, 'retention.days': cacheRetention.inDays},
       );
       return removed;
     } catch (e, st) {
-      developer.log(
-        'cache cleanup: aborted by exception',
-        name: 'kidflix.downloads.cleanup',
-        level: 900,
-        error: e,
-        stackTrace: st,
-      );
+      await _logger.warn('cache.cleanup.failed', error: e, stack: st);
       return 0;
     }
   }

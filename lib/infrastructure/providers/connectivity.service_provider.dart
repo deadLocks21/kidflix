@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:kidflix/core/domain/services/connectivity.service.dart';
 import 'package:kidflix/infrastructure/connectivity/connectivity_plus.service.dart';
+import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'connectivity.service_provider.g.dart';
@@ -18,9 +21,27 @@ ConnectivityService connectivityService(Ref ref) {
 /// Reactive online/offline boolean. Listeners rebuild on every
 /// transition. Defaults to `true` until the platform reports a value
 /// (cf. [ConnectivityPlusService] doc).
+///
+/// Émet `connectivity.online` / `connectivity.offline` à chaque vraie
+/// transition. La première valeur (replay de l'état courant, cf.
+/// [ConnectivityService.watch]) n'est pas loggée : seul un changement
+/// effectif par rapport à la valeur précédente déclenche un log.
 @Riverpod(keepAlive: true)
-Stream<bool> connectivity(Ref ref) {
-  return ref.watch(connectivityServiceProvider).watch();
+Stream<bool> connectivity(Ref ref) async* {
+  final logger = ref.read(loggerProvider);
+  bool? previous;
+  await for (final online in ref.watch(connectivityServiceProvider).watch()) {
+    if (previous != null && online != previous) {
+      // Fire-and-forget : ne pas bloquer la propagation de l'état réseau.
+      unawaited(
+        online
+            ? logger.info('connectivity.online')
+            : logger.info('connectivity.offline'),
+      );
+    }
+    previous = online;
+    yield online;
+  }
 }
 
 /// Synchronous best-effort accessor for the latest known online state.

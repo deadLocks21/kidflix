@@ -22,11 +22,11 @@ AuthApplicationService authService(Ref ref) {
   final logger = ref.watch(loggerProvider);
   return AuthApplicationService(
     requestOtp: RequestOtpUseCase(auth, logger),
-    verifyOtp: VerifyOtpUseCase(auth),
-    resendOtp: ResendOtpUseCase(auth),
-    restoreSession: RestoreSessionUseCase(sessions),
-    logout: LogoutUseCase(sessions),
-    selectProfile: const SelectProfileUseCase(),
-    verifyProfilePin: VerifyProfilePinUseCase(pin),
+    verifyOtp: VerifyOtpUseCase(auth, logger),
+    resendOtp: ResendOtpUseCase(auth, logger),
+    restoreSession: RestoreSessionUseCase(sessions, logger),
+    logout: LogoutUseCase(sessions, logger),
+    selectProfile: SelectProfileUseCase(logger),
+    verifyProfilePin: VerifyProfilePinUseCase(pin, logger),
   );
 }

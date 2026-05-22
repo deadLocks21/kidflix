@@ -73,6 +73,11 @@ String _$connectivityServiceHash() =>
 /// Reactive online/offline boolean. Listeners rebuild on every
 /// transition. Defaults to `true` until the platform reports a value
 /// (cf. [ConnectivityPlusService] doc).
+///
+/// Émet `connectivity.online` / `connectivity.offline` à chaque vraie
+/// transition. La première valeur (replay de l'état courant, cf.
+/// [ConnectivityService.watch]) n'est pas loggée : seul un changement
+/// effectif par rapport à la valeur précédente déclenche un log.
 
 @ProviderFor(connectivity)
 final connectivityProvider = ConnectivityProvider._();
@@ -80,6 +85,11 @@ final connectivityProvider = ConnectivityProvider._();
 /// Reactive online/offline boolean. Listeners rebuild on every
 /// transition. Defaults to `true` until the platform reports a value
 /// (cf. [ConnectivityPlusService] doc).
+///
+/// Émet `connectivity.online` / `connectivity.offline` à chaque vraie
+/// transition. La première valeur (replay de l'état courant, cf.
+/// [ConnectivityService.watch]) n'est pas loggée : seul un changement
+/// effectif par rapport à la valeur précédente déclenche un log.
 
 final class ConnectivityProvider
     extends $FunctionalProvider<AsyncValue<bool>, bool, Stream<bool>>
@@ -87,6 +97,11 @@ final class ConnectivityProvider
   /// Reactive online/offline boolean. Listeners rebuild on every
   /// transition. Defaults to `true` until the platform reports a value
   /// (cf. [ConnectivityPlusService] doc).
+  ///
+  /// Émet `connectivity.online` / `connectivity.offline` à chaque vraie
+  /// transition. La première valeur (replay de l'état courant, cf.
+  /// [ConnectivityService.watch]) n'est pas loggée : seul un changement
+  /// effectif par rapport à la valeur précédente déclenche un log.
   ConnectivityProvider._()
     : super(
         from: null,
@@ -112,7 +127,7 @@ final class ConnectivityProvider
   }
 }
 
-String _$connectivityHash() => r'67f471db46a93e49be5a125767e524f1939f54ca';
+String _$connectivityHash() => r'35fccbbee37b6448c46d54f19a7b487762dc16e2';
 
 /// Synchronous best-effort accessor for the latest known online state.
 /// Reads the cached value from the underlying service so it never

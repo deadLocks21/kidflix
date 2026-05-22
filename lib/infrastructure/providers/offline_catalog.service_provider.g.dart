@@ -142,4 +142,4 @@ final class OfflineCatalogServiceProvider
 }
 
 String _$offlineCatalogServiceHash() =>
-    r'736d5a8eff273af29abe94436d0b1de866ea88dd';
+    r'2effb48f099546ec6e19d1c106a8199d35a3d517';

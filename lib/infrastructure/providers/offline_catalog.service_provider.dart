@@ -4,6 +4,7 @@ import 'package:kidflix/core/application/usecases/resolve_continue_watching.usec
 import 'package:kidflix/core/domain/services/catalog.repository.dart';
 import 'package:kidflix/infrastructure/catalog/manifest_backed.catalog.repository.dart';
 import 'package:kidflix/infrastructure/providers/download_manifest_store.provider.dart';
+import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/series.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/infrastructure/providers/watch_progress.repository_provider.dart';
@@ -41,6 +42,7 @@ CatalogApplicationService offlineCatalogService(Ref ref) {
     progressRepo: watchProgress,
     catalogRepo: repository,
     seriesRepo: ref.watch(seriesRepositoryProvider),
+    logger: ref.watch(loggerProvider),
   );
   return CatalogApplicationService(
     repository,

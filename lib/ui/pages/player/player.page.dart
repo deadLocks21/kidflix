@@ -22,6 +22,7 @@ import 'package:kidflix/core/domain/services/profile_pin.service.dart';
 import 'package:kidflix/infrastructure/providers/catalog.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/download.usecases_provider.dart';
 import 'package:kidflix/infrastructure/providers/kids_lock.service_provider.dart';
+import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/profile_pin.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/series.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
@@ -480,10 +481,45 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       _selectedAudioIdNotifier.value = selected.audioId;
       _selectedSubtitleIdNotifier.value = selected.subtitleId;
     });
-    await engine.open(localPath, initialPosition: initialPosition);
+    try {
+      await engine.open(localPath, initialPosition: initialPosition);
+      if (_disposed) return;
+      await engine.play();
+    } catch (e, st) {
+      if (_disposed) return;
+      unawaited(
+        ref.read(loggerProvider).error(
+          'playback.failed',
+          attrs: {'content.id': _currentMediaId()},
+          error: e,
+          stack: st,
+        ),
+      );
+      rethrow;
+    }
     if (_disposed) return;
-    await engine.play();
+    unawaited(
+      ref.read(loggerProvider).info(
+        'playback.started',
+        attrs: {
+          'content.id': _currentMediaId(),
+          'content.type': switch (_currentMedia) {
+            PlayerMovieRef() => 'movie',
+            PlayerEpisodeRef() => 'episode',
+          },
+          'is_offline':
+              _lastDownload?.status == DownloadStatusDto.complete,
+        },
+      ),
+    );
   }
+
+  /// Id of the title currently loaded into the engine, regardless of
+  /// movie/episode variant.
+  String _currentMediaId() => switch (_currentMedia) {
+    PlayerMovieRef(:final movieId) => movieId,
+    PlayerEpisodeRef(:final episodeId) => episodeId,
+  };
 
   void _onTracksAvailable(AvailableTracks tracks) {
     if (_disposed) return;
@@ -801,6 +837,12 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         }
     }
     if (target == null) return;
+    unawaited(
+      ref.read(loggerProvider).debug(
+        'playback.next_episode',
+        attrs: {'content.id': target.id},
+      ),
+    );
     await _switchToEpisode(target.id);
   }
 
@@ -822,6 +864,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       context,
       mainProfile: main,
       pinService: _pinService,
+      logger: ref.read(loggerProvider),
     );
     if (!ok) return;
     await _kidsLock.stopLock();

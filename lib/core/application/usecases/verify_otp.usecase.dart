@@ -1,3 +1,4 @@
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/domain/exceptions/invalid_otp.exception.dart';
 import 'package:kidflix/core/domain/exceptions/otp_expired.exception.dart';
 import 'package:kidflix/core/domain/model/device.dart';
@@ -29,8 +30,9 @@ class VerifyOtpExpired extends VerifyOtpResult {
 /// authenticated [Session].
 class VerifyOtpUseCase {
   final AuthRepository _auth;
+  final LoggerApplicationService _logger;
 
-  const VerifyOtpUseCase(this._auth);
+  const VerifyOtpUseCase(this._auth, this._logger);
 
   Future<VerifyOtpResult> execute({
     required PhoneNumber phone,
@@ -45,10 +47,14 @@ class VerifyOtpUseCase {
     }
     try {
       final session = await _auth.verifyOtp(phone, code, device);
+      await _logger.info('auth.verify_otp.success');
       return VerifyOtpSuccess(session);
-    } on InvalidOtpException {
+    } on InvalidOtpException catch (e, st) {
+      // Code OTP volontairement non loggé (donnée sensible).
+      await _logger.warn('auth.verify_otp.failed', error: e, stack: st);
       return const VerifyOtpInvalidCode();
-    } on OtpExpiredException {
+    } on OtpExpiredException catch (e, st) {
+      await _logger.warn('auth.verify_otp.failed', error: e, stack: st);
       return const VerifyOtpExpired();
     }
   }

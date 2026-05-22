@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/application/usecases/verify_management_pin.usecase.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/services/profile_pin.service.dart';
+import 'package:kidflix/infrastructure/logger/console.logger.service.dart';
 
 /// Modal PIN dialog opened when the user taps the unlock button on a
 /// locked player. Returns `true` when the entered PIN matches the
@@ -14,12 +16,16 @@ Future<bool> showUnlockPinDialog(
   BuildContext context, {
   required Profile mainProfile,
   required ProfilePinService pinService,
+  LoggerApplicationService? logger,
 }) async {
   final result = await showDialog<bool>(
     context: context,
     barrierDismissible: false,
-    builder: (context) =>
-        _UnlockPinDialog(mainProfile: mainProfile, pinService: pinService),
+    builder: (context) => _UnlockPinDialog(
+      mainProfile: mainProfile,
+      pinService: pinService,
+      logger: logger ?? LoggerApplicationService(const ConsoleLoggerService()),
+    ),
   );
   return result ?? false;
 }
@@ -27,8 +33,13 @@ Future<bool> showUnlockPinDialog(
 class _UnlockPinDialog extends StatefulWidget {
   final Profile mainProfile;
   final ProfilePinService pinService;
+  final LoggerApplicationService logger;
 
-  const _UnlockPinDialog({required this.mainProfile, required this.pinService});
+  const _UnlockPinDialog({
+    required this.mainProfile,
+    required this.pinService,
+    required this.logger,
+  });
 
   @override
   State<_UnlockPinDialog> createState() => _UnlockPinDialogState();
@@ -47,7 +58,7 @@ class _UnlockPinDialogState extends State<_UnlockPinDialog>
   @override
   void initState() {
     super.initState();
-    _verify = VerifyManagementPinUseCase(widget.pinService);
+    _verify = VerifyManagementPinUseCase(widget.pinService, widget.logger);
     _shake = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),

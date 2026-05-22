@@ -5,6 +5,7 @@ import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/core/application/dtos/profile.dto.dart';
 import 'package:kidflix/core/application/dtos/series.dto.dart';
 import 'package:kidflix/core/application/services/catalog_application.service.dart';
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/application/usecases/resolve_continue_watching.usecase.dart';
 import 'package:kidflix/core/domain/model/download_entry.dart';
 import 'package:kidflix/core/domain/model/download_kind.dart';
@@ -15,6 +16,7 @@ import 'package:kidflix/core/domain/model/watch_progress.dart';
 import 'package:kidflix/core/domain/services/catalog.repository.dart';
 import 'package:kidflix/core/domain/services/series.repository.dart';
 import 'package:kidflix/core/domain/services/watch_progress.repository.dart';
+import 'package:kidflix/infrastructure/logger/in_memory.logger.service.dart';
 
 class _FakeRepo implements CatalogRepository {
   final List<CatalogItem> _pool;
@@ -111,6 +113,7 @@ class _CannedCWUseCase extends ResolveContinueWatchingUseCase {
         progressRepo: _NoopProgressRepo(),
         catalogRepo: _FakeRepo(const []),
         seriesRepo: _NoopSeriesRepo(),
+        logger: LoggerApplicationService(InMemoryLoggerService()),
       );
 
   @override

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/application/usecases/get_storage_summary.usecase.dart';
 import 'package:kidflix/core/domain/model/download_inventory_record.dart';
 import 'package:kidflix/core/domain/model/download_kind.dart';
@@ -6,6 +7,7 @@ import 'package:kidflix/core/domain/model/episode_download.dart';
 import 'package:kidflix/core/domain/model/movie_download.dart';
 import 'package:kidflix/core/domain/services/device_storage_probe.dart';
 import 'package:kidflix/core/domain/services/download.repository.dart';
+import 'package:kidflix/infrastructure/logger/in_memory.logger.service.dart';
 
 void main() {
   test('aggregates probe and inventory partition counts', () async {
@@ -18,6 +20,7 @@ void main() {
         _record('d', kind: DownloadKind.cache),
         _record('e', kind: DownloadKind.cache),
       ]),
+      logger: LoggerApplicationService(InMemoryLoggerService()),
     );
 
     final summary = await useCase.execute();
@@ -32,6 +35,7 @@ void main() {
     final useCase = GetStorageSummaryUseCase(
       probe: _StubProbe(appBytes: 0, freeBytes: null),
       repository: _StubRepo(const []),
+      logger: LoggerApplicationService(InMemoryLoggerService()),
     );
     final summary = await useCase.execute();
     expect(summary.deviceFreeBytes, isNull);
@@ -41,6 +45,7 @@ void main() {
     final useCase = GetStorageSummaryUseCase(
       probe: _StubProbe(appBytes: 0, freeBytes: 1000),
       repository: _StubRepo(const []),
+      logger: LoggerApplicationService(InMemoryLoggerService()),
     );
     final summary = await useCase.execute();
     expect(summary.downloadsCount, equals(0));

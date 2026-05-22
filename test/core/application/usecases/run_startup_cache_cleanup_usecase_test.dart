@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kidflix/core/application/preferences/cache_cleanup_preferences.dart';
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/application/usecases/run_startup_cache_cleanup.usecase.dart';
 import 'package:kidflix/core/domain/services/download_cleanup.service.dart';
+import 'package:kidflix/infrastructure/logger/in_memory.logger.service.dart';
 
 void main() {
   test('runs the cleanup when the preference is enabled', () async {
@@ -9,6 +11,7 @@ void main() {
     final useCase = RunStartupCacheCleanupUseCase(
       service: service,
       preferences: _StubPrefs(enabled: true),
+      logger: LoggerApplicationService(InMemoryLoggerService()),
     );
 
     final removed = await useCase.execute();
@@ -23,6 +26,7 @@ void main() {
     final useCase = RunStartupCacheCleanupUseCase(
       service: service,
       preferences: _StubPrefs(enabled: false),
+      logger: LoggerApplicationService(InMemoryLoggerService()),
     );
 
     final removed = await useCase.execute();
@@ -36,6 +40,7 @@ void main() {
     final useCase = RunStartupCacheCleanupUseCase(
       service: service,
       preferences: _StubPrefs(enabled: true),
+      logger: LoggerApplicationService(InMemoryLoggerService()),
     );
 
     final removed = await useCase.execute();

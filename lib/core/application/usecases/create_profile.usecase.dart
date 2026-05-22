@@ -1,3 +1,4 @@
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/domain/exceptions/invalid_profile_name.exception.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/services/profile_management.repository.dart';
@@ -35,8 +36,9 @@ class CreateProfileUseCase {
   static final RegExp _pinPattern = RegExp(r'^[0-9]{4}$');
 
   final ProfileManagementRepository _repo;
+  final LoggerApplicationService _logger;
 
-  const CreateProfileUseCase(this._repo);
+  const CreateProfileUseCase(this._repo, this._logger);
 
   Future<CreateProfileResult> execute({
     required String rawName,
@@ -54,12 +56,21 @@ class CreateProfileUseCase {
     if (rawPin != null && !_pinPattern.hasMatch(rawPin)) {
       return const CreateProfileInvalidPin();
     }
-    final created = await _repo.create(
-      name: trimmed,
-      ageCategory: ageCategory,
-      rawPin: rawPin,
-      avatarId: avatarId,
-    );
-    return CreateProfileSuccess(created);
+    try {
+      final created = await _repo.create(
+        name: trimmed,
+        ageCategory: ageCategory,
+        rawPin: rawPin,
+        avatarId: avatarId,
+      );
+      await _logger.info(
+        'profile.created',
+        attrs: {'profile.id': created.id},
+      );
+      return CreateProfileSuccess(created);
+    } catch (e, st) {
+      await _logger.warn('profile.create_failed', error: e, stack: st);
+      rethrow;
+    }
   }
 }

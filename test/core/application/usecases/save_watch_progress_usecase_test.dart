@@ -1,14 +1,19 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/application/usecases/save_watch_progress.usecase.dart';
 import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/model/watch_progress.dart';
 import 'package:kidflix/core/domain/services/watch_progress.repository.dart';
+import 'package:kidflix/infrastructure/logger/in_memory.logger.service.dart';
 
 void main() {
   test('saves a MovieProgress built from movieId params', () async {
     final fake = _FakeRepo();
-    final useCase = SaveWatchProgressUseCase(fake);
+    final useCase = SaveWatchProgressUseCase(
+      fake,
+      LoggerApplicationService(InMemoryLoggerService()),
+    );
     final before = DateTime.now();
     await useCase.execute(
       profileId: 'p1',
@@ -37,7 +42,10 @@ void main() {
   group('executeForMedia (polymorphic)', () {
     test('builds a MovieProgress when given a Movie', () async {
       final fake = _FakeRepo();
-      final useCase = SaveWatchProgressUseCase(fake);
+      final useCase = SaveWatchProgressUseCase(
+      fake,
+      LoggerApplicationService(InMemoryLoggerService()),
+    );
       final movie = Movie(
         id: 'nemo',
         title: 'Nemo',
@@ -64,7 +72,10 @@ void main() {
 
     test('builds an EpisodeProgress when given an Episode', () async {
       final fake = _FakeRepo();
-      final useCase = SaveWatchProgressUseCase(fake);
+      final useCase = SaveWatchProgressUseCase(
+      fake,
+      LoggerApplicationService(InMemoryLoggerService()),
+    );
       final episode = Episode(
         id: 'ep-1',
         seriesId: 'pingu',

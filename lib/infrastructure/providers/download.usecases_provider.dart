@@ -10,6 +10,7 @@ import 'package:kidflix/core/application/usecases/start_episode_download.usecase
 import 'package:kidflix/core/application/usecases/start_movie_download.usecase.dart';
 import 'package:kidflix/infrastructure/providers/download.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/download_manifest_store.provider.dart';
+import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'download.usecases_provider.g.dart';
@@ -19,6 +20,7 @@ StartMovieDownloadUseCase startMovieDownloadUseCase(Ref ref) {
   return StartMovieDownloadUseCase(
     repository: ref.watch(downloadRepositoryProvider),
     manifest: ref.watch(downloadManifestStoreProvider),
+    logger: ref.watch(loggerProvider),
   );
 }
 
@@ -29,7 +31,10 @@ FindMovieDownloadUseCase findMovieDownloadUseCase(Ref ref) {
 
 @Riverpod(keepAlive: true)
 CancelMovieDownloadUseCase cancelMovieDownloadUseCase(Ref ref) {
-  return CancelMovieDownloadUseCase(ref.watch(downloadRepositoryProvider));
+  return CancelMovieDownloadUseCase(
+    ref.watch(downloadRepositoryProvider),
+    ref.watch(loggerProvider),
+  );
 }
 
 @Riverpod(keepAlive: true)
@@ -42,6 +47,7 @@ StartEpisodeDownloadUseCase startEpisodeDownloadUseCase(Ref ref) {
   return StartEpisodeDownloadUseCase(
     repository: ref.watch(downloadRepositoryProvider),
     manifest: ref.watch(downloadManifestStoreProvider),
+    logger: ref.watch(loggerProvider),
   );
 }
 
@@ -52,7 +58,10 @@ FindEpisodeDownloadUseCase findEpisodeDownloadUseCase(Ref ref) {
 
 @Riverpod(keepAlive: true)
 CancelEpisodeDownloadUseCase cancelEpisodeDownloadUseCase(Ref ref) {
-  return CancelEpisodeDownloadUseCase(ref.watch(downloadRepositoryProvider));
+  return CancelEpisodeDownloadUseCase(
+    ref.watch(downloadRepositoryProvider),
+    ref.watch(loggerProvider),
+  );
 }
 
 @Riverpod(keepAlive: true)

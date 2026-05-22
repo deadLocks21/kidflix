@@ -1,3 +1,4 @@
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/domain/model/download_inventory_record.dart';
 import 'package:kidflix/core/domain/model/download_kind.dart';
 import 'package:kidflix/core/domain/services/device_storage_probe.dart';
@@ -39,17 +40,24 @@ class StorageSummary {
       'downloads: $downloadsCount, cache: $cacheCount)';
 }
 
+/// Seuil sous lequel l'espace disque libre est considéré comme faible.
+/// Valeur défendable choisie pour l'observabilité (< 500 Mo).
+const int lowFreeStorageThresholdBytes = 500 * 1024 * 1024;
+
 /// Aggregates storage info for the manager page header. Probe + listAll
 /// run in parallel so the page renders fast.
 class GetStorageSummaryUseCase {
   final DeviceStorageProbe _probe;
   final DownloadRepository _repository;
+  final LoggerApplicationService _logger;
 
   const GetStorageSummaryUseCase({
     required DeviceStorageProbe probe,
     required DownloadRepository repository,
+    required LoggerApplicationService logger,
   }) : _probe = probe,
-       _repository = repository;
+       _repository = repository,
+       _logger = logger;
 
   Future<StorageSummary> execute() async {
     final appBytesF = _probe.appDownloadsBytes();
@@ -67,6 +75,17 @@ class GetStorageSummaryUseCase {
       } else {
         cache++;
       }
+    }
+
+    if (freeBytes != null && freeBytes < lowFreeStorageThresholdBytes) {
+      await _logger.warn(
+        'storage.low',
+        attrs: {
+          'free.bytes': freeBytes,
+          'threshold.bytes': lowFreeStorageThresholdBytes,
+          'app.downloads.bytes': appBytes,
+        },
+      );
     }
 
     return StorageSummary(

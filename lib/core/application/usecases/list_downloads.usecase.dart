@@ -1,5 +1,4 @@
-import 'dart:developer' as developer;
-
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/domain/model/download_entry.dart';
 import 'package:kidflix/core/domain/model/download_inventory_record.dart';
 import 'package:kidflix/core/domain/model/download_kind.dart';
@@ -47,14 +46,17 @@ class ListDownloadsUseCase {
   final DownloadRepository _repository;
   final CatalogRepository _catalog;
   final SeriesRepository _series;
+  final LoggerApplicationService _logger;
 
   const ListDownloadsUseCase({
     required DownloadRepository repository,
     required CatalogRepository catalog,
     required SeriesRepository series,
+    required LoggerApplicationService logger,
   }) : _repository = repository,
        _catalog = catalog,
-       _series = series;
+       _series = series,
+       _logger = logger;
 
   /// [profileIds] is the family's profile ids — typically every profile
   /// in the current session. The empty list falls back to a single
@@ -121,10 +123,9 @@ class ListDownloadsUseCase {
           byId[item.id] = item;
         }
       } catch (e) {
-        developer.log(
-          'list-downloads: catalog lookup failed (no profiles)',
-          name: 'kidflix.downloads.list',
-          level: 900,
+        await _logger.warn(
+          'download.list_failed',
+          attrs: {'stage': 'catalog', 'profiles': 'none'},
           error: e,
         );
       }
@@ -141,10 +142,9 @@ class ListDownloadsUseCase {
           }
         }
       } catch (e) {
-        developer.log(
-          'list-downloads: catalog lookup failed for profile $pid',
-          name: 'kidflix.downloads.list',
-          level: 900,
+        await _logger.warn(
+          'download.list_failed',
+          attrs: {'stage': 'catalog', 'profile.id': pid},
           error: e,
         );
       }
@@ -248,10 +248,9 @@ class ListDownloadsUseCase {
       return s;
     } catch (e) {
       seriesCache[seriesId] = null;
-      developer.log(
-        'list-downloads: series lookup failed for $seriesId',
-        name: 'kidflix.downloads.list',
-        level: 900,
+      await _logger.warn(
+        'download.list_failed',
+        attrs: {'stage': 'series', 'series.id': seriesId},
         error: e,
       );
       return null;

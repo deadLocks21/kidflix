@@ -1,10 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kidflix/core/application/dtos/profile.dto.dart';
 import 'package:kidflix/core/application/services/catalog_application.service.dart';
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/application/usecases/list_home_catalog.usecase.dart';
 import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/services/catalog.repository.dart';
+import 'package:kidflix/infrastructure/logger/in_memory.logger.service.dart';
 
 class _FakeRepo implements CatalogRepository {
   @override
@@ -35,7 +37,10 @@ class _FakeRepo implements CatalogRepository {
 void main() {
   test('ListHomeCatalogUseCase delegates to the service', () async {
     final service = CatalogApplicationService(_FakeRepo());
-    final useCase = ListHomeCatalogUseCase(service);
+    final useCase = ListHomeCatalogUseCase(
+      service,
+      LoggerApplicationService(InMemoryLoggerService()),
+    );
     final rows = await useCase.execute(
       const ProfileDto(
         id: 'p1',

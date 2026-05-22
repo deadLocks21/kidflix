@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kidflix/core/application/dtos/continue_watching_item.dto.dart';
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/application/usecases/resolve_continue_watching.usecase.dart';
 import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
@@ -7,6 +8,9 @@ import 'package:kidflix/core/domain/model/watch_progress.dart';
 import 'package:kidflix/core/domain/services/catalog.repository.dart';
 import 'package:kidflix/core/domain/services/series.repository.dart';
 import 'package:kidflix/core/domain/services/watch_progress.repository.dart';
+import 'package:kidflix/infrastructure/logger/in_memory.logger.service.dart';
+
+final _logger = LoggerApplicationService(InMemoryLoggerService());
 
 Movie _movie({String id = 'nemo', String title = 'Nemo'}) => Movie(
   id: id,
@@ -129,6 +133,7 @@ void main() {
         progressRepo: _FakeProgress([]),
         catalogRepo: _FakeCatalog([]),
         seriesRepo: _FakeSeries({}),
+        logger: _logger,
       );
       expect(await uc.execute('p1'), isEmpty);
     });
@@ -146,6 +151,7 @@ void main() {
         progressRepo: _FakeProgress([progress]),
         catalogRepo: _FakeCatalog([movie]),
         seriesRepo: _FakeSeries({}),
+        logger: _logger,
       );
 
       final result = await uc.execute('p1');
@@ -172,6 +178,7 @@ void main() {
         progressRepo: _FakeProgress([progress]),
         catalogRepo: _FakeCatalog([movie]),
         seriesRepo: _FakeSeries({}),
+        logger: _logger,
       );
 
       final result = await uc.execute('p1');
@@ -201,6 +208,7 @@ void main() {
           _seriesWith(id: 'pingu', seasons: const []),
         ]),
         seriesRepo: _FakeSeries({'pingu': series}),
+        logger: _logger,
       );
 
       final result = await uc.execute('p1');
@@ -221,6 +229,7 @@ void main() {
         progressRepo: _FakeProgress([progress]),
         catalogRepo: _FakeCatalog([movie]),
         seriesRepo: _FakeSeries({}),
+        logger: _logger,
       );
 
       final result = await uc.execute('p1');
@@ -260,6 +269,7 @@ void main() {
             _seriesWith(id: 'pingu', seasons: const []),
           ]),
           seriesRepo: _FakeSeries({'pingu': series}),
+          logger: _logger,
         );
 
         final result = await uc.execute('p1');
@@ -300,6 +310,7 @@ void main() {
           _seriesWith(id: 'pingu', seasons: const []),
         ]),
         seriesRepo: _FakeSeries({'pingu': series}),
+        logger: _logger,
       );
 
       final result = await uc.execute('p1');
@@ -342,6 +353,7 @@ void main() {
             _seriesWith(id: 'pingu', seasons: const []),
           ]),
           seriesRepo: _FakeSeries({'pingu': series}),
+          logger: _logger,
         );
 
         final e = (await uc.execute('p1')).single as EpisodeContinueDto;
@@ -376,6 +388,7 @@ void main() {
           _seriesWith(id: 'pingu', seasons: const []),
         ]),
         seriesRepo: _FakeSeries({'pingu': series}),
+        logger: _logger,
       );
 
       final e = (await uc.execute('p1')).single as EpisodeContinueDto;
@@ -413,6 +426,7 @@ void main() {
           _seriesWith(id: 'pingu', seasons: const []),
         ]),
         seriesRepo: _FakeSeries({'pingu': series}),
+        logger: _logger,
       );
 
       final e = (await uc.execute('p1')).single as EpisodeContinueDto;
@@ -457,6 +471,7 @@ void main() {
             _seriesWith(id: 'pingu', seasons: const []),
           ]),
           seriesRepo: _FakeSeries({'pingu': series}),
+          logger: _logger,
         );
 
         final result = await uc.execute('p1');
@@ -504,6 +519,7 @@ void main() {
           _seriesWith(id: 'pingu', seasons: const []),
         ]),
         seriesRepo: fakeSeries,
+        logger: _logger,
       );
 
       final result = await uc.execute('p1');
@@ -548,6 +564,7 @@ void main() {
             _seriesWith(id: 'pingu', seasons: const []),
           ]),
           seriesRepo: _FakeSeries({'pingu': pinguSeries}),
+          logger: _logger,
         );
 
         final result = await uc.execute('p1');

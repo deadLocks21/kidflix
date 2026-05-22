@@ -9,7 +9,9 @@ import 'package:kidflix/core/domain/model/avatar_update.dart';
 import 'package:kidflix/core/domain/model/device.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/model/session.dart';
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/domain/services/profile_management.repository.dart';
+import 'package:kidflix/infrastructure/logger/in_memory.logger.service.dart';
 
 /// Defense-in-depth tests: when the repository throws
 /// [UnknownProfileException] (e.g. the HTTP backend returned 404 because the
@@ -89,6 +91,7 @@ void main() {
     () async {
       final usecase = DeleteProfileUseCase(
         _ThrowingRepository(UnknownProfileException('ar')),
+        LoggerApplicationService(InMemoryLoggerService()),
       );
 
       final result = await usecase.execute(session: session, profileId: 'ar');

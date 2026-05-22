@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/application/usecases/list_downloads.usecase.dart';
 import 'package:kidflix/core/domain/model/download_entry.dart';
 import 'package:kidflix/core/domain/model/download_inventory_record.dart';
@@ -10,6 +11,7 @@ import 'package:kidflix/core/domain/model/movie_download.dart';
 import 'package:kidflix/core/domain/services/catalog.repository.dart';
 import 'package:kidflix/core/domain/services/download.repository.dart';
 import 'package:kidflix/core/domain/services/series.repository.dart';
+import 'package:kidflix/infrastructure/logger/in_memory.logger.service.dart';
 
 void main() {
   test('partitions by kind and decorates movie entries from catalog', () async {
@@ -25,6 +27,7 @@ void main() {
       repository: repo,
       catalog: catalog,
       series: _NoopSeries(),
+      logger: LoggerApplicationService(InMemoryLoggerService()),
     );
 
     final inv = await useCase.execute();
@@ -44,6 +47,7 @@ void main() {
       repository: repo,
       catalog: catalog,
       series: _NoopSeries(),
+      logger: LoggerApplicationService(InMemoryLoggerService()),
     );
 
     final inv = await useCase.execute();
@@ -79,6 +83,7 @@ void main() {
       repository: repo,
       catalog: _StubCatalog(const []),
       series: _NoopSeries(),
+      logger: LoggerApplicationService(InMemoryLoggerService()),
     );
 
     final inv = await useCase.execute();
@@ -125,6 +130,7 @@ void main() {
       repository: repo,
       catalog: catalog,
       series: _StubSeries({'pingu': pingu}),
+      logger: LoggerApplicationService(InMemoryLoggerService()),
     );
 
     final inv = await useCase.execute();

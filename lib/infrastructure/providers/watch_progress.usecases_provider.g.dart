@@ -103,7 +103,7 @@ final class SaveWatchProgressUseCaseProvider
 }
 
 String _$saveWatchProgressUseCaseHash() =>
-    r'4eab9b4ea8418268edfead93c881f38d4ade7462';
+    r'3431209b33e287ff09c2e1065bea1e8e567ccc75';
 
 @ProviderFor(dismissContinueWatchingUseCase)
 final dismissContinueWatchingUseCaseProvider =

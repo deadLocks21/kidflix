@@ -55,7 +55,7 @@ final class ListDownloadsUseCaseProvider
 }
 
 String _$listDownloadsUseCaseHash() =>
-    r'453efa53a567d950dd2796edc3d463f4b620a727';
+    r'47f4da24bb90fd2361c4a6f30e1cdaf0b719b6fb';
 
 @ProviderFor(markAsDownloadUseCase)
 final markAsDownloadUseCaseProvider = MarkAsDownloadUseCaseProvider._();
@@ -199,7 +199,7 @@ final class GetStorageSummaryUseCaseProvider
 }
 
 String _$getStorageSummaryUseCaseHash() =>
-    r'd811138edf816df043de4cdd742ffbe201fbb3f9';
+    r'36ccb89fdc921b469f9b4703deb3d5c3fc84db69';
 
 @ProviderFor(downloadSeasonUseCase)
 final downloadSeasonUseCaseProvider = DownloadSeasonUseCaseProvider._();
@@ -247,7 +247,7 @@ final class DownloadSeasonUseCaseProvider
 }
 
 String _$downloadSeasonUseCaseHash() =>
-    r'74bd479cfd31d9f7d2c2baeaa5446db1f0798ea5';
+    r'be1db3915af2046881c8939f3cf662d19f7ad01e';
 
 @ProviderFor(runStartupCacheCleanupUseCase)
 final runStartupCacheCleanupUseCaseProvider =
@@ -298,7 +298,7 @@ final class RunStartupCacheCleanupUseCaseProvider
 }
 
 String _$runStartupCacheCleanupUseCaseHash() =>
-    r'c5a27162a8501679b70d2c1e18d570f92b8c9cfb';
+    r'69c9cf6639e160c109e43ee2eda6cf7782231b5d';
 
 /// Reactive inventory provider — use cases that mutate the manifest
 /// invalidate this provider so the manager UI re-renders.

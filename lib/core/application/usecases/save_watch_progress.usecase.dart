@@ -1,3 +1,4 @@
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/watch_progress.dart';
 import 'package:kidflix/core/domain/services/watch_progress.repository.dart';
@@ -19,8 +20,9 @@ import 'package:kidflix/core/domain/services/watch_progress.repository.dart';
 /// (cf. `API.md` § Progression de lecture).
 class SaveWatchProgressUseCase {
   final WatchProgressRepository _repository;
+  final LoggerApplicationService _logger;
 
-  const SaveWatchProgressUseCase(this._repository);
+  const SaveWatchProgressUseCase(this._repository, this._logger);
 
   Future<void> execute({
     required String profileId,
@@ -35,7 +37,7 @@ class SaveWatchProgressUseCase {
       completed: completed,
       updatedAt: DateTime.now(),
     );
-    return _repository.save(progress);
+    return _save(progress);
   }
 
   Future<void> executeForMedia({
@@ -60,6 +62,15 @@ class SaveWatchProgressUseCase {
         updatedAt: DateTime.now(),
       ),
     };
-    return _repository.save(progress);
+    return _save(progress);
+  }
+
+  Future<void> _save(WatchProgress progress) async {
+    try {
+      await _repository.save(progress);
+    } catch (e, st) {
+      await _logger.warn('playback.progress_save_failed', error: e, stack: st);
+      rethrow;
+    }
   }
 }

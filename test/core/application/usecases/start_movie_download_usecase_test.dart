@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kidflix/core/application/dtos/movie_download.dto.dart';
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/application/usecases/start_movie_download.usecase.dart';
 import 'package:kidflix/core/domain/model/cached_cast_member.dart';
 import 'package:kidflix/core/domain/model/download_inventory_record.dart';
@@ -10,6 +11,7 @@ import 'package:kidflix/core/domain/model/episode_download.dart';
 import 'package:kidflix/core/domain/model/movie_download.dart';
 import 'package:kidflix/core/domain/services/download.repository.dart';
 import 'package:kidflix/infrastructure/downloads/manifest_store.dart';
+import 'package:kidflix/infrastructure/logger/in_memory.logger.service.dart';
 
 void main() {
   test('maps every domain event to its DTO in order', () async {
@@ -20,6 +22,7 @@ void main() {
       manifest: JsonFileDownloadManifestStore(
         resolveDownloadsDir: () async => tempDir,
       ),
+      logger: LoggerApplicationService(InMemoryLoggerService()),
     );
     final events = await useCase.execute('abc').toList();
 

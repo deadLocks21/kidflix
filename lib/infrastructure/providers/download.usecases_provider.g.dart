@@ -55,7 +55,7 @@ final class StartMovieDownloadUseCaseProvider
 }
 
 String _$startMovieDownloadUseCaseHash() =>
-    r'a5634d0a090f39b25f9c5cb9ce89bc5d81ada186';
+    r'ed0c51030fd02fe3e704c8f5f1bd06253363f368';
 
 @ProviderFor(findMovieDownloadUseCase)
 final findMovieDownloadUseCaseProvider = FindMovieDownloadUseCaseProvider._();
@@ -152,7 +152,7 @@ final class CancelMovieDownloadUseCaseProvider
 }
 
 String _$cancelMovieDownloadUseCaseHash() =>
-    r'86932cbe5ce4e84fea765e741d1a62ec41437aee';
+    r'7c1c22e9e8300451f80fceb349708b3dcb336831';
 
 @ProviderFor(deleteMovieDownloadUseCase)
 final deleteMovieDownloadUseCaseProvider =
@@ -250,7 +250,7 @@ final class StartEpisodeDownloadUseCaseProvider
 }
 
 String _$startEpisodeDownloadUseCaseHash() =>
-    r'4227c4ee0f120e13f1981e67a7e1a6d219ab99d2';
+    r'383fedaedcab20bc0909a0d4b9a1803bf69a5942';
 
 @ProviderFor(findEpisodeDownloadUseCase)
 final findEpisodeDownloadUseCaseProvider =
@@ -348,7 +348,7 @@ final class CancelEpisodeDownloadUseCaseProvider
 }
 
 String _$cancelEpisodeDownloadUseCaseHash() =>
-    r'a52151fa07ade75cc867adb3df2edf80ebd669a2';
+    r'e41d373307c01d149d8f82a43bab29e6bfae939d';
 
 @ProviderFor(deleteEpisodeDownloadUseCase)
 final deleteEpisodeDownloadUseCaseProvider =

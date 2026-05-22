@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/application/usecases/cancel_movie_download.usecase.dart';
 import 'package:kidflix/core/domain/model/cached_cast_member.dart';
 import 'package:kidflix/core/domain/model/download_inventory_record.dart';
@@ -6,11 +7,15 @@ import 'package:kidflix/core/domain/model/download_kind.dart';
 import 'package:kidflix/core/domain/model/episode_download.dart';
 import 'package:kidflix/core/domain/model/movie_download.dart';
 import 'package:kidflix/core/domain/services/download.repository.dart';
+import 'package:kidflix/infrastructure/logger/in_memory.logger.service.dart';
 
 void main() {
   test('delegates to repository.cancelMovie', () async {
     final fake = _FakeRepo();
-    final useCase = CancelMovieDownloadUseCase(fake);
+    final useCase = CancelMovieDownloadUseCase(
+      fake,
+      LoggerApplicationService(InMemoryLoggerService()),
+    );
     await useCase.execute('abc');
     expect(fake.cancelledIds, ['abc']);
   });

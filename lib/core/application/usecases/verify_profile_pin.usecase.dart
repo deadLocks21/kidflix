@@ -1,3 +1,4 @@
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/services/profile_pin.service.dart';
 
@@ -17,8 +18,9 @@ class VerifyProfilePinInvalid extends VerifyProfilePinResult {
 /// Verifies a PIN against the bcrypt hash carried by the profile.
 class VerifyProfilePinUseCase {
   final ProfilePinService _pin;
+  final LoggerApplicationService _logger;
 
-  const VerifyProfilePinUseCase(this._pin);
+  const VerifyProfilePinUseCase(this._pin, this._logger);
 
   Future<VerifyProfilePinResult> execute({
     required Profile profile,
@@ -29,8 +31,11 @@ class VerifyProfilePinUseCase {
       return const VerifyProfilePinSuccess();
     }
     final ok = await _pin.verify(rawPin, hash);
-    return ok
-        ? const VerifyProfilePinSuccess()
-        : const VerifyProfilePinInvalid();
+    if (!ok) {
+      // PIN volontairement non loggé (donnée sensible).
+      await _logger.warn('profile.pin.verify_failed');
+      return const VerifyProfilePinInvalid();
+    }
+    return const VerifyProfilePinSuccess();
   }
 }

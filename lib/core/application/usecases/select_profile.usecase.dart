@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/model/session.dart';
 
@@ -27,7 +30,9 @@ class SelectProfileUnknown extends SelectProfileResult {
 /// Resolves a profile by id from the active session and decides whether
 /// it requires PIN verification.
 class SelectProfileUseCase {
-  const SelectProfileUseCase();
+  final LoggerApplicationService _logger;
+
+  const SelectProfileUseCase(this._logger);
 
   SelectProfileResult execute({
     required Session session,
@@ -41,6 +46,9 @@ class SelectProfileUseCase {
       }
     }
     if (found == null) return const SelectProfileUnknown();
+    unawaited(
+      _logger.info('profile.selected', attrs: {'profile.id': found.id}),
+    );
     return found.hasPin
         ? SelectProfilePinRequired(found)
         : SelectProfileReady(found);

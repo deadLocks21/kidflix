@@ -55,7 +55,7 @@ final class ListHomeCatalogUseCaseProvider
 }
 
 String _$listHomeCatalogUseCaseHash() =>
-    r'663d9202b322f2f1bdc01a829470062cd368af14';
+    r'4c419a05e83328525eb8a489025ff432ed46311e';
 
 @ProviderFor(refreshDownloadSnapshotsUseCase)
 final refreshDownloadSnapshotsUseCaseProvider =
@@ -163,7 +163,7 @@ final class ListOfflineHomeCatalogUseCaseProvider
 }
 
 String _$listOfflineHomeCatalogUseCaseHash() =>
-    r'beb656b5d586090de366002c89aad110f0e5931b';
+    r'b8d44fc38c30bf0ffffbf6b5dc3cab4be290cff8';
 
 /// Session-stable seed for the home shuffle. `keepAlive` so it survives
 /// across `homeCatalogRows` rebuilds — without this, every invalidation

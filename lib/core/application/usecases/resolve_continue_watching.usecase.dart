@@ -1,7 +1,6 @@
-import 'dart:developer' as developer;
-
 import 'package:kidflix/core/application/dtos/continue_watching_item.dto.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/watch_progress.dart';
 import 'package:kidflix/core/domain/services/catalog.repository.dart';
@@ -33,14 +32,17 @@ class ResolveContinueWatchingUseCase {
   final WatchProgressRepository _progressRepo;
   final CatalogRepository _catalogRepo;
   final SeriesRepository _seriesRepo;
+  final LoggerApplicationService _logger;
 
   const ResolveContinueWatchingUseCase({
     required WatchProgressRepository progressRepo,
     required CatalogRepository catalogRepo,
     required SeriesRepository seriesRepo,
+    required LoggerApplicationService logger,
   }) : _progressRepo = progressRepo,
        _catalogRepo = catalogRepo,
-       _seriesRepo = seriesRepo;
+       _seriesRepo = seriesRepo,
+       _logger = logger;
 
   Future<List<ContinueWatchingItemDto>> execute(String profileId) async {
     final progresses = await _progressRepo.listForProfile(profileId);
@@ -150,11 +152,11 @@ class ResolveContinueWatchingUseCase {
             }
           }
         }
-      } catch (e, st) {
-        developer.log(
-          'ResolveContinueWatchingUseCase: skipping series ${item.id}',
+      } catch (e) {
+        await _logger.warn(
+          'continue_watching.series_skipped',
+          attrs: {'series.id': item.id},
           error: e,
-          stackTrace: st,
         );
       }
     }

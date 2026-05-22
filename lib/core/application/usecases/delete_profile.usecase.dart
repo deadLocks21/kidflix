@@ -1,3 +1,4 @@
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/domain/exceptions/cannot_delete_main_profile.exception.dart';
 import 'package:kidflix/core/domain/exceptions/unknown_profile.exception.dart';
 import 'package:kidflix/core/domain/model/session.dart';
@@ -29,8 +30,9 @@ class DeleteProfileInvalidState extends DeleteProfileResult {
 /// to a UI-ready failure flag.
 class DeleteProfileUseCase {
   final ProfileManagementRepository _repo;
+  final LoggerApplicationService _logger;
 
-  const DeleteProfileUseCase(this._repo);
+  const DeleteProfileUseCase(this._repo, this._logger);
 
   Future<DeleteProfileResult> execute({
     required Session session,
@@ -40,10 +42,13 @@ class DeleteProfileUseCase {
     if (!exists) return const DeleteProfileUnknownProfile();
     try {
       await _repo.delete(id: profileId);
+      await _logger.info('profile.deleted', attrs: {'profile.id': profileId});
       return const DeleteProfileSuccess();
-    } on CannotDeleteMainProfileException {
+    } on CannotDeleteMainProfileException catch (e, st) {
+      await _logger.warn('profile.delete_failed', error: e, stack: st);
       return const DeleteProfileCannotDeleteMain();
-    } on UnknownProfileException {
+    } on UnknownProfileException catch (e, st) {
+      await _logger.warn('profile.delete_failed', error: e, stack: st);
       return const DeleteProfileUnknownProfile();
     }
   }

@@ -8,6 +8,7 @@ import 'package:kidflix/core/application/usecases/enter_management_mode.usecase.
 import 'package:kidflix/core/application/usecases/update_profile_included_lower_ages.usecase.dart';
 import 'package:kidflix/core/application/usecases/update_profile_metadata.usecase.dart';
 import 'package:kidflix/core/application/usecases/verify_management_pin.usecase.dart';
+import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/profile_management.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/profile_pin.service_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -18,15 +19,16 @@ part 'profile_management.service_provider.g.dart';
 ProfileManagementApplicationService profileManagementService(Ref ref) {
   final repo = ref.watch(profileManagementRepositoryProvider);
   final pin = ref.watch(profilePinServiceProvider);
+  final logger = ref.watch(loggerProvider);
   return ProfileManagementApplicationService(
     enterManagementMode: const EnterManagementModeUseCase(),
-    verifyManagementPin: VerifyManagementPinUseCase(pin),
-    createProfile: CreateProfileUseCase(repo),
+    verifyManagementPin: VerifyManagementPinUseCase(pin, logger),
+    createProfile: CreateProfileUseCase(repo, logger),
     updateProfileMetadata: UpdateProfileMetadataUseCase(repo),
     updateProfileIncludedLowerAges: UpdateProfileIncludedLowerAgesUseCase(repo),
     changeProfilePin: ChangeProfilePinUseCase(repo),
     clearProfilePin: ClearProfilePinUseCase(repo),
     changeMainProfilePin: ChangeMainProfilePinUseCase(repo),
-    deleteProfile: DeleteProfileUseCase(repo),
+    deleteProfile: DeleteProfileUseCase(repo, logger),
   );
 }

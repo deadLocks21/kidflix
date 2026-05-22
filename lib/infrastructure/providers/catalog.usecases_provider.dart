@@ -14,6 +14,7 @@ import 'package:kidflix/infrastructure/providers/download.repository_provider.da
 import 'package:kidflix/infrastructure/providers/download_management.usecases_provider.dart';
 import 'package:kidflix/infrastructure/providers/download_manifest_store.provider.dart';
 import 'package:kidflix/infrastructure/providers/favorites.controller_provider.dart';
+import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/offline_catalog.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/series.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
@@ -23,7 +24,10 @@ part 'catalog.usecases_provider.g.dart';
 
 @Riverpod(keepAlive: true)
 ListHomeCatalogUseCase listHomeCatalogUseCase(Ref ref) {
-  return ListHomeCatalogUseCase(ref.watch(catalogServiceProvider));
+  return ListHomeCatalogUseCase(
+    ref.watch(catalogServiceProvider),
+    ref.watch(loggerProvider),
+  );
 }
 
 @Riverpod(keepAlive: true)
@@ -40,7 +44,10 @@ RefreshDownloadSnapshotsUseCase refreshDownloadSnapshotsUseCase(Ref ref) {
 /// case type, but wired on top of the manifest-backed catalog service.
 @Riverpod(keepAlive: true)
 ListHomeCatalogUseCase listOfflineHomeCatalogUseCase(Ref ref) {
-  return ListHomeCatalogUseCase(ref.watch(offlineCatalogServiceProvider));
+  return ListHomeCatalogUseCase(
+    ref.watch(offlineCatalogServiceProvider),
+    ref.watch(loggerProvider),
+  );
 }
 
 /// Session-stable seed for the home shuffle. `keepAlive` so it survives

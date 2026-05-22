@@ -55,7 +55,7 @@ final class SearchMoviesUseCaseProvider
 }
 
 String _$searchMoviesUseCaseHash() =>
-    r'fdc799de86e114d18895ec4c3750a1eb1f01a039';
+    r'1cfa50eb758b1e2b84d9e213960c9900317d06a3';
 
 /// Returns the alphabetically-sorted list of catalog items (movies and
 /// series mixed) matching [debouncedQuery] for the currently active

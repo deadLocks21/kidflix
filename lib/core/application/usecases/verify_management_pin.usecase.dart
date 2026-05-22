@@ -1,3 +1,4 @@
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/services/profile_pin.service.dart';
 
@@ -19,8 +20,9 @@ class VerifyManagementPinInvalid extends VerifyManagementPinResult {
 /// thread is not blocked.
 class VerifyManagementPinUseCase {
   final ProfilePinService _pin;
+  final LoggerApplicationService _logger;
 
-  const VerifyManagementPinUseCase(this._pin);
+  const VerifyManagementPinUseCase(this._pin, this._logger);
 
   Future<VerifyManagementPinResult> execute({
     required Profile mainProfile,
@@ -30,11 +32,14 @@ class VerifyManagementPinUseCase {
     if (hash == null || hash.isEmpty) {
       // The main profile is required to have a PIN by design; if this
       // invariant ever breaks, treat as invalid rather than silently pass.
+      await _logger.warn('profile.management.verify_failed');
       return const VerifyManagementPinInvalid();
     }
     final ok = await _pin.verify(rawPin, hash);
-    return ok
-        ? const VerifyManagementPinSuccess()
-        : const VerifyManagementPinInvalid();
+    if (!ok) {
+      await _logger.warn('profile.management.verify_failed');
+      return const VerifyManagementPinInvalid();
+    }
+    return const VerifyManagementPinSuccess();
   }
 }
