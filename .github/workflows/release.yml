@@ -32,7 +32,7 @@
 #   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
 #   ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD,
 #   GCLOUD_SERVICE_ACCOUNT_CREDENTIALS,
-#   SIGNOZ_INGESTION_KEY
+#   SIGNOZ_INGEST_URL, SIGNOZ_INGESTION_KEY
 name: Release
 
 on:
@@ -50,8 +50,11 @@ concurrency:
 # `lib/infrastructure/providers/logger.service_provider.dart` qui lit
 # `String.fromEnvironment('SIGNOZ_INGEST_URL')`). Sans ces valeurs, l'app
 # retombe sur ConsoleLoggerService → pas de remontée Signoz côté users.
+#
+# `SIGNOZ_INGEST_URL` vient du secret du même nom (instance self-hosted →
+# l'URL n'est pas codée en dur ici). Il est mappé dans le bloc `env:` de
+# chaque job de build, à côté de `SIGNOZ_INGESTION_KEY`.
 env:
-  SIGNOZ_INGEST_URL: "https://ingest.eu.signoz.cloud:443/v1/logs"
   SIGNOZ_ENV: "production"
 
 jobs:
@@ -158,6 +161,7 @@ jobs:
 
       - name: Build IPA
         env:
+          SIGNOZ_INGEST_URL: ${{ secrets.SIGNOZ_INGEST_URL }}
           SIGNOZ_INGESTION_KEY: ${{ secrets.SIGNOZ_INGESTION_KEY }}
         run: |
           flutter build ipa --release \
@@ -254,6 +258,7 @@ jobs:
 
       - name: Build App Bundle (.aab)
         env:
+          SIGNOZ_INGEST_URL: ${{ secrets.SIGNOZ_INGEST_URL }}
           SIGNOZ_INGESTION_KEY: ${{ secrets.SIGNOZ_INGESTION_KEY }}
         run: |
           flutter build appbundle --release \
@@ -382,6 +387,7 @@ jobs:
 
       - name: Build macOS release
         env:
+          SIGNOZ_INGEST_URL: ${{ secrets.SIGNOZ_INGEST_URL }}
           SIGNOZ_INGESTION_KEY: ${{ secrets.SIGNOZ_INGESTION_KEY }}
         run: |
           flutter build macos --release \
@@ -460,6 +466,7 @@ jobs:
       - name: Build Windows release
         shell: pwsh
         env:
+          SIGNOZ_INGEST_URL: ${{ secrets.SIGNOZ_INGEST_URL }}
           SIGNOZ_INGESTION_KEY: ${{ secrets.SIGNOZ_INGESTION_KEY }}
         run: |
           flutter build windows --release `
@@ -531,6 +538,7 @@ jobs:
 
       - name: Build Linux release
         env:
+          SIGNOZ_INGEST_URL: ${{ secrets.SIGNOZ_INGEST_URL }}
           SIGNOZ_INGESTION_KEY: ${{ secrets.SIGNOZ_INGESTION_KEY }}
         run: |
           flutter build linux --release \
