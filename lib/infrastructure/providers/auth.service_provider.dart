@@ -7,6 +7,7 @@ import 'package:kidflix/core/application/usecases/select_profile.usecase.dart';
 import 'package:kidflix/core/application/usecases/verify_otp.usecase.dart';
 import 'package:kidflix/core/application/usecases/verify_profile_pin.usecase.dart';
 import 'package:kidflix/infrastructure/providers/auth.repository_provider.dart';
+import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/profile_pin.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.repository_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -18,8 +19,9 @@ AuthApplicationService authService(Ref ref) {
   final auth = ref.watch(authRepositoryProvider);
   final sessions = ref.watch(sessionRepositoryProvider);
   final pin = ref.watch(profilePinServiceProvider);
+  final logger = ref.watch(loggerProvider);
   return AuthApplicationService(
-    requestOtp: RequestOtpUseCase(auth),
+    requestOtp: RequestOtpUseCase(auth, logger),
     verifyOtp: VerifyOtpUseCase(auth),
     resendOtp: ResendOtpUseCase(auth),
     restoreSession: RestoreSessionUseCase(sessions),

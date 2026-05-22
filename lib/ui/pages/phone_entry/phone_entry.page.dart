@@ -40,11 +40,15 @@ class _PhoneEntryPageState extends ConsumerState<PhoneEntryPage> {
       _errorText = null;
       _isSubmitting = true;
     });
-    final result = await ref
-        .read(sessionControllerProvider.notifier)
-        .requestOtp(_controller.text);
+    final RequestOtpResult result;
+    try {
+      result = await ref
+          .read(sessionControllerProvider.notifier)
+          .requestOtp(_controller.text);
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
     if (!mounted) return;
-    setState(() => _isSubmitting = false);
     switch (result) {
       case RequestOtpSuccess():
         // La redirection est prise en charge par go_router.
@@ -54,6 +58,14 @@ class _PhoneEntryPageState extends ConsumerState<PhoneEntryPage> {
       case RequestOtpUnknownPhone():
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Numéro inconnu. Contactez l'admin.")),
+        );
+      case RequestOtpFailure():
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Connexion impossible. Vérifie ta connexion et réessaie.',
+            ),
+          ),
         );
     }
   }
