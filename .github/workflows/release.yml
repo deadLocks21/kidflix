@@ -268,12 +268,28 @@ jobs:
             --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
             --dart-define=SIGNOZ_ENV="$SIGNOZ_ENV"
 
-      - name: Upload AAB + mapping artifact
+      - name: Build APK (.apk)
+        # APK universel attaché à la GitHub Release pour install directe /
+        # sideload. Le Play Store reçoit l'AAB (cf. job publish-android) ;
+        # l'APK ne sert qu'à la distribution hors store. Mêmes `--dart-define`.
+        env:
+          SIGNOZ_INGEST_URL: ${{ secrets.SIGNOZ_INGEST_URL }}
+          SIGNOZ_INGESTION_KEY: ${{ secrets.SIGNOZ_INGESTION_KEY }}
+        run: |
+          flutter build apk --release \
+            --build-name="$VERSION" \
+            --build-number="${{ steps.build-number.outputs.build_number }}" \
+            --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
+            --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
+            --dart-define=SIGNOZ_ENV="$SIGNOZ_ENV"
+
+      - name: Upload AAB + APK + mapping artifact
         uses: actions/upload-artifact@v4
         with:
           name: kidflix-android
           path: |
             build/app/outputs/bundle/release/*.aab
+            build/app/outputs/flutter-apk/*.apk
             build/app/outputs/mapping/release/mapping.txt
           retention-days: 14
           if-no-files-found: error
@@ -784,6 +800,7 @@ jobs:
           BODY=$(jq -r '.[] | select(.language=="fr-FR") | .text' release_notes.json)
           IPA=$(find artifacts -type f -name '*.ipa' | head -1)
           AAB=$(find artifacts -type f -name '*.aab' | head -1)
+          APK=$(find artifacts -type f -name '*.apk' | head -1)
           MAPPING=$(find artifacts -type f -name 'mapping.txt' | head -1)
           PKG=$(find artifacts -type f -name '*.pkg' | head -1)
           WIN_ZIP=$(find artifacts -type f -name '*.zip' | head -1)
@@ -792,6 +809,7 @@ jobs:
           echo "Releasing assets:"
           echo "  iOS IPA     : $IPA"
           echo "  Android AAB : $AAB"
+          echo "  Android APK : $APK"
           echo "  Mapping     : $MAPPING"
           echo "  macOS PKG   : $PKG"
           echo "  Windows ZIP : $WIN_ZIP"
@@ -811,4 +829,4 @@ jobs:
           gh release create "$RELEASE_TAG" \
             --title "Kidflix v$VERSION" \
             --notes "$BODY" \
-            "$IPA" "$AAB" "$MAPPING" "$PKG" "$WIN_ZIP" "$APPIMAGE"
+            "$IPA" "$AAB" "$APK" "$MAPPING" "$PKG" "$WIN_ZIP" "$APPIMAGE"
