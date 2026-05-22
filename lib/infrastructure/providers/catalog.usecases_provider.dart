@@ -80,14 +80,12 @@ Future<List<CatalogRowDto>> homeCatalogRows(Ref ref) async {
   // Favorites feed the "Ma liste" row. The controller is keepAlive so
   // a transient AsyncLoading on startup is rare ; treat unresolved
   // states as an empty list rather than blocking the whole home.
-  final favorites = ref.watch(favoritesControllerProvider).maybeWhen(
-        data: (v) => v,
-        orElse: () => const <Favorite>[],
-      );
-  final online = ref.watch(connectivityProvider).maybeWhen(
-        data: (v) => v,
-        orElse: () => true,
-      );
+  final favorites = ref
+      .watch(favoritesControllerProvider)
+      .maybeWhen(data: (v) => v, orElse: () => const <Favorite>[]);
+  final online = ref
+      .watch(connectivityProvider)
+      .maybeWhen(data: (v) => v, orElse: () => true);
   if (!online) {
     final offline = ref.watch(listOfflineHomeCatalogUseCaseProvider);
     return offline.execute(

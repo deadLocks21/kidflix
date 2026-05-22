@@ -36,28 +36,26 @@ class _FakeAuthRepository implements AuthRepository {
 
 void main() {
   group('RefreshProfilesUseCase', () {
-    test('forwards to AuthRepository.fetchProfiles and returns the result',
-        () async {
-      final repo = _FakeAuthRepository(const [
-        Profile(
-          id: 'papa',
-          name: 'Papa',
-          ageCategory: AgeCategory.adulte,
-          isMain: true,
-        ),
-        Profile(
-          id: 'ar',
-          name: 'Ar',
-          ageCategory: AgeCategory.enfant,
-        ),
-      ]);
-      final useCase = RefreshProfilesUseCase(repo);
+    test(
+      'forwards to AuthRepository.fetchProfiles and returns the result',
+      () async {
+        final repo = _FakeAuthRepository(const [
+          Profile(
+            id: 'papa',
+            name: 'Papa',
+            ageCategory: AgeCategory.adulte,
+            isMain: true,
+          ),
+          Profile(id: 'ar', name: 'Ar', ageCategory: AgeCategory.enfant),
+        ]);
+        final useCase = RefreshProfilesUseCase(repo);
 
-      final result = await useCase.execute();
+        final result = await useCase.execute();
 
-      expect(repo.callCount, 1);
-      expect(result.map((p) => p.id), ['papa', 'ar']);
-    });
+        expect(repo.callCount, 1);
+        expect(result.map((p) => p.id), ['papa', 'ar']);
+      },
+    );
 
     test('propagates exceptions from the repository', () async {
       final repo = _FakeAuthRepository(const [], error: Exception('boom'));

@@ -83,11 +83,14 @@ class _EpisodePickerContentState extends State<_EpisodePickerContent> {
     final regular =
         widget.series.seasons.where((s) => s.seasonNumber > 0).toList()
           ..sort((a, b) => a.seasonNumber.compareTo(b.seasonNumber));
-    final specials =
-        widget.series.seasons.where((s) => s.seasonNumber == 0).toList();
+    final specials = widget.series.seasons
+        .where((s) => s.seasonNumber == 0)
+        .toList();
     final ordered = [...regular, ...specials];
-    final currentSeasonNumber =
-        _seasonNumberOf(widget.currentEpisodeId, ordered);
+    final currentSeasonNumber = _seasonNumberOf(
+      widget.currentEpisodeId,
+      ordered,
+    );
 
     return Theme(
       data: ThemeData.dark(useMaterial3: true).copyWith(
@@ -102,9 +105,9 @@ class _EpisodePickerContentState extends State<_EpisodePickerContent> {
             child: Text(
               widget.series.title,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           for (final s in ordered)
@@ -145,8 +148,9 @@ class _SeasonSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label =
-        season.isSpecials ? 'Specials' : 'Saison ${season.seasonNumber}';
+    final label = season.isSpecials
+        ? 'Specials'
+        : 'Saison ${season.seasonNumber}';
     return ExpansionTile(
       initiallyExpanded: initiallyExpanded,
       collapsedIconColor: Colors.white70,
@@ -190,7 +194,8 @@ class _EpisodeTile extends StatelessWidget {
         : 'E${episode.episodeNumber}';
     final isWatched = progress?.completed ?? false;
     final totalSeconds = episode.duration.inSeconds;
-    final inProgress = progress != null &&
+    final inProgress =
+        progress != null &&
         !progress!.completed &&
         progress!.positionSeconds > 0 &&
         totalSeconds > 0;
@@ -215,10 +220,7 @@ class _EpisodeTile extends StatelessWidget {
               if (isCurrent)
                 Container(
                   decoration: BoxDecoration(
-                    border: Border.all(
-                      color: KidflixPalette.red,
-                      width: 2,
-                    ),
+                    border: Border.all(color: KidflixPalette.red, width: 2),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   alignment: Alignment.center,

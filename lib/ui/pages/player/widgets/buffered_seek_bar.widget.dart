@@ -31,7 +31,8 @@ class BufferedSeekBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = MaterialVideoControlsTheme.maybeOf(context)?.normal ??
+    final t =
+        MaterialVideoControlsTheme.maybeOf(context)?.normal ??
         kDefaultMaterialVideoControlsThemeData;
     return Stack(
       clipBehavior: Clip.none,
@@ -56,9 +57,7 @@ class BufferedSeekBar extends StatelessWidget {
                 return FractionallySizedBox(
                   alignment: Alignment.centerLeft,
                   widthFactor: fraction.clamp(0.0, 1.0),
-                  child: Container(
-                    color: Colors.white.withValues(alpha: 0.55),
-                  ),
+                  child: Container(color: Colors.white.withValues(alpha: 0.55)),
                 );
               },
             ),

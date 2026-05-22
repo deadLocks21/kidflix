@@ -226,9 +226,7 @@ class _ProfileFormPageState extends ConsumerState<ProfileFormPage> {
   };
 
   void _showSnack(String msg) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   @override
@@ -386,10 +384,7 @@ class _AvatarHero extends StatelessWidget {
               decoration: BoxDecoration(
                 color: theme.colorScheme.primary,
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: theme.colorScheme.surface,
-                  width: 2,
-                ),
+                border: Border.all(color: theme.colorScheme.surface, width: 2),
               ),
               child: Icon(
                 Icons.edit,

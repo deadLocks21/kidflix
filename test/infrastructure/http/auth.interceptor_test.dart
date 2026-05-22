@@ -8,39 +8,33 @@ import 'package:kidflix/infrastructure/http/auth.interceptor.dart';
 
 void main() {
   group('AuthInterceptor', () {
-    test(
-      'skips /auth/request-otp without adding any auth header',
-      () async {
-        final adapter = _FakeAdapter();
-        final dio = _dio(adapter);
-        dio.interceptors.add(
-          AuthInterceptor(session: () => _session, profileId: () => 'ar'),
-        );
+    test('skips /auth/request-otp without adding any auth header', () async {
+      final adapter = _FakeAdapter();
+      final dio = _dio(adapter);
+      dio.interceptors.add(
+        AuthInterceptor(session: () => _session, profileId: () => 'ar'),
+      );
 
-        await dio.post<dynamic>('/auth/request-otp');
+      await dio.post<dynamic>('/auth/request-otp');
 
-        expect(adapter.last.headers, isNot(contains('Authorization')));
-        expect(adapter.last.headers, isNot(contains('X-Device-Id')));
-        expect(adapter.last.headers, isNot(contains('X-Profile-Id')));
-      },
-    );
+      expect(adapter.last.headers, isNot(contains('Authorization')));
+      expect(adapter.last.headers, isNot(contains('X-Device-Id')));
+      expect(adapter.last.headers, isNot(contains('X-Profile-Id')));
+    });
 
-    test(
-      'skips /auth/verify-otp without adding any auth header',
-      () async {
-        final adapter = _FakeAdapter();
-        final dio = _dio(adapter);
-        dio.interceptors.add(
-          AuthInterceptor(session: () => _session, profileId: () => 'ar'),
-        );
+    test('skips /auth/verify-otp without adding any auth header', () async {
+      final adapter = _FakeAdapter();
+      final dio = _dio(adapter);
+      dio.interceptors.add(
+        AuthInterceptor(session: () => _session, profileId: () => 'ar'),
+      );
 
-        await dio.post<dynamic>('/auth/verify-otp');
+      await dio.post<dynamic>('/auth/verify-otp');
 
-        expect(adapter.last.headers, isNot(contains('Authorization')));
-        expect(adapter.last.headers, isNot(contains('X-Device-Id')));
-        expect(adapter.last.headers, isNot(contains('X-Profile-Id')));
-      },
-    );
+      expect(adapter.last.headers, isNot(contains('Authorization')));
+      expect(adapter.last.headers, isNot(contains('X-Device-Id')));
+      expect(adapter.last.headers, isNot(contains('X-Profile-Id')));
+    });
 
     test(
       'GET /profiles bootstrap receives JWT + device but NOT X-Profile-Id',
@@ -59,22 +53,19 @@ void main() {
       },
     );
 
-    test(
-      'POST /profiles receives all three headers',
-      () async {
-        final adapter = _FakeAdapter();
-        final dio = _dio(adapter);
-        dio.interceptors.add(
-          AuthInterceptor(session: () => _session, profileId: () => 'papa'),
-        );
+    test('POST /profiles receives all three headers', () async {
+      final adapter = _FakeAdapter();
+      final dio = _dio(adapter);
+      dio.interceptors.add(
+        AuthInterceptor(session: () => _session, profileId: () => 'papa'),
+      );
 
-        await dio.post<dynamic>('/profiles');
+      await dio.post<dynamic>('/profiles');
 
-        expect(adapter.last.headers['Authorization'], 'Bearer eyJabc');
-        expect(adapter.last.headers['X-Device-Id'], 'uuid-1');
-        expect(adapter.last.headers['X-Profile-Id'], 'papa');
-      },
-    );
+      expect(adapter.last.headers['Authorization'], 'Bearer eyJabc');
+      expect(adapter.last.headers['X-Device-Id'], 'uuid-1');
+      expect(adapter.last.headers['X-Profile-Id'], 'papa');
+    });
 
     test(
       'PATCH /profiles/:id receives all three headers (path is not the bootstrap exemption)',
@@ -93,22 +84,19 @@ void main() {
       },
     );
 
-    test(
-      'GET /movies (protected route) receives all three headers',
-      () async {
-        final adapter = _FakeAdapter();
-        final dio = _dio(adapter);
-        dio.interceptors.add(
-          AuthInterceptor(session: () => _session, profileId: () => 'ar'),
-        );
+    test('GET /movies (protected route) receives all three headers', () async {
+      final adapter = _FakeAdapter();
+      final dio = _dio(adapter);
+      dio.interceptors.add(
+        AuthInterceptor(session: () => _session, profileId: () => 'ar'),
+      );
 
-        await dio.get<dynamic>('/movies');
+      await dio.get<dynamic>('/movies');
 
-        expect(adapter.last.headers['Authorization'], 'Bearer eyJabc');
-        expect(adapter.last.headers['X-Device-Id'], 'uuid-1');
-        expect(adapter.last.headers['X-Profile-Id'], 'ar');
-      },
-    );
+      expect(adapter.last.headers['Authorization'], 'Bearer eyJabc');
+      expect(adapter.last.headers['X-Device-Id'], 'uuid-1');
+      expect(adapter.last.headers['X-Profile-Id'], 'ar');
+    });
 
     test(
       'lets the request through without any auth header when session is null',
@@ -232,11 +220,7 @@ class _FakeAdapter implements HttpClientAdapter {
         headers: Map<String, dynamic>.from(options.headers),
       ),
     );
-    return ResponseBody.fromBytes(
-      <int>[],
-      200,
-      headers: const {},
-    );
+    return ResponseBody.fromBytes(<int>[], 200, headers: const {});
   }
 
   @override

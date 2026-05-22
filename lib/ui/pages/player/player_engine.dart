@@ -6,10 +6,7 @@ import 'package:kidflix/core/domain/model/media_track.dart';
 /// entries — those are exposed only via [PlayerEngine.setAudioTrack] and
 /// [PlayerEngine.setSubtitleTrack] using the special ids `'auto'` and
 /// `'no'`.
-typedef AvailableTracks = ({
-  List<MediaTrack> audio,
-  List<MediaTrack> subtitle,
-});
+typedef AvailableTracks = ({List<MediaTrack> audio, List<MediaTrack> subtitle});
 
 /// Snapshot of the engine's currently selected audio and subtitle track
 /// ids. The ids match either an entry in [AvailableTracks] or one of
@@ -26,7 +23,10 @@ abstract class PlayerEngine {
   /// Opens [filePath] (a local file, passed as an absolute path without
   /// the `file://` scheme). When [initialPosition] is non-null the
   /// engine seeks to it before playback starts.
-  Future<void> open(String filePath, {Duration initialPosition = Duration.zero});
+  Future<void> open(
+    String filePath, {
+    Duration initialPosition = Duration.zero,
+  });
 
   Future<void> play();
 

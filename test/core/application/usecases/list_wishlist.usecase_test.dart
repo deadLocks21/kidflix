@@ -18,8 +18,7 @@ class _WishlistStub implements WishlistRepository {
   Future<WishlistEntry> updateStatus({
     required int watcharrId,
     required WatchedStatus status,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 
   @override
   Future<void> remove(int watcharrId) => throw UnimplementedError();
@@ -32,8 +31,7 @@ class _WishlistStub implements WishlistRepository {
   Future<WishlistEntry> add({
     required int tmdbId,
     required WishlistItemKind kind,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 }
 
 class _ProgressStub implements WatchProgressRepository {
@@ -50,15 +48,13 @@ class _ProgressStub implements WatchProgressRepository {
   Future<MovieProgress?> findForMovie({
     required String profileId,
     required String movieId,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 
   @override
   Future<EpisodeProgress?> findForEpisode({
     required String profileId,
     required String episodeId,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 
   @override
   Future<void> save(WatchProgress progress) => throw UnimplementedError();
@@ -67,29 +63,25 @@ class _ProgressStub implements WatchProgressRepository {
   Future<void> dismissMovie({
     required String profileId,
     required String movieId,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 
   @override
   Future<void> unDismissMovie({
     required String profileId,
     required String movieId,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 
   @override
   Future<void> dismissEpisode({
     required String profileId,
     required String episodeId,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 
   @override
   Future<void> unDismissEpisode({
     required String profileId,
     required String episodeId,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 }
 
 WishlistEntry _entry({
@@ -99,44 +91,40 @@ WishlistEntry _entry({
   WatchedStatus status = WatchedStatus.planned,
   bool available = false,
   String? catalogId,
-}) =>
-    WishlistEntry(
-      watcharrId: watcharrId,
-      tmdbId: 1000 + watcharrId,
-      kind: kind,
-      title: title,
-      status: status,
-      rating: 0,
-      availableInCatalog: available,
-      catalogId: available ? (catalogId ?? 'catalog-$watcharrId') : null,
-    );
+}) => WishlistEntry(
+  watcharrId: watcharrId,
+  tmdbId: 1000 + watcharrId,
+  kind: kind,
+  title: title,
+  status: status,
+  rating: 0,
+  availableInCatalog: available,
+  catalogId: available ? (catalogId ?? 'catalog-$watcharrId') : null,
+);
 
-MovieProgress _completed(String profileId, String movieId) =>
-    MovieProgress(
-      profileId: profileId,
-      movieId: movieId,
-      positionSeconds: 1000,
-      completed: true,
-      updatedAt: DateTime.utc(2026, 5, 1),
-    );
+MovieProgress _completed(String profileId, String movieId) => MovieProgress(
+  profileId: profileId,
+  movieId: movieId,
+  positionSeconds: 1000,
+  completed: true,
+  updatedAt: DateTime.utc(2026, 5, 1),
+);
 
-MovieProgress _inProgress(String profileId, String movieId) =>
-    MovieProgress(
-      profileId: profileId,
-      movieId: movieId,
-      positionSeconds: 200,
-      completed: false,
-      updatedAt: DateTime.utc(2026, 5, 1),
-    );
+MovieProgress _inProgress(String profileId, String movieId) => MovieProgress(
+  profileId: profileId,
+  movieId: movieId,
+  positionSeconds: 200,
+  completed: false,
+  updatedAt: DateTime.utc(2026, 5, 1),
+);
 
 ListWishlistUseCase _buildUseCase({
   required List<WishlistEntry> wishlist,
   Map<String, List<WatchProgress>> progress = const {},
-}) =>
-    ListWishlistUseCase(
-      wishlistRepo: _WishlistStub(wishlist),
-      progressRepo: _ProgressStub(progress),
-    );
+}) => ListWishlistUseCase(
+  wishlistRepo: _WishlistStub(wishlist),
+  progressRepo: _ProgressStub(progress),
+);
 
 void main() {
   group('ListWishlistUseCase.execute — filter on PLANNED', () {
@@ -170,8 +158,9 @@ void main() {
           status: WatchedStatus.dropped,
         ),
       ];
-      final result = await _buildUseCase(wishlist: entries)
-          .execute(profileIds: const []);
+      final result = await _buildUseCase(
+        wishlist: entries,
+      ).execute(profileIds: const []);
       expect(result.map((e) => e.title), ['Keep']);
     });
 
@@ -181,41 +170,23 @@ void main() {
         _entry(watcharrId: 2, title: 'abeille'),
         _entry(watcharrId: 3, title: 'Manchot'),
       ];
-      final result = await _buildUseCase(wishlist: entries)
-          .execute(profileIds: const []);
+      final result = await _buildUseCase(
+        wishlist: entries,
+      ).execute(profileIds: const []);
       expect(result.map((e) => e.title), ['abeille', 'Manchot', 'Zorro']);
     });
   });
 
   group('ListWishlistUseCase.execute — categorisation', () {
     test('flags entries not in the catalog as toAcquire', () async {
-      final result = await _buildUseCase(wishlist: [
-        _entry(watcharrId: 1, title: 'Indispo'),
-      ]).execute(profileIds: const ['p1']);
+      final result = await _buildUseCase(
+        wishlist: [_entry(watcharrId: 1, title: 'Indispo')],
+      ).execute(profileIds: const ['p1']);
       expect(result.single.category, WishlistCategory.toAcquire);
     });
 
-    test('flags in-catalog movies as toWatch when no profile watched it',
-        () async {
-      final result = await _buildUseCase(
-        wishlist: [
-          _entry(
-            watcharrId: 1,
-            title: 'Astérix',
-            available: true,
-            catalogId: 'asterix',
-          ),
-        ],
-        progress: {
-          'p1': [_inProgress('p1', 'asterix')], // started but not completed
-        },
-      ).execute(profileIds: const ['p1']);
-      expect(result.single.category, WishlistCategory.toWatch);
-    });
-
     test(
-      'flags in-catalog movies as watched when ANY profile of the foyer '
-      'has completed them',
+      'flags in-catalog movies as toWatch when no profile watched it',
       () async {
         final result = await _buildUseCase(
           wishlist: [
@@ -227,43 +198,63 @@ void main() {
             ),
           ],
           progress: {
-            'p_parent': const [], // parent never watched
-            'p_kid': [_completed('p_kid', 'asterix')], // kid completed
+            'p1': [_inProgress('p1', 'asterix')], // started but not completed
           },
-        ).execute(profileIds: const ['p_parent', 'p_kid']);
-        expect(result.single.category, WishlistCategory.watched);
+        ).execute(profileIds: const ['p1']);
+        expect(result.single.category, WishlistCategory.toWatch);
       },
     );
 
-    test('flags in-catalog series as toWatch even with episode progress',
-        () async {
-      // Series category is never `watched` in v1 — episode-level
-      // progress is granular and the wishlist tracks the series as a
-      // single unit.
+    test('flags in-catalog movies as watched when ANY profile of the foyer '
+        'has completed them', () async {
       final result = await _buildUseCase(
         wishlist: [
           _entry(
             watcharrId: 1,
-            title: 'Pingu',
-            kind: WishlistItemKind.series,
+            title: 'Astérix',
             available: true,
-            catalogId: 'pingu',
+            catalogId: 'asterix',
           ),
         ],
         progress: {
-          'p_kid': [
-            EpisodeProgress(
-              profileId: 'p_kid',
-              episodeId: 'pingu-s1e1',
-              positionSeconds: 300,
-              completed: true,
-              updatedAt: DateTime.utc(2026, 5, 1),
+          'p_parent': const [], // parent never watched
+          'p_kid': [_completed('p_kid', 'asterix')], // kid completed
+        },
+      ).execute(profileIds: const ['p_parent', 'p_kid']);
+      expect(result.single.category, WishlistCategory.watched);
+    });
+
+    test(
+      'flags in-catalog series as toWatch even with episode progress',
+      () async {
+        // Series category is never `watched` in v1 — episode-level
+        // progress is granular and the wishlist tracks the series as a
+        // single unit.
+        final result = await _buildUseCase(
+          wishlist: [
+            _entry(
+              watcharrId: 1,
+              title: 'Pingu',
+              kind: WishlistItemKind.series,
+              available: true,
+              catalogId: 'pingu',
             ),
           ],
-        },
-      ).execute(profileIds: const ['p_kid']);
-      expect(result.single.category, WishlistCategory.toWatch);
-    });
+          progress: {
+            'p_kid': [
+              EpisodeProgress(
+                profileId: 'p_kid',
+                episodeId: 'pingu-s1e1',
+                positionSeconds: 300,
+                completed: true,
+                updatedAt: DateTime.utc(2026, 5, 1),
+              ),
+            ],
+          },
+        ).execute(profileIds: const ['p_kid']);
+        expect(result.single.category, WishlistCategory.toWatch);
+      },
+    );
 
     test('ignores movie progress for unrelated catalogIds', () async {
       final result = await _buildUseCase(

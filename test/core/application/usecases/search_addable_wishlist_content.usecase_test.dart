@@ -25,8 +25,7 @@ class _StubRepository implements WishlistRepository {
   Future<WishlistEntry> updateStatus({
     required int watcharrId,
     required WatchedStatus status,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 
   @override
   Future<void> remove(int watcharrId) => throw UnimplementedError();
@@ -35,18 +34,19 @@ class _StubRepository implements WishlistRepository {
   Future<WishlistEntry> add({
     required int tmdbId,
     required WishlistItemKind kind,
-  }) =>
-      throw UnimplementedError();
+  }) => throw UnimplementedError();
 }
 
-WishlistSearchResult _result(int id, {WishlistItemKind kind = WishlistItemKind.movie}) =>
-    WishlistSearchResult(
-      tmdbId: id,
-      kind: kind,
-      title: 'Result $id',
-      availableInCatalog: false,
-      alreadyInWishlist: false,
-    );
+WishlistSearchResult _result(
+  int id, {
+  WishlistItemKind kind = WishlistItemKind.movie,
+}) => WishlistSearchResult(
+  tmdbId: id,
+  kind: kind,
+  title: 'Result $id',
+  availableInCatalog: false,
+  alreadyInWishlist: false,
+);
 
 void main() {
   group('SearchAddableWishlistContentUseCase.execute', () {
@@ -79,11 +79,7 @@ void main() {
     test('preserves the repository result order', () async {
       // The use case doesn't impose any sort — Watcharr's relevance
       // ranking flows through unchanged.
-      final repo = _StubRepository([
-        _result(3),
-        _result(1),
-        _result(2),
-      ]);
+      final repo = _StubRepository([_result(3), _result(1), _result(2)]);
       final usecase = SearchAddableWishlistContentUseCase(repo);
       final result = await usecase.execute('something');
       expect(result.map((r) => r.tmdbId), [3, 1, 2]);

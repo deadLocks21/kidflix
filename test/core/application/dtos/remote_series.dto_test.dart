@@ -15,8 +15,7 @@ Map<String, dynamic> _pinguCatalogJson() => {
   'poster_url': 'https://image.tmdb.org/t/p/original/poster.jpg',
   'backdrop_url': 'https://image.tmdb.org/t/p/original/backdrop.jpg',
   'logo_url': 'https://image.tmdb.org/t/p/original/pingu_catalog_logo.png',
-  'trailer_url':
-      'plugin://plugin.video.youtube/play/?video_id=PinguTrailer1',
+  'trailer_url': 'plugin://plugin.video.youtube/play/?video_id=PinguTrailer1',
   'age_category': 'enfant',
   'genres': ['Animation', 'Familial'],
   'saga_id': null,
@@ -36,8 +35,7 @@ Map<String, dynamic> _pinguDetailJson() => {
   'poster_url': 'https://image.tmdb.org/t/p/original/poster.jpg',
   'backdrop_url': 'https://image.tmdb.org/t/p/original/backdrop.jpg',
   'logo_url': 'https://image.tmdb.org/t/p/original/pingu_detail_logo.png',
-  'trailer_url':
-      'plugin://plugin.video.youtube/play/?video_id=PinguTrailer2',
+  'trailer_url': 'plugin://plugin.video.youtube/play/?video_id=PinguTrailer2',
   'age_category': 'enfant',
   'genres': ['Animation', 'Familial'],
   'director': <String>[],
@@ -101,8 +99,9 @@ Map<String, dynamic> _pinguDetailJson() => {
 void main() {
   group('RemoteSeriesCatalogDto.fromJson + toDomain', () {
     test('parses a catalog series with empty seasons', () {
-      final domain =
-          RemoteSeriesCatalogDto.fromJson(_pinguCatalogJson()).toDomain();
+      final domain = RemoteSeriesCatalogDto.fromJson(
+        _pinguCatalogJson(),
+      ).toDomain();
 
       expect(domain.id, 'pingu');
       expect(domain.title, 'Pingu');
@@ -125,8 +124,9 @@ void main() {
     });
 
     test('logo_url is projected through to the catalog projection', () {
-      final domain =
-          RemoteSeriesCatalogDto.fromJson(_pinguCatalogJson()).toDomain();
+      final domain = RemoteSeriesCatalogDto.fromJson(
+        _pinguCatalogJson(),
+      ).toDomain();
       expect(
         domain.logoUrl,
         'https://image.tmdb.org/t/p/original/pingu_catalog_logo.png',
@@ -144,8 +144,9 @@ void main() {
 
   group('RemoteSeriesDetailDto.fromJson + toDomain', () {
     test('parses Pingu detail with Specials and Season 1', () {
-      final domain =
-          RemoteSeriesDetailDto.fromJson(_pinguDetailJson()).toDomain();
+      final domain = RemoteSeriesDetailDto.fromJson(
+        _pinguDetailJson(),
+      ).toDomain();
 
       expect(domain.id, 'pingu');
       expect(domain.seasons.length, 2);
@@ -162,22 +163,26 @@ void main() {
       expect(s1.episodes.length, 2);
     });
 
-    test('injects seriesId, seasonNumber and ageCategory into each episode',
-        () {
-      final domain =
-          RemoteSeriesDetailDto.fromJson(_pinguDetailJson()).toDomain();
-      for (final season in domain.seasons) {
-        for (final ep in season.episodes) {
-          expect(ep.seriesId, 'pingu');
-          expect(ep.seasonNumber, season.seasonNumber);
-          expect(ep.ageCategory, AgeCategory.enfant);
+    test(
+      'injects seriesId, seasonNumber and ageCategory into each episode',
+      () {
+        final domain = RemoteSeriesDetailDto.fromJson(
+          _pinguDetailJson(),
+        ).toDomain();
+        for (final season in domain.seasons) {
+          for (final ep in season.episodes) {
+            expect(ep.seriesId, 'pingu');
+            expect(ep.seasonNumber, season.seasonNumber);
+            expect(ep.ageCategory, AgeCategory.enfant);
+          }
         }
-      }
-    });
+      },
+    );
 
     test('parses aired_at as a DateTime when present, null when absent', () {
-      final domain =
-          RemoteSeriesDetailDto.fromJson(_pinguDetailJson()).toDomain();
+      final domain = RemoteSeriesDetailDto.fromJson(
+        _pinguDetailJson(),
+      ).toDomain();
       final s1e1 = domain.seasons
           .firstWhere((s) => s.seasonNumber == 1)
           .episodes
@@ -191,15 +196,17 @@ void main() {
     });
 
     test('episode duration_seconds projects to a Duration', () {
-      final domain =
-          RemoteSeriesDetailDto.fromJson(_pinguDetailJson()).toDomain();
+      final domain = RemoteSeriesDetailDto.fromJson(
+        _pinguDetailJson(),
+      ).toDomain();
       final special = domain.seasons[0].episodes[0];
       expect(special.duration, const Duration(seconds: 1500));
     });
 
     test('trailer_url is projected through to the domain Series', () {
-      final domain =
-          RemoteSeriesDetailDto.fromJson(_pinguDetailJson()).toDomain();
+      final domain = RemoteSeriesDetailDto.fromJson(
+        _pinguDetailJson(),
+      ).toDomain();
       expect(
         domain.trailerUrl,
         'plugin://plugin.video.youtube/play/?video_id=PinguTrailer2',
@@ -207,8 +214,9 @@ void main() {
     });
 
     test('logo_url is projected through to the domain Series', () {
-      final domain =
-          RemoteSeriesDetailDto.fromJson(_pinguDetailJson()).toDomain();
+      final domain = RemoteSeriesDetailDto.fromJson(
+        _pinguDetailJson(),
+      ).toDomain();
       expect(
         domain.logoUrl,
         'https://image.tmdb.org/t/p/original/pingu_detail_logo.png',

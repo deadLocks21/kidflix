@@ -18,7 +18,9 @@ void main() {
     });
 
     test('accepts an empty avatars list without exception', () {
-      final dto = RemoteAvatarsDto.fromJson({'avatars': <Map<String, dynamic>>[]});
+      final dto = RemoteAvatarsDto.fromJson({
+        'avatars': <Map<String, dynamic>>[],
+      });
       expect(dto.avatars, isEmpty);
       expect(dto.toDomain(), isEmpty);
     });

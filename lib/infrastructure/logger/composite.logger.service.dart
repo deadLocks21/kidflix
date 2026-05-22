@@ -20,8 +20,11 @@ class CompositeLoggerService implements LoggerService {
   final List<LoggerService> _children;
 
   CompositeLoggerService(List<LoggerService> children)
-      : assert(children.isNotEmpty, 'CompositeLoggerService needs at least one child'),
-        _children = List.unmodifiable(children);
+    : assert(
+        children.isNotEmpty,
+        'CompositeLoggerService needs at least one child',
+      ),
+      _children = List.unmodifiable(children);
 
   @override
   Future<void> log(

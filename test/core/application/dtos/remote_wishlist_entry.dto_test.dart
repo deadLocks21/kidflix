@@ -48,7 +48,9 @@ void main() {
     });
 
     test('parses a series entry without catalog crossing', () {
-      final entry = RemoteWishlistEntryDto.fromJson(_seriesPayload()).toDomain();
+      final entry = RemoteWishlistEntryDto.fromJson(
+        _seriesPayload(),
+      ).toDomain();
 
       expect(entry.watcharrId, 87);
       expect(entry.tmdbId, 1399);
@@ -109,9 +111,11 @@ void main() {
       for (final status in WatchedStatus.values) {
         // toWire then fromJson on a payload re-using that wire string —
         // a tighter round-trip than just toString comparison.
-        final payload = _moviePayload()..['status'] = watchedStatusToWire(status);
-        final parsed =
-            RemoteWishlistEntryDto.fromJson(payload).toDomain().status;
+        final payload = _moviePayload()
+          ..['status'] = watchedStatusToWire(status);
+        final parsed = RemoteWishlistEntryDto.fromJson(
+          payload,
+        ).toDomain().status;
         expect(parsed, status, reason: 'round-trip failed for $status');
       }
     });

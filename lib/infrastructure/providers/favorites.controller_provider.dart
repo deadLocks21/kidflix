@@ -39,21 +39,22 @@ class FavoritesController extends _$FavoritesController {
     return repo.listForProfile(session.profile.id);
   }
 
-  Future<void> addMovie(String movieId) =>
-      _mutate((repo, profileId, current) async {
-        final optimistic = [
-          ...current.where(
-            (f) => !(f is MovieFavorite && f.movieId == movieId),
-          ),
-          MovieFavorite(
-            profileId: profileId,
-            movieId: movieId,
-            createdAt: DateTime.now().toUtc(),
-          ),
-        ];
-        state = AsyncData(optimistic);
-        await repo.addMovie(profileId: profileId, movieId: movieId);
-      });
+  Future<void> addMovie(String movieId) => _mutate((
+    repo,
+    profileId,
+    current,
+  ) async {
+    final optimistic = [
+      ...current.where((f) => !(f is MovieFavorite && f.movieId == movieId)),
+      MovieFavorite(
+        profileId: profileId,
+        movieId: movieId,
+        createdAt: DateTime.now().toUtc(),
+      ),
+    ];
+    state = AsyncData(optimistic);
+    await repo.addMovie(profileId: profileId, movieId: movieId);
+  });
 
   Future<void> removeMovie(String movieId) =>
       _mutate((repo, profileId, current) async {
@@ -64,21 +65,22 @@ class FavoritesController extends _$FavoritesController {
         await repo.removeMovie(profileId: profileId, movieId: movieId);
       });
 
-  Future<void> addSeries(String seriesId) =>
-      _mutate((repo, profileId, current) async {
-        final optimistic = [
-          ...current.where(
-            (f) => !(f is SeriesFavorite && f.seriesId == seriesId),
-          ),
-          SeriesFavorite(
-            profileId: profileId,
-            seriesId: seriesId,
-            createdAt: DateTime.now().toUtc(),
-          ),
-        ];
-        state = AsyncData(optimistic);
-        await repo.addSeries(profileId: profileId, seriesId: seriesId);
-      });
+  Future<void> addSeries(String seriesId) => _mutate((
+    repo,
+    profileId,
+    current,
+  ) async {
+    final optimistic = [
+      ...current.where((f) => !(f is SeriesFavorite && f.seriesId == seriesId)),
+      SeriesFavorite(
+        profileId: profileId,
+        seriesId: seriesId,
+        createdAt: DateTime.now().toUtc(),
+      ),
+    ];
+    state = AsyncData(optimistic);
+    await repo.addSeries(profileId: profileId, seriesId: seriesId);
+  });
 
   Future<void> removeSeries(String seriesId) =>
       _mutate((repo, profileId, current) async {
@@ -94,7 +96,8 @@ class FavoritesController extends _$FavoritesController {
       FavoritesRepository repo,
       String profileId,
       List<Favorite> current,
-    ) action,
+    )
+    action,
   ) async {
     final session = ref.read(sessionControllerProvider);
     if (session is! ProfileSelected) {

@@ -19,11 +19,8 @@ class InMemoryProfileManagementRepository
   final ProfilePinService _pin;
   final Uuid _uuid;
 
-  InMemoryProfileManagementRepository(
-    this._store,
-    this._pin, {
-    Uuid? uuid,
-  }) : _uuid = uuid ?? const Uuid();
+  InMemoryProfileManagementRepository(this._store, this._pin, {Uuid? uuid})
+    : _uuid = uuid ?? const Uuid();
 
   @override
   Future<Profile> create({

@@ -99,25 +99,27 @@ void main() {
   });
 
   group('WatchProgress sealed cross-kind equality', () {
-    test('MovieProgress and EpisodeProgress with identical id strings are not equal',
-        () {
-      final m = MovieProgress(
-        profileId: 'p1',
-        movieId: 'x',
-        positionSeconds: 0,
-        completed: false,
-        updatedAt: DateTime(2026, 5, 4),
-      );
-      final e = EpisodeProgress(
-        profileId: 'p1',
-        episodeId: 'x',
-        positionSeconds: 0,
-        completed: false,
-        updatedAt: DateTime(2026, 5, 4),
-      );
-      expect(m == e, isFalse);
-      expect(e == m, isFalse);
-    });
+    test(
+      'MovieProgress and EpisodeProgress with identical id strings are not equal',
+      () {
+        final m = MovieProgress(
+          profileId: 'p1',
+          movieId: 'x',
+          positionSeconds: 0,
+          completed: false,
+          updatedAt: DateTime(2026, 5, 4),
+        );
+        final e = EpisodeProgress(
+          profileId: 'p1',
+          episodeId: 'x',
+          positionSeconds: 0,
+          completed: false,
+          updatedAt: DateTime(2026, 5, 4),
+        );
+        expect(m == e, isFalse);
+        expect(e == m, isFalse);
+      },
+    );
 
     test('exhaustive switch covers MovieProgress and EpisodeProgress', () {
       String label(WatchProgress p) {

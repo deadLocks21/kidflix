@@ -45,9 +45,7 @@ class UpdateProfileIncludedLowerAgesUseCase {
     required String profileId,
     required List<AgeCategory> categories,
   }) async {
-    final target = session.profiles
-        .where((p) => p.id == profileId)
-        .firstOrNull;
+    final target = session.profiles.where((p) => p.id == profileId).firstOrNull;
     if (target == null) {
       return const UpdateProfileIncludedLowerAgesUnknownProfile();
     }

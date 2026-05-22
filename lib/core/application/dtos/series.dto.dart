@@ -34,12 +34,12 @@ class SeriesDto implements CatalogItemDto {
   });
 
   factory SeriesDto.fromDomain(Series series) => SeriesDto(
-        id: series.id,
-        title: series.title,
-        year: series.year,
-        posterUrl: series.posterUrl,
-        ageCategory: series.ageCategory.name,
-        seasonsCount: series.seasonsCount,
-        episodesCount: series.episodesCount,
-      );
+    id: series.id,
+    title: series.title,
+    year: series.year,
+    posterUrl: series.posterUrl,
+    ageCategory: series.ageCategory.name,
+    seasonsCount: series.seasonsCount,
+    episodesCount: series.episodesCount,
+  );
 }

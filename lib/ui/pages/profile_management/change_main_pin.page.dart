@@ -77,55 +77,55 @@ class _ChangeMainPinPageState extends ConsumerState<ChangeMainPinPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-              const SizedBox(height: 16),
-              PinConfirmField(
-                key: _newKey,
-                label: 'Nouveau code',
-                autofocus: true,
-                onChanged: (v) => setState(() => _newPin = v),
-              ),
-              const SizedBox(height: 32),
-              PinConfirmField(
-                key: _confirmKey,
-                label: 'Confirmer le code',
-                onChanged: (v) => setState(() => _confirmPin = v),
-              ),
-              const SizedBox(height: 24),
-              if (_error != null)
-                Text(
-                  _error!,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.error,
+                  const SizedBox(height: 16),
+                  PinConfirmField(
+                    key: _newKey,
+                    label: 'Nouveau code',
+                    autofocus: true,
+                    onChanged: (v) => setState(() => _newPin = v),
                   ),
-                ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _submitting ? null : () => context.pop(),
-                      child: const Text('Annuler'),
+                  const SizedBox(height: 32),
+                  PinConfirmField(
+                    key: _confirmKey,
+                    label: 'Confirmer le code',
+                    onChanged: (v) => setState(() => _confirmPin = v),
+                  ),
+                  const SizedBox(height: 24),
+                  if (_error != null)
+                    Text(
+                      _error!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _submitting ? null : () => context.pop(),
+                          child: const Text('Annuler'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: _canSubmit ? _submit : null,
+                          child: _submitting
+                              ? const SizedBox(
+                                  height: 16,
+                                  width: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text('Valider'),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: _canSubmit ? _submit : null,
-                      child: _submitting
-                          ? const SizedBox(
-                              height: 16,
-                              width: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text('Valider'),
-                    ),
-                  ),
-                ],
-              ),
                 ],
               ),
             ),

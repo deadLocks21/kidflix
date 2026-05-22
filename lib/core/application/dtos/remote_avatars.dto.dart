@@ -29,10 +29,7 @@ class RemoteAvatarOption {
   const RemoteAvatarOption({required this.id, required this.url});
 
   factory RemoteAvatarOption.fromJson(Map<String, dynamic> json) =>
-      RemoteAvatarOption(
-        id: json['id'] as String,
-        url: json['url'] as String,
-      );
+      RemoteAvatarOption(id: json['id'] as String, url: json['url'] as String);
 
   AvatarOption toDomain() => AvatarOption(id: id, url: url);
 }

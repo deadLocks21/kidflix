@@ -29,8 +29,9 @@ class TrackPreferences {
   }) {
     return TrackPreferences(
       profileId: profileId,
-      audioLanguage:
-          clearAudioLanguage ? null : (audioLanguage ?? this.audioLanguage),
+      audioLanguage: clearAudioLanguage
+          ? null
+          : (audioLanguage ?? this.audioLanguage),
       subtitleLanguage: clearSubtitleLanguage
           ? null
           : (subtitleLanguage ?? this.subtitleLanguage),
@@ -49,11 +50,11 @@ class TrackPreferences {
 
   @override
   int get hashCode => Object.hash(
-        profileId,
-        audioLanguage,
-        subtitleLanguage,
-        subtitlesDisabled,
-      );
+    profileId,
+    audioLanguage,
+    subtitleLanguage,
+    subtitlesDisabled,
+  );
 
   @override
   String toString() =>

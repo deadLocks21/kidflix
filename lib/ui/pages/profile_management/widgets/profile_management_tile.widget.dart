@@ -44,14 +44,13 @@ class ProfileManagementTile extends StatelessWidget {
         ),
         title: Row(
           children: [
-            Flexible(child: Text(profile.name, overflow: TextOverflow.ellipsis)),
+            Flexible(
+              child: Text(profile.name, overflow: TextOverflow.ellipsis),
+            ),
             if (profile.isMain) ...[
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 2,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.secondaryContainer,
                   borderRadius: BorderRadius.circular(4),

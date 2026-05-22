@@ -78,10 +78,7 @@ void main() {
         _ThrowingRepository(UnknownProfileException('ar')),
       );
 
-      final result = await usecase.execute(
-        session: session,
-        profileId: 'ar',
-      );
+      final result = await usecase.execute(session: session, profileId: 'ar');
 
       expect(result, isA<ClearProfilePinUnknownProfile>());
     },
@@ -94,10 +91,7 @@ void main() {
         _ThrowingRepository(UnknownProfileException('ar')),
       );
 
-      final result = await usecase.execute(
-        session: session,
-        profileId: 'ar',
-      );
+      final result = await usecase.execute(session: session, profileId: 'ar');
 
       expect(result, isA<DeleteProfileUnknownProfile>());
     },

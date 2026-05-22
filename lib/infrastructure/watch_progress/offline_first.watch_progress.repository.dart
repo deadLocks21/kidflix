@@ -42,10 +42,10 @@ class OfflineFirstWatchProgressRepository implements WatchProgressRepository {
     required WatchProgressDiskStore store,
     required WatchProgressPendingQueue queue,
     required ConnectivityService connectivity,
-  })  : _remote = remote,
-        _store = store,
-        _queue = queue,
-        _connectivity = connectivity;
+  }) : _remote = remote,
+       _store = store,
+       _queue = queue,
+       _connectivity = connectivity;
 
   @override
   Future<MovieProgress?> findForMovie({
@@ -184,10 +184,8 @@ class OfflineFirstWatchProgressRepository implements WatchProgressRepository {
     );
     await _tryReplayThenQueue(
       op,
-      () => _remote.unDismissEpisode(
-        profileId: profileId,
-        episodeId: episodeId,
-      ),
+      () =>
+          _remote.unDismissEpisode(profileId: profileId, episodeId: episodeId),
     );
   }
 

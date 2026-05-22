@@ -31,9 +31,9 @@ class WishlistController extends _$WishlistController {
     if (session is! ProfileSelected || !session.profile.isMain) {
       return const [];
     }
-    return ref.read(listWishlistUseCaseProvider).execute(
-          profileIds: _foyerProfileIds(session.session),
-        );
+    return ref
+        .read(listWishlistUseCaseProvider)
+        .execute(profileIds: _foyerProfileIds(session.session));
   }
 
   /// Every profile id of the foyer — used by the use case to
@@ -99,9 +99,9 @@ class WishlistController extends _$WishlistController {
     }
     state = const AsyncLoading();
     state = await AsyncValue.guard(
-      () => ref.read(listWishlistUseCaseProvider).execute(
-            profileIds: _foyerProfileIds(session.session),
-          ),
+      () => ref
+          .read(listWishlistUseCaseProvider)
+          .execute(profileIds: _foyerProfileIds(session.session)),
     );
   }
 
@@ -131,9 +131,9 @@ class WishlistController extends _$WishlistController {
       // Re-fetch through the use case so the new entry shows up only
       // if it passes the filter and the watch progress crossing.
       state = AsyncData(
-        await ref.read(listWishlistUseCaseProvider).execute(
-              profileIds: profileIds,
-            ),
+        await ref
+            .read(listWishlistUseCaseProvider)
+            .execute(profileIds: profileIds),
       );
     } catch (e, st) {
       debugPrint(

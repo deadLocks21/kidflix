@@ -67,10 +67,7 @@ void main() {
     test('throws when a required field is missing', () {
       final payload = _moviePayload()..remove('position_seconds');
 
-      expect(
-        () => watchProgressFromJson(payload),
-        throwsA(isA<TypeError>()),
-      );
+      expect(() => watchProgressFromJson(payload), throwsA(isA<TypeError>()));
     });
 
     test('parses completed: true', () {
@@ -110,10 +107,7 @@ void main() {
 
       final body = watchProgressToWireBody(progress);
 
-      expect(body, {
-        'position_seconds': 1900,
-        'completed': false,
-      });
+      expect(body, {'position_seconds': 1900, 'completed': false});
     });
 
     test('produces the PUT body for an EpisodeProgress', () {

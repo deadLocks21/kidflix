@@ -122,19 +122,19 @@ class _DownloadIntentButtonState extends ConsumerState<DownloadIntentButton> {
   Widget build(BuildContext context) {
     return switch (_state) {
       _ButtonState.inFlight => _InFlightButton(
-          mediaId: widget.mediaId,
-          isEpisode: widget.isEpisode,
-        ),
+        mediaId: widget.mediaId,
+        isEpisode: widget.isEpisode,
+      ),
       _ButtonState.kept => OutlinedButton.icon(
-          icon: const Icon(Icons.check_circle_outline),
-          label: const Text('Téléchargé'),
-          onPressed: _busy ? null : () => _showDownloadedActions(context),
-        ),
+        icon: const Icon(Icons.check_circle_outline),
+        label: const Text('Téléchargé'),
+        onPressed: _busy ? null : () => _showDownloadedActions(context),
+      ),
       _ButtonState.cacheOrAbsent => OutlinedButton.icon(
-          icon: const Icon(Icons.file_download_outlined),
-          label: const Text('Télécharger'),
-          onPressed: _busy ? null : () => _onPromote(context),
-        ),
+        icon: const Icon(Icons.file_download_outlined),
+        label: const Text('Télécharger'),
+        onPressed: _busy ? null : () => _onPromote(context),
+      ),
     };
   }
 
@@ -177,7 +177,9 @@ class _DownloadIntentButtonState extends ConsumerState<DownloadIntentButton> {
       // the parent's perspective, and so the offline home / detail
       // modal can render from disk only.
       if (widget.title != null) {
-        await ref.read(downloadRepositoryProvider).cacheMediaMetadata(
+        await ref
+            .read(downloadRepositoryProvider)
+            .cacheMediaMetadata(
               mediaId: widget.mediaId,
               isEpisode: widget.isEpisode,
               title: widget.title!,
@@ -199,10 +201,9 @@ class _DownloadIntentButtonState extends ConsumerState<DownloadIntentButton> {
               episodeNumber: widget.episodeNumber,
             );
       }
-      await ref.read(markAsDownloadUseCaseProvider).execute(
-            mediaId: widget.mediaId,
-            isEpisode: widget.isEpisode,
-          );
+      await ref
+          .read(markAsDownloadUseCaseProvider)
+          .execute(mediaId: widget.mediaId, isEpisode: widget.isEpisode);
       // Kick off the actual transfer if no file on disk yet (best-effort
       // — we drain the stream silently; the player will pick up the
       // file once complete).
@@ -252,9 +253,7 @@ class _DownloadIntentButtonState extends ConsumerState<DownloadIntentButton> {
                 ),
                 title: Text(
                   'Supprimer',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.error,
-                  ),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
                 onTap: () async {
                   Navigator.of(sheetCtx).pop();
@@ -273,10 +272,9 @@ class _DownloadIntentButtonState extends ConsumerState<DownloadIntentButton> {
     try {
       final allowed = await _kidsLockChallenge(context);
       if (!allowed) return;
-      await ref.read(markAsCacheUseCaseProvider).execute(
-            mediaId: widget.mediaId,
-            isEpisode: widget.isEpisode,
-          );
+      await ref
+          .read(markAsCacheUseCaseProvider)
+          .execute(mediaId: widget.mediaId, isEpisode: widget.isEpisode);
       ref.invalidate(downloadInventoryProvider);
       ref.invalidate(storageSummaryProvider);
       if (mounted) setState(() {});

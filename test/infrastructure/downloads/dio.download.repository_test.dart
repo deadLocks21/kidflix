@@ -39,7 +39,10 @@ void main() {
 
       expect(adapter.lastRequest!.method, 'GET');
       expect(adapter.lastRequest!.path, '/movies/abc/download');
-      expect(adapter.lastRequest!.uri.toString(), 'http://localhost:8080/movies/abc/download');
+      expect(
+        adapter.lastRequest!.uri.toString(),
+        'http://localhost:8080/movies/abc/download',
+      );
       expect(events.last.status, DownloadStatus.complete);
       expect(events.last.localPath, endsWith('abc.mp4'));
     });
@@ -84,30 +87,30 @@ void main() {
       expect(File('${tempDir.path}/movies/abc.mp4').existsSync(), isFalse);
     });
 
-    test('two concurrent download() calls share the same network request', () async {
-      const totalBytes = 3 * 1024 * 1024;
-      final adapter = _FakeAdapter(totalBytes: totalBytes);
-      final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
-      final repo = DioDownloadRepository(
-        dio: dio,
-        manifest: _newManifest(tempDir),
-        downloadsDirectory: tempDir,
-      );
+    test(
+      'two concurrent download() calls share the same network request',
+      () async {
+        const totalBytes = 3 * 1024 * 1024;
+        final adapter = _FakeAdapter(totalBytes: totalBytes);
+        final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
+        final repo = DioDownloadRepository(
+          dio: dio,
+          manifest: _newManifest(tempDir),
+          downloadsDirectory: tempDir,
+        );
 
-      final stream1 = repo.downloadMovie('abc');
-      final stream2 = repo.downloadMovie('abc');
+        final stream1 = repo.downloadMovie('abc');
+        final stream2 = repo.downloadMovie('abc');
 
-      final results = await Future.wait([stream1.toList(), stream2.toList()]);
-      expect(adapter.requestCount, 1);
-      expect(results[0].last.status, DownloadStatus.complete);
-      expect(results[1].last.status, DownloadStatus.complete);
-    });
+        final results = await Future.wait([stream1.toList(), stream2.toList()]);
+        expect(adapter.requestCount, 1);
+        expect(results[0].last.status, DownloadStatus.complete);
+        expect(results[1].last.status, DownloadStatus.complete);
+      },
+    );
 
     test('emits failed on 403 forbidden_age_category', () async {
-      final adapter = _FakeAdapter(
-        totalBytes: 0,
-        statusCodeOverride: 403,
-      );
+      final adapter = _FakeAdapter(totalBytes: 0, statusCodeOverride: 403);
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
       final repo = DioDownloadRepository(
         dio: dio,
@@ -122,10 +125,7 @@ void main() {
     });
 
     test('emits failed on 5xx', () async {
-      final adapter = _FakeAdapter(
-        totalBytes: 0,
-        statusCodeOverride: 500,
-      );
+      final adapter = _FakeAdapter(totalBytes: 0, statusCodeOverride: 500);
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
       final repo = DioDownloadRepository(
         dio: dio,
@@ -231,7 +231,10 @@ void main() {
 
     test('cancel() during an active download emits cancelled', () async {
       const totalBytes = 3 * 1024 * 1024;
-      final adapter = _FakeAdapter(totalBytes: totalBytes, chunkDelay: const Duration(milliseconds: 1));
+      final adapter = _FakeAdapter(
+        totalBytes: totalBytes,
+        chunkDelay: const Duration(milliseconds: 1),
+      );
       final dio = _newDio(adapter, baseUrl: 'http://localhost:8080');
       final repo = DioDownloadRepository(
         dio: dio,

@@ -43,10 +43,7 @@ class WishlistCard extends ConsumerWidget {
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: InkWell(
         onTap: canPlay ? () => _openPlayer(context) : null,
-        onLongPress: () => showWishlistEntryActionsSheet(
-          context,
-          entry: entry,
-        ),
+        onLongPress: () => showWishlistEntryActionsSheet(context, entry: entry),
         child: Padding(
           padding: const EdgeInsets.all(8),
           child: Row(

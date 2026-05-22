@@ -30,20 +30,19 @@ class PendingProgressOp {
     this.progress,
   });
 
-  String get key =>
-      '${isEpisode ? 'episodes' : 'movies'}/$profileId/$mediaId';
+  String get key => '${isEpisode ? 'episodes' : 'movies'}/$profileId/$mediaId';
 
   Map<String, dynamic> toJson() => {
-        'op': kind.name,
-        'isEpisode': isEpisode,
-        'profileId': profileId,
-        'mediaId': mediaId,
-        if (progress != null) ...{
-          'positionSeconds': progress!.positionSeconds,
-          'completed': progress!.completed,
-          'updatedAt': progress!.updatedAt.toUtc().toIso8601String(),
-        },
-      };
+    'op': kind.name,
+    'isEpisode': isEpisode,
+    'profileId': profileId,
+    'mediaId': mediaId,
+    if (progress != null) ...{
+      'positionSeconds': progress!.positionSeconds,
+      'completed': progress!.completed,
+      'updatedAt': progress!.updatedAt.toUtc().toIso8601String(),
+    },
+  };
 
   static PendingProgressOp? fromJson(Map<String, dynamic> json) {
     final opName = json['op'];
@@ -130,8 +129,9 @@ class JsonFileWatchProgressPendingQueue implements WatchProgressPendingQueue {
   Future<void> enqueue(PendingProgressOp op) async {
     await _lock.synchronized(() async {
       final cache = await _ensureLoadedUnlocked();
-      cache.removeWhere((existing) =>
-          existing.key == op.key && existing.kind == op.kind);
+      cache.removeWhere(
+        (existing) => existing.key == op.key && existing.kind == op.kind,
+      );
       cache.add(op);
       await _persistUnlocked(cache);
     });
@@ -147,8 +147,9 @@ class JsonFileWatchProgressPendingQueue implements WatchProgressPendingQueue {
   Future<void> remove(PendingProgressOp op) async {
     await _lock.synchronized(() async {
       final cache = await _ensureLoadedUnlocked();
-      cache.removeWhere((existing) =>
-          existing.key == op.key && existing.kind == op.kind);
+      cache.removeWhere(
+        (existing) => existing.key == op.key && existing.kind == op.kind,
+      );
       await _persistUnlocked(cache);
     });
   }
@@ -189,8 +190,9 @@ class JsonFileWatchProgressPendingQueue implements WatchProgressPendingQueue {
       _cache = [];
       for (final item in decoded) {
         if (item is Map) {
-          final parsed =
-              PendingProgressOp.fromJson(item.cast<String, dynamic>());
+          final parsed = PendingProgressOp.fromJson(
+            item.cast<String, dynamic>(),
+          );
           if (parsed != null) _cache!.add(parsed);
         }
       }

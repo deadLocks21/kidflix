@@ -8,54 +8,47 @@ Widget _wrap(Widget child) => MaterialApp(home: Scaffold(body: child));
 
 void main() {
   group('TrailerHeader', () {
-    testWidgets(
-      'falls back to the backdrop image when trailerUrl is null',
-      (tester) async {
-        await tester.pumpWidget(
-          _wrap(
-            const TrailerHeader(
-              trailerUrl: null,
-              fallbackImageUrl:
-                  'https://image.tmdb.org/t/p/original/backdrop.jpg',
-            ),
+    testWidgets('falls back to the backdrop image when trailerUrl is null', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          const TrailerHeader(
+            trailerUrl: null,
+            fallbackImageUrl:
+                'https://image.tmdb.org/t/p/original/backdrop.jpg',
           ),
-        );
-        await tester.pump();
+        ),
+      );
+      await tester.pump();
 
-        expect(find.byType(Video), findsNothing);
-        expect(find.byType(CachedNetworkImage), findsOneWidget);
-      },
-    );
+      expect(find.byType(Video), findsNothing);
+      expect(find.byType(CachedNetworkImage), findsOneWidget);
+    });
 
-    testWidgets(
-      'falls back when trailerUrl is not a recognised YouTube URL',
-      (tester) async {
-        await tester.pumpWidget(
-          _wrap(
-            const TrailerHeader(
-              trailerUrl: 'https://example.com/some/page',
-              fallbackImageUrl:
-                  'https://image.tmdb.org/t/p/original/backdrop.jpg',
-            ),
+    testWidgets('falls back when trailerUrl is not a recognised YouTube URL', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          const TrailerHeader(
+            trailerUrl: 'https://example.com/some/page',
+            fallbackImageUrl:
+                'https://image.tmdb.org/t/p/original/backdrop.jpg',
           ),
-        );
-        await tester.pump();
+        ),
+      );
+      await tester.pump();
 
-        expect(find.byType(Video), findsNothing);
-        expect(find.byType(CachedNetworkImage), findsOneWidget);
-      },
-    );
+      expect(find.byType(Video), findsNothing);
+      expect(find.byType(CachedNetworkImage), findsOneWidget);
+    });
 
     testWidgets(
       'renders only the placeholder Container when both URLs are null',
       (tester) async {
         await tester.pumpWidget(
-          _wrap(
-            const TrailerHeader(
-              trailerUrl: null,
-              fallbackImageUrl: null,
-            ),
-          ),
+          _wrap(const TrailerHeader(trailerUrl: null, fallbackImageUrl: null)),
         );
         await tester.pump();
 
@@ -67,17 +60,11 @@ void main() {
 
     testWidgets('keeps the 16:9 ratio in fallback mode', (tester) async {
       await tester.pumpWidget(
-        _wrap(
-          const TrailerHeader(
-            trailerUrl: null,
-            fallbackImageUrl: null,
-          ),
-        ),
+        _wrap(const TrailerHeader(trailerUrl: null, fallbackImageUrl: null)),
       );
       await tester.pump();
 
-      final aspectRatio =
-          tester.widget<AspectRatio>(find.byType(AspectRatio));
+      final aspectRatio = tester.widget<AspectRatio>(find.byType(AspectRatio));
       expect(aspectRatio.aspectRatio, 16 / 9);
     });
 
@@ -103,23 +90,22 @@ void main() {
       },
     );
 
-    testWidgets(
-      'no Stack/Positioned overlay when logoUrl is null',
-      (tester) async {
-        await tester.pumpWidget(
-          _wrap(
-            const TrailerHeader(
-              trailerUrl: null,
-              fallbackImageUrl:
-                  'https://image.tmdb.org/t/p/original/backdrop.jpg',
-            ),
+    testWidgets('no Stack/Positioned overlay when logoUrl is null', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          const TrailerHeader(
+            trailerUrl: null,
+            fallbackImageUrl:
+                'https://image.tmdb.org/t/p/original/backdrop.jpg',
           ),
-        );
-        await tester.pump();
+        ),
+      );
+      await tester.pump();
 
-        expect(find.byType(CachedNetworkImage), findsOneWidget);
-        expect(find.byType(Positioned), findsNothing);
-      },
-    );
+      expect(find.byType(CachedNetworkImage), findsOneWidget);
+      expect(find.byType(Positioned), findsNothing);
+    });
   });
 }

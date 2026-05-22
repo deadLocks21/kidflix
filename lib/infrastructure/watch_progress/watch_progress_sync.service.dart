@@ -30,9 +30,9 @@ class WatchProgressSyncService {
     required WatchProgressRepository remote,
     required WatchProgressPendingQueue queue,
     required ConnectivityService connectivity,
-  })  : _remote = remote,
-        _queue = queue,
-        _connectivity = connectivity;
+  }) : _remote = remote,
+       _queue = queue,
+       _connectivity = connectivity;
 
   /// Subscribes to the connectivity stream. Safe to call once at
   /// app startup. Subsequent calls are no-ops.

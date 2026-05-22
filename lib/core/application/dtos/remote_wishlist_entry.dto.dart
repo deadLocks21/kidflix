@@ -68,17 +68,17 @@ class RemoteWishlistEntryDto {
       );
 
   WishlistEntry toDomain() => WishlistEntry(
-        watcharrId: watcharrId,
-        tmdbId: tmdbId,
-        kind: kind,
-        title: title,
-        year: year,
-        posterUrl: posterUrl,
-        status: status,
-        rating: rating,
-        availableInCatalog: availableInCatalog,
-        catalogId: catalogId,
-      );
+    watcharrId: watcharrId,
+    tmdbId: tmdbId,
+    kind: kind,
+    title: title,
+    year: year,
+    posterUrl: posterUrl,
+    status: status,
+    rating: rating,
+    availableInCatalog: availableInCatalog,
+    catalogId: catalogId,
+  );
 }
 
 WishlistItemKind _kindFromWire(String wire) {

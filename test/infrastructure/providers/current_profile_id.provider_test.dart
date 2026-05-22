@@ -70,9 +70,7 @@ void main() {
       final ar = session.profiles.firstWhere((p) => p.id == 'ar');
       final controller = _MutableController(const Anonymous());
       final container = ProviderContainer(
-        overrides: [
-          sessionControllerProvider.overrideWith(() => controller),
-        ],
+        overrides: [sessionControllerProvider.overrideWith(() => controller)],
       );
       addTearDown(container.dispose);
 

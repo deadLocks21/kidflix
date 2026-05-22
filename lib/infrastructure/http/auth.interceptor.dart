@@ -40,10 +40,7 @@ class AuthInterceptor extends Interceptor {
   final String? Function() _currentProfileId;
 
   @override
-  void onRequest(
-    RequestOptions options,
-    RequestInterceptorHandler handler,
-  ) {
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     if (options.path.startsWith('/auth/')) {
       return handler.next(options);
     }
@@ -53,8 +50,7 @@ class AuthInterceptor extends Interceptor {
       options.headers['X-Device-Id'] = session.device.id;
     }
     final isProfilesBootstrap =
-        options.path == '/profiles' &&
-        options.method.toUpperCase() == 'GET';
+        options.path == '/profiles' && options.method.toUpperCase() == 'GET';
     if (!isProfilesBootstrap) {
       // A caller MAY pre-set `X-Profile-Id` via per-call `Options.headers`
       // to query the backend on behalf of a profile other than the

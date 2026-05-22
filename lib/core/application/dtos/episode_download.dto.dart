@@ -48,12 +48,13 @@ class EpisodeDownloadDto {
     return ratio;
   }
 
-  static DownloadStatusDto _mapStatus(DownloadStatus status) => switch (status) {
-    DownloadStatus.notStarted => DownloadStatusDto.notStarted,
-    DownloadStatus.downloading => DownloadStatusDto.downloading,
-    DownloadStatus.readyToPlay => DownloadStatusDto.readyToPlay,
-    DownloadStatus.complete => DownloadStatusDto.complete,
-    DownloadStatus.failed => DownloadStatusDto.failed,
-    DownloadStatus.cancelled => DownloadStatusDto.cancelled,
-  };
+  static DownloadStatusDto _mapStatus(DownloadStatus status) =>
+      switch (status) {
+        DownloadStatus.notStarted => DownloadStatusDto.notStarted,
+        DownloadStatus.downloading => DownloadStatusDto.downloading,
+        DownloadStatus.readyToPlay => DownloadStatusDto.readyToPlay,
+        DownloadStatus.complete => DownloadStatusDto.complete,
+        DownloadStatus.failed => DownloadStatusDto.failed,
+        DownloadStatus.cancelled => DownloadStatusDto.cancelled,
+      };
 }

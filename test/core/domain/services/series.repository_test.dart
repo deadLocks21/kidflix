@@ -23,18 +23,18 @@ class _FakeSeriesRepository implements SeriesRepository {
 }
 
 Series _series(String id) => Series(
-      id: id,
-      title: id,
-      synopsis: '',
-      ageCategory: AgeCategory.enfant,
-      genres: const [],
-      director: const [],
-      cast: const [],
-      addedAt: DateTime(2026, 1, 1),
-      seasonsCount: 0,
-      episodesCount: 0,
-      seasons: const [],
-    );
+  id: id,
+  title: id,
+  synopsis: '',
+  ageCategory: AgeCategory.enfant,
+  genres: const [],
+  director: const [],
+  cast: const [],
+  addedAt: DateTime(2026, 1, 1),
+  seasonsCount: 0,
+  episodesCount: 0,
+  seasons: const [],
+);
 
 void main() {
   group('SeriesRepository contract', () {

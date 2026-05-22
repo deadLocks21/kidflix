@@ -97,9 +97,7 @@ GoRouter appRouter(Ref ref) {
             next is ProfileSelected ||
             next is ManagingProfiles)) {
       didRunStartupCleanup = true;
-      unawaited(
-        ref.read(runStartupCacheCleanupUseCaseProvider).execute(),
-      );
+      unawaited(ref.read(runStartupCacheCleanupUseCaseProvider).execute());
     }
   });
   return GoRouter(
@@ -176,7 +174,8 @@ GoRouter appRouter(Ref ref) {
       ),
       GoRoute(
         path: AppRoutes.player,
-        builder: (_, s) => PlayerPage.movie(movieId: s.pathParameters['movieId']!),
+        builder: (_, s) =>
+            PlayerPage.movie(movieId: s.pathParameters['movieId']!),
       ),
       GoRoute(
         path: AppRoutes.playerEpisode,

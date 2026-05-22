@@ -50,10 +50,7 @@ class _SheetContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FractionallySizedBox(
-      heightFactor: 0.92,
-      child: child,
-    );
+    return FractionallySizedBox(heightFactor: 0.92, child: child);
   }
 }
 
@@ -229,7 +226,9 @@ class _PlayButton extends ConsumerWidget {
         // /catalog, and so the offline home can render rows + the detail
         // modal from disk only. Best-effort, fire-and-forget.
         unawaited(
-          ref.read(downloadRepositoryProvider).cacheMediaMetadata(
+          ref
+              .read(downloadRepositoryProvider)
+              .cacheMediaMetadata(
                 mediaId: movie.id,
                 isEpisode: false,
                 title: movie.title,

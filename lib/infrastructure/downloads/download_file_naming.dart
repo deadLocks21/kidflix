@@ -37,10 +37,7 @@ String extensionForContentType(String? contentType) {
   if (contentType == null) return defaultMediaExtension;
   final mime = contentType.split(';').first.trim().toLowerCase();
   return switch (mime) {
-    'video/x-matroska' ||
-    'video/matroska' ||
-    'application/x-matroska' =>
-      'mkv',
+    'video/x-matroska' || 'video/matroska' || 'application/x-matroska' => 'mkv',
     'video/webm' => 'webm',
     'video/mp4' => 'mp4',
     _ => defaultMediaExtension,

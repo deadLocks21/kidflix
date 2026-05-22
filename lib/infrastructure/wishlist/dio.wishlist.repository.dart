@@ -104,10 +104,7 @@ class DioWishlistRepository implements WishlistRepository {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/wishlist',
-        data: {
-          'tmdb_id': tmdbId,
-          'kind': wishlistKindToWire(kind),
-        },
+        data: {'tmdb_id': tmdbId, 'kind': wishlistKindToWire(kind)},
       );
       return RemoteWishlistEntryDto.fromJson(response.data!).toDomain();
     } on DioException catch (e) {

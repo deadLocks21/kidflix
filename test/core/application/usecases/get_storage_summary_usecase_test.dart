@@ -108,9 +108,6 @@ class _StubRepo implements DownloadRepository {
   Future<void> setEpisodeKind(String episodeId, DownloadKind kind) =>
       throw UnimplementedError();
   @override
-  Future<void> markPlayed({
-    required String mediaId,
-    required bool isEpisode,
-  }) =>
+  Future<void> markPlayed({required String mediaId, required bool isEpisode}) =>
       throw UnimplementedError();
 }

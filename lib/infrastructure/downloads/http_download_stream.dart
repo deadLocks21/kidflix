@@ -124,8 +124,9 @@ Future<void> _runDownload({
     final resumeExt = existingPartial == null
         ? null
         : parseMediaFileName(existingPartial.uri.pathSegments.last)?.ext;
-    final initialBytes =
-        existingPartial != null ? await existingPartial.length() : 0;
+    final initialBytes = existingPartial != null
+        ? await existingPartial.length()
+        : 0;
 
     final Response<ResponseBody> response;
     try {
@@ -144,7 +145,12 @@ Future<void> _runDownload({
       );
     } on DioException catch (e) {
       if (isCancelled() || CancelToken.isCancel(e)) {
-        await _emitCancelled(controller, movieId, existingPartial, initialBytes);
+        await _emitCancelled(
+          controller,
+          movieId,
+          existingPartial,
+          initialBytes,
+        );
       } else {
         await _emitFailed(
           controller,
@@ -174,10 +180,12 @@ Future<void> _runDownload({
         : extensionForContentType(
             response.headers.value(Headers.contentTypeHeader),
           );
-    final finalFile =
-        File('${downloadsDir.path}/${mediaFileName(movieId, ext)}');
-    final partialFile =
-        File('${downloadsDir.path}/${partialFileName(movieId, ext)}');
+    final finalFile = File(
+      '${downloadsDir.path}/${mediaFileName(movieId, ext)}',
+    );
+    final partialFile = File(
+      '${downloadsDir.path}/${partialFileName(movieId, ext)}',
+    );
 
     var bytesReceived = serverAcceptedRange ? initialBytes : 0;
     if (!serverAcceptedRange && existingPartial != null) {

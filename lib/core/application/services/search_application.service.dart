@@ -40,7 +40,7 @@ class SearchApplicationService {
       a.title.compareTo(b.title);
 
   static CatalogItemDto _project(CatalogItem item) => switch (item) {
-        Movie() => MovieDto.fromDomain(item),
-        Series() => SeriesDto.fromDomain(item),
-      };
+    Movie() => MovieDto.fromDomain(item),
+    Series() => SeriesDto.fromDomain(item),
+  };
 }

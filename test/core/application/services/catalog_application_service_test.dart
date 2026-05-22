@@ -47,7 +47,8 @@ class _NoopProgressRepo implements WatchProgressRepository {
   @override
   Future<void> save(WatchProgress progress) async {}
   @override
-  Future<List<WatchProgress>> listForProfile(String profileId) async => const [];
+  Future<List<WatchProgress>> listForProfile(String profileId) async =>
+      const [];
   @override
   Future<void> dismissMovie({
     required String profileId,
@@ -82,14 +83,13 @@ MovieProgress _movieProgress(
   String movieId, {
   bool completed = true,
   int positionSeconds = 0,
-}) =>
-    MovieProgress(
-      profileId: 'p1',
-      movieId: movieId,
-      positionSeconds: positionSeconds,
-      completed: completed,
-      updatedAt: DateTime(2026, 5, 1),
-    );
+}) => MovieProgress(
+  profileId: 'p1',
+  movieId: movieId,
+  positionSeconds: positionSeconds,
+  completed: completed,
+  updatedAt: DateTime(2026, 5, 1),
+);
 
 class _NoopSeriesRepo implements SeriesRepository {
   @override
@@ -107,11 +107,11 @@ class _CannedCWUseCase extends ResolveContinueWatchingUseCase {
   final List<ContinueWatchingItemDto> _items;
 
   _CannedCWUseCase(this._items)
-      : super(
-          progressRepo: _NoopProgressRepo(),
-          catalogRepo: _FakeRepo(const []),
-          seriesRepo: _NoopSeriesRepo(),
-        );
+    : super(
+        progressRepo: _NoopProgressRepo(),
+        catalogRepo: _FakeRepo(const []),
+        seriesRepo: _NoopSeriesRepo(),
+      );
 
   @override
   Future<List<ContinueWatchingItemDto>> execute(String profileId) async =>
@@ -127,20 +127,19 @@ Series _s({
   DateTime? addedAt,
   AgeCategory ageCategory = AgeCategory.enfant,
   List<String> genres = const [],
-}) =>
-    Series(
-      id: id,
-      title: title,
-      synopsis: '',
-      ageCategory: ageCategory,
-      genres: genres,
-      director: const [],
-      cast: const [],
-      addedAt: addedAt ?? DateTime(2026, 1, 1),
-      seasonsCount: seasonsCount,
-      episodesCount: episodesCount,
-      year: year,
-    );
+}) => Series(
+  id: id,
+  title: title,
+  synopsis: '',
+  ageCategory: ageCategory,
+  genres: genres,
+  director: const [],
+  cast: const [],
+  addedAt: addedAt ?? DateTime(2026, 1, 1),
+  seasonsCount: seasonsCount,
+  episodesCount: episodesCount,
+  year: year,
+);
 
 Movie _m({
   required String id,
@@ -171,30 +170,28 @@ Movie _m({
 DownloadEntry _movieDownload({
   required String mediaId,
   required String? triggeredBy,
-}) =>
-    DownloadEntry(
-      mediaId: mediaId,
-      mediaKind: DownloadMediaKind.movie,
-      kind: DownloadKind.download,
-      bytesOnDisk: 100,
-      displayTitle: mediaId,
-      triggeredByProfileId: triggeredBy,
-    );
+}) => DownloadEntry(
+  mediaId: mediaId,
+  mediaKind: DownloadMediaKind.movie,
+  kind: DownloadKind.download,
+  bytesOnDisk: 100,
+  displayTitle: mediaId,
+  triggeredByProfileId: triggeredBy,
+);
 
 DownloadEntry _episodeDownload({
   required String mediaId,
   required String parentSeriesId,
   required String? triggeredBy,
-}) =>
-    DownloadEntry(
-      mediaId: mediaId,
-      mediaKind: DownloadMediaKind.episode,
-      kind: DownloadKind.download,
-      bytesOnDisk: 100,
-      displayTitle: mediaId,
-      triggeredByProfileId: triggeredBy,
-      parentSeriesId: parentSeriesId,
-    );
+}) => DownloadEntry(
+  mediaId: mediaId,
+  mediaKind: DownloadMediaKind.episode,
+  kind: DownloadKind.download,
+  bytesOnDisk: 100,
+  displayTitle: mediaId,
+  triggeredByProfileId: triggeredBy,
+  parentSeriesId: parentSeriesId,
+);
 
 ProfileDto _profile(AgeCategory category) => ProfileDto(
   id: 'p1',
@@ -218,8 +215,9 @@ void main() {
         final rows = await service.buildHomeRowsFor(
           _profile(AgeCategory.enfant),
         );
-        final allMovieIds =
-            rows.expand((r) => r.items.map((m) => m.id)).toSet();
+        final allMovieIds = rows
+            .expand((r) => r.items.map((m) => m.id))
+            .toSet();
         // Both movies appear: the service forwards the repository's output
         // verbatim. Filtering is server-side (HTTP) or absent (in-memory).
         expect(allMovieIds, containsAll(['b1', 'e1']));
@@ -269,40 +267,36 @@ void main() {
       expect(genreRows.single.label, 'Familial');
     });
 
-    test(
-      'fixed rows precede dynamic block; dynamic rows come last',
-      () async {
-        final service = CatalogApplicationService(
-          _FakeRepo([
-            for (var i = 0; i < 4; i++)
-              _m(
-                id: 'a$i',
-                sagaId: 'asterix',
-                sagaLabel: 'Astérix',
-                genres: const ['Familial'],
-              ),
-            for (var i = 0; i < 4; i++)
-              _m(id: 'c$i', genres: const ['Comédie']),
-          ]),
-        );
-        final rows = await service.buildHomeRowsFor(
-          _profile(AgeCategory.enfant),
-          favorites: [
-            MovieFavorite(
-              profileId: 'p1',
-              movieId: 'a0',
-              createdAt: DateTime(2026, 1, 2),
+    test('fixed rows precede dynamic block; dynamic rows come last', () async {
+      final service = CatalogApplicationService(
+        _FakeRepo([
+          for (var i = 0; i < 4; i++)
+            _m(
+              id: 'a$i',
+              sagaId: 'asterix',
+              sagaLabel: 'Astérix',
+              genres: const ['Familial'],
             ),
-          ],
-        );
-        final types = rows.map((r) => r.type).toList();
-        final raIdx = types.indexOf('recentlyAdded');
-        final favIdx = types.indexOf('favorites');
-        final genreIdx = types.indexOf('genre');
-        expect(raIdx, lessThan(favIdx));
-        expect(favIdx, lessThan(genreIdx));
-      },
-    );
+          for (var i = 0; i < 4; i++) _m(id: 'c$i', genres: const ['Comédie']),
+        ]),
+      );
+      final rows = await service.buildHomeRowsFor(
+        _profile(AgeCategory.enfant),
+        favorites: [
+          MovieFavorite(
+            profileId: 'p1',
+            movieId: 'a0',
+            createdAt: DateTime(2026, 1, 2),
+          ),
+        ],
+      );
+      final types = rows.map((r) => r.type).toList();
+      final raIdx = types.indexOf('recentlyAdded');
+      final favIdx = types.indexOf('favorites');
+      final genreIdx = types.indexOf('genre');
+      expect(raIdx, lessThan(favIdx));
+      expect(favIdx, lessThan(genreIdx));
+    });
 
     test('favorites row hidden when no favorites are passed', () async {
       final service = CatalogApplicationService(
@@ -312,56 +306,46 @@ void main() {
       expect(rows.where((r) => r.type == 'favorites'), isEmpty);
     });
 
-    test(
-      'favorites row mixes movies + series sorted by createdAt desc, '
-      'skipping unresolvable ids',
-      () async {
-        final service = CatalogApplicationService(
-          _FakeRepo([
-            _m(id: 'm1'),
-            _s(id: 's1'),
-          ]),
-        );
-        final rows = await service.buildHomeRowsFor(
-          _profile(AgeCategory.enfant),
-          favorites: [
-            MovieFavorite(
-              profileId: 'p1',
-              movieId: 'm1',
-              createdAt: DateTime(2026, 1, 1),
-            ),
-            SeriesFavorite(
-              profileId: 'p1',
-              seriesId: 's1',
-              createdAt: DateTime(2026, 2, 1),
-            ),
-            // Unknown id → silently dropped.
-            MovieFavorite(
-              profileId: 'p1',
-              movieId: 'unknown',
-              createdAt: DateTime(2026, 3, 1),
-            ),
-          ],
-        );
-        final favRow = rows.singleWhere((r) => r.type == 'favorites');
-        expect(favRow.label, 'Ma liste');
-        // SeriesFavorite is more recent → first.
-        expect(favRow.items.map((i) => i.id).toList(), ['s1', 'm1']);
-      },
-    );
+    test('favorites row mixes movies + series sorted by createdAt desc, '
+        'skipping unresolvable ids', () async {
+      final service = CatalogApplicationService(
+        _FakeRepo([_m(id: 'm1'), _s(id: 's1')]),
+      );
+      final rows = await service.buildHomeRowsFor(
+        _profile(AgeCategory.enfant),
+        favorites: [
+          MovieFavorite(
+            profileId: 'p1',
+            movieId: 'm1',
+            createdAt: DateTime(2026, 1, 1),
+          ),
+          SeriesFavorite(
+            profileId: 'p1',
+            seriesId: 's1',
+            createdAt: DateTime(2026, 2, 1),
+          ),
+          // Unknown id → silently dropped.
+          MovieFavorite(
+            profileId: 'p1',
+            movieId: 'unknown',
+            createdAt: DateTime(2026, 3, 1),
+          ),
+        ],
+      );
+      final favRow = rows.singleWhere((r) => r.type == 'favorites');
+      expect(favRow.label, 'Ma liste');
+      // SeriesFavorite is more recent → first.
+      expect(favRow.items.map((i) => i.id).toList(), ['s1', 'm1']);
+    });
 
     test('dynamic rows below the 4-item threshold are hidden', () async {
       final service = CatalogApplicationService(
         _FakeRepo([
           // 3-movie genre: must NOT appear (below threshold)
           for (var i = 0; i < 3; i++)
-            _m(
-              id: 'a$i',
-              genres: const ['Animation'],
-            ),
+            _m(id: 'a$i', genres: const ['Animation']),
           // 4-movie genre: must appear
-          for (var i = 0; i < 4; i++)
-            _m(id: 'c$i', genres: const ['Comédie']),
+          for (var i = 0; i < 4; i++) _m(id: 'c$i', genres: const ['Comédie']),
         ]),
       );
       final rows = await service.buildHomeRowsFor(_profile(AgeCategory.enfant));
@@ -418,73 +402,70 @@ void main() {
       final genreRows = rows.where((r) => r.type == 'genre').toList();
       expect(genreRows, hasLength(1));
       expect(genreRows.single.label, 'Animation');
-      expect(
-        genreRows.single.items.map((i) => i.id).toSet(),
-        {'m0', 'm1', 'm2', 'm3'},
-      );
+      expect(genreRows.single.items.map((i) => i.id).toSet(), {
+        'm0',
+        'm1',
+        'm2',
+        'm3',
+      });
     });
 
     group('Téléchargés row', () {
       test('is absent when no downloads provided', () async {
-        final service = CatalogApplicationService(
-          _FakeRepo([_m(id: 'm1')]),
-        );
+        final service = CatalogApplicationService(_FakeRepo([_m(id: 'm1')]));
         final rows = await service.buildHomeRowsFor(
           _profile(AgeCategory.enfant),
         );
         expect(rows.where((r) => r.type == 'downloaded'), isEmpty);
       });
 
-      test(
-        'shows entries triggered by active profile + entries with no '
-        'known triggerer; skips items triggered by other profiles',
-        () async {
-          final service = CatalogApplicationService(
-            _FakeRepo([_m(id: 'm1'), _m(id: 'm2'), _m(id: 'm3')]),
-          );
-          final downloads = [
-            _movieDownload(mediaId: 'm1', triggeredBy: 'p1'),
-            _movieDownload(mediaId: 'm2', triggeredBy: 'p2'),
-            _movieDownload(mediaId: 'm3', triggeredBy: null),
-          ];
-          final rows = await service.buildHomeRowsFor(
-            _profile(AgeCategory.enfant),
-            downloads: downloads,
-          );
-          final dl = rows.firstWhere((r) => r.type == 'downloaded');
-          expect(dl.items.map((i) => i.id).toList(), ['m1', 'm3']);
-        },
-      );
-
-      test('deduplicates episodes of the same series into one series card',
-          () async {
+      test('shows entries triggered by active profile + entries with no '
+          'known triggerer; skips items triggered by other profiles', () async {
         final service = CatalogApplicationService(
-          _FakeRepo([_s(id: 'pingu')]),
+          _FakeRepo([_m(id: 'm1'), _m(id: 'm2'), _m(id: 'm3')]),
         );
         final downloads = [
-          _episodeDownload(
-            mediaId: 'pingu-s01e01',
-            parentSeriesId: 'pingu',
-            triggeredBy: 'p1',
-          ),
-          _episodeDownload(
-            mediaId: 'pingu-s01e02',
-            parentSeriesId: 'pingu',
-            triggeredBy: 'p1',
-          ),
+          _movieDownload(mediaId: 'm1', triggeredBy: 'p1'),
+          _movieDownload(mediaId: 'm2', triggeredBy: 'p2'),
+          _movieDownload(mediaId: 'm3', triggeredBy: null),
         ];
         final rows = await service.buildHomeRowsFor(
           _profile(AgeCategory.enfant),
           downloads: downloads,
         );
         final dl = rows.firstWhere((r) => r.type == 'downloaded');
-        expect(dl.items.map((i) => i.id).toList(), ['pingu']);
+        expect(dl.items.map((i) => i.id).toList(), ['m1', 'm3']);
       });
 
+      test(
+        'deduplicates episodes of the same series into one series card',
+        () async {
+          final service = CatalogApplicationService(
+            _FakeRepo([_s(id: 'pingu')]),
+          );
+          final downloads = [
+            _episodeDownload(
+              mediaId: 'pingu-s01e01',
+              parentSeriesId: 'pingu',
+              triggeredBy: 'p1',
+            ),
+            _episodeDownload(
+              mediaId: 'pingu-s01e02',
+              parentSeriesId: 'pingu',
+              triggeredBy: 'p1',
+            ),
+          ];
+          final rows = await service.buildHomeRowsFor(
+            _profile(AgeCategory.enfant),
+            downloads: downloads,
+          );
+          final dl = rows.firstWhere((r) => r.type == 'downloaded');
+          expect(dl.items.map((i) => i.id).toList(), ['pingu']);
+        },
+      );
+
       test('skips entries whose catalog metadata is missing', () async {
-        final service = CatalogApplicationService(
-          _FakeRepo([_m(id: 'm1')]),
-        );
+        final service = CatalogApplicationService(_FakeRepo([_m(id: 'm1')]));
         final downloads = [
           _movieDownload(mediaId: 'm1', triggeredBy: 'p1'),
           _movieDownload(mediaId: 'orphan', triggeredBy: 'p1'),
@@ -502,23 +483,25 @@ void main() {
         expect(dl.items.map((i) => i.id).toList(), ['m1']);
       });
 
-      test('preserves order of the downloads list (lastPlayedAt-desc)',
-          () async {
-        final service = CatalogApplicationService(
-          _FakeRepo([_m(id: 'm1'), _m(id: 'm2'), _m(id: 'm3')]),
-        );
-        final downloads = [
-          _movieDownload(mediaId: 'm3', triggeredBy: 'p1'),
-          _movieDownload(mediaId: 'm1', triggeredBy: 'p1'),
-          _movieDownload(mediaId: 'm2', triggeredBy: 'p1'),
-        ];
-        final rows = await service.buildHomeRowsFor(
-          _profile(AgeCategory.enfant),
-          downloads: downloads,
-        );
-        final dl = rows.firstWhere((r) => r.type == 'downloaded');
-        expect(dl.items.map((i) => i.id).toList(), ['m3', 'm1', 'm2']);
-      });
+      test(
+        'preserves order of the downloads list (lastPlayedAt-desc)',
+        () async {
+          final service = CatalogApplicationService(
+            _FakeRepo([_m(id: 'm1'), _m(id: 'm2'), _m(id: 'm3')]),
+          );
+          final downloads = [
+            _movieDownload(mediaId: 'm3', triggeredBy: 'p1'),
+            _movieDownload(mediaId: 'm1', triggeredBy: 'p1'),
+            _movieDownload(mediaId: 'm2', triggeredBy: 'p1'),
+          ];
+          final rows = await service.buildHomeRowsFor(
+            _profile(AgeCategory.enfant),
+            downloads: downloads,
+          );
+          final dl = rows.firstWhere((r) => r.type == 'downloaded');
+          expect(dl.items.map((i) => i.id).toList(), ['m3', 'm1', 'm2']);
+        },
+      );
     });
 
     group('Continuer à regarder row', () {
@@ -623,52 +606,56 @@ void main() {
         expect(wrapper.progress, 1.0);
       });
 
-      test('movie zero duration → progress 0.0 (no division by zero)',
-          () async {
-        final m = nemo(duration: Duration.zero);
-        final cw = _CannedCWUseCase([
-          MovieContinueDto(
-            movie: MovieDto.fromDomain(m),
-            resumeSeconds: 42,
-            completed: false,
-          ),
-        ]);
-        final service = CatalogApplicationService(
-          _FakeRepo([m]),
-          continueWatching: cw,
-        );
-        final rows = await service.buildHomeRowsFor(
-          _profile(AgeCategory.enfant),
-        );
-        final row = rows.firstWhere((r) => r.type == 'continueWatching');
-        final wrapper = row.items.first as ContinueWatchingCardDto;
-        expect(wrapper.progress, 0.0);
-      });
+      test(
+        'movie zero duration → progress 0.0 (no division by zero)',
+        () async {
+          final m = nemo(duration: Duration.zero);
+          final cw = _CannedCWUseCase([
+            MovieContinueDto(
+              movie: MovieDto.fromDomain(m),
+              resumeSeconds: 42,
+              completed: false,
+            ),
+          ]);
+          final service = CatalogApplicationService(
+            _FakeRepo([m]),
+            continueWatching: cw,
+          );
+          final rows = await service.buildHomeRowsFor(
+            _profile(AgeCategory.enfant),
+          );
+          final row = rows.firstWhere((r) => r.type == 'continueWatching');
+          final wrapper = row.items.first as ContinueWatchingCardDto;
+          expect(wrapper.progress, 0.0);
+        },
+      );
 
-      test('episode inProgress → progress = resume / episode duration',
-          () async {
-        final s = pingu();
-        final e = episode(duration: const Duration(seconds: 300));
-        final cw = _CannedCWUseCase([
-          EpisodeContinueDto(
-            series: s,
-            episode: e,
-            resumeSeconds: 75,
-            kind: ContinueWatchingState.inProgress,
-          ),
-        ]);
-        final service = CatalogApplicationService(
-          _FakeRepo([s]),
-          continueWatching: cw,
-        );
-        final rows = await service.buildHomeRowsFor(
-          _profile(AgeCategory.enfant),
-        );
-        final row = rows.firstWhere((r) => r.type == 'continueWatching');
-        final wrapper = row.items.first as ContinueWatchingCardDto;
-        expect(wrapper.progress, closeTo(75 / 300, 1e-9));
-        expect(wrapper.inner, isA<SeriesDto>());
-      });
+      test(
+        'episode inProgress → progress = resume / episode duration',
+        () async {
+          final s = pingu();
+          final e = episode(duration: const Duration(seconds: 300));
+          final cw = _CannedCWUseCase([
+            EpisodeContinueDto(
+              series: s,
+              episode: e,
+              resumeSeconds: 75,
+              kind: ContinueWatchingState.inProgress,
+            ),
+          ]);
+          final service = CatalogApplicationService(
+            _FakeRepo([s]),
+            continueWatching: cw,
+          );
+          final rows = await service.buildHomeRowsFor(
+            _profile(AgeCategory.enfant),
+          );
+          final row = rows.firstWhere((r) => r.type == 'continueWatching');
+          final wrapper = row.items.first as ContinueWatchingCardDto;
+          expect(wrapper.progress, closeTo(75 / 300, 1e-9));
+          expect(wrapper.inner, isA<SeriesDto>());
+        },
+      );
 
       test('episode nextAfterCompleted → progress 0.0', () async {
         final s = pingu();
@@ -716,42 +703,48 @@ void main() {
     });
 
     group('Jamais vus row', () {
-      test('excludes movies with any recorded progress for the profile',
-          () async {
-        final movies = [for (var i = 0; i < 6; i++) _m(id: 'n$i')];
-        final service = CatalogApplicationService(
-          _FakeRepo(movies),
-          watchProgress: _CannedProgressRepo([
-            _movieProgress('n0'),
-            _movieProgress('n3'),
-          ]),
-        );
-        final rows =
-            await service.buildHomeRowsFor(_profile(AgeCategory.enfant));
-        final neverWatched =
-            rows.firstWhere((r) => r.type == 'neverWatched');
-        expect(
-          neverWatched.items.map((i) => i.id).toSet(),
-          {'n1', 'n2', 'n4', 'n5'},
-        );
-      });
+      test(
+        'excludes movies with any recorded progress for the profile',
+        () async {
+          final movies = [for (var i = 0; i < 6; i++) _m(id: 'n$i')];
+          final service = CatalogApplicationService(
+            _FakeRepo(movies),
+            watchProgress: _CannedProgressRepo([
+              _movieProgress('n0'),
+              _movieProgress('n3'),
+            ]),
+          );
+          final rows = await service.buildHomeRowsFor(
+            _profile(AgeCategory.enfant),
+          );
+          final neverWatched = rows.firstWhere((r) => r.type == 'neverWatched');
+          expect(neverWatched.items.map((i) => i.id).toSet(), {
+            'n1',
+            'n2',
+            'n4',
+            'n5',
+          });
+        },
+      );
 
-      test('partial progress (not completed) also excludes the movie',
-          () async {
-        final movies = [for (var i = 0; i < 5; i++) _m(id: 'n$i')];
-        final service = CatalogApplicationService(
-          _FakeRepo(movies),
-          watchProgress: _CannedProgressRepo([
-            _movieProgress('n2', completed: false, positionSeconds: 30),
-          ]),
-        );
-        final rows =
-            await service.buildHomeRowsFor(_profile(AgeCategory.enfant));
-        final neverWatched =
-            rows.firstWhere((r) => r.type == 'neverWatched');
-        expect(neverWatched.items.any((i) => i.id == 'n2'), isFalse);
-        expect(neverWatched.items, hasLength(4));
-      });
+      test(
+        'partial progress (not completed) also excludes the movie',
+        () async {
+          final movies = [for (var i = 0; i < 5; i++) _m(id: 'n$i')];
+          final service = CatalogApplicationService(
+            _FakeRepo(movies),
+            watchProgress: _CannedProgressRepo([
+              _movieProgress('n2', completed: false, positionSeconds: 30),
+            ]),
+          );
+          final rows = await service.buildHomeRowsFor(
+            _profile(AgeCategory.enfant),
+          );
+          final neverWatched = rows.firstWhere((r) => r.type == 'neverWatched');
+          expect(neverWatched.items.any((i) => i.id == 'n2'), isFalse);
+          expect(neverWatched.items, hasLength(4));
+        },
+      );
 
       test('row is hidden when fewer than 4 unseen movies remain', () async {
         final movies = [for (var i = 0; i < 5; i++) _m(id: 'n$i')];
@@ -762,8 +755,9 @@ void main() {
             _movieProgress('n1'),
           ]),
         );
-        final rows =
-            await service.buildHomeRowsFor(_profile(AgeCategory.enfant));
+        final rows = await service.buildHomeRowsFor(
+          _profile(AgeCategory.enfant),
+        );
         expect(rows.where((r) => r.type == 'neverWatched'), isEmpty);
       });
     });

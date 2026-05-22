@@ -35,18 +35,14 @@ void main() {
     testWidgets('shows skeleton while loading', (tester) async {
       final pending = Completer<List<CatalogRowDto>>();
       await tester.pumpWidget(
-        _app([
-          homeCatalogRowsProvider.overrideWith((ref) => pending.future),
-        ]),
+        _app([homeCatalogRowsProvider.overrideWith((ref) => pending.future)]),
       );
       expect(find.byType(CatalogSkeleton), findsOneWidget);
     });
 
     testWidgets('shows empty state when rows list is empty', (tester) async {
       await tester.pumpWidget(
-        _app([
-          homeCatalogRowsProvider.overrideWith((ref) async => const []),
-        ]),
+        _app([homeCatalogRowsProvider.overrideWith((ref) async => const [])]),
       );
       await tester.pumpAndSettle();
       expect(

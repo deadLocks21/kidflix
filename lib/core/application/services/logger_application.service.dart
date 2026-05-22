@@ -39,8 +39,8 @@ class LoggerApplicationService {
     this._logger, {
     Map<String, Object?> context = const {},
     Map<String, Object?> Function()? resolveContext,
-  })  : _staticContext = context,
-        _resolveContext = resolveContext;
+  }) : _staticContext = context,
+       _resolveContext = resolveContext;
 
   /// Returns a new facade that adds [extra] on top of the current static
   /// context. The dynamic [resolveContext] is preserved as-is.
@@ -64,8 +64,7 @@ class LoggerApplicationService {
     Map<String, Object?> attrs = const {},
     Object? error,
     StackTrace? stack,
-  }) =>
-      _emit(LogLevel.warn, message, attrs: attrs, error: error, stack: stack);
+  }) => _emit(LogLevel.warn, message, attrs: attrs, error: error, stack: stack);
 
   Future<void> error(
     String message, {

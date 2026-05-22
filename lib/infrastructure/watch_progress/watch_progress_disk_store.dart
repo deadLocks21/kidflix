@@ -13,8 +13,7 @@ String _keyFor({
   required bool isEpisode,
   required String profileId,
   required String mediaId,
-}) =>
-    '${isEpisode ? 'episodes' : 'movies'}/$profileId/$mediaId';
+}) => '${isEpisode ? 'episodes' : 'movies'}/$profileId/$mediaId';
 
 /// Local mirror of every `WatchProgress` known to the client, kept in
 /// the JSON sidecar `<appDocs>/watch_progress.json`.
@@ -52,10 +51,7 @@ abstract interface class WatchProgressDiskStore {
   /// Bulk-replaces every entry for [profileId] with [progresses]. Used
   /// by the sync layer when it pulls the server-side state on a
   /// reconnect (server is the eventual source of truth).
-  Future<void> replaceProfile(
-    String profileId,
-    List<WatchProgress> progresses,
-  );
+  Future<void> replaceProfile(String profileId, List<WatchProgress> progresses);
 }
 
 /// JSON-file backed implementation. Lazy-loads at first access,
@@ -69,9 +65,8 @@ class JsonFileWatchProgressStore implements WatchProgressDiskStore {
   final Lock _lock = Lock();
   Map<String, WatchProgress>? _cache;
 
-  JsonFileWatchProgressStore({
-    required Future<Directory> Function() resolveDir,
-  }) : _resolveDir = resolveDir;
+  JsonFileWatchProgressStore({required Future<Directory> Function() resolveDir})
+    : _resolveDir = resolveDir;
 
   @override
   Future<WatchProgress?> find({
@@ -94,16 +89,18 @@ class JsonFileWatchProgressStore implements WatchProgressDiskStore {
       switch (progress) {
         case MovieProgress(:final profileId, :final movieId):
           cache[_keyFor(
-            isEpisode: false,
-            profileId: profileId,
-            mediaId: movieId,
-          )] = progress;
+                isEpisode: false,
+                profileId: profileId,
+                mediaId: movieId,
+              )] =
+              progress;
         case EpisodeProgress(:final profileId, :final episodeId):
           cache[_keyFor(
-            isEpisode: true,
-            profileId: profileId,
-            mediaId: episodeId,
-          )] = progress;
+                isEpisode: true,
+                profileId: profileId,
+                mediaId: episodeId,
+              )] =
+              progress;
       }
       await _persistUnlocked(cache);
     });
@@ -150,16 +147,18 @@ class JsonFileWatchProgressStore implements WatchProgressDiskStore {
         switch (p) {
           case MovieProgress(:final movieId):
             cache[_keyFor(
-              isEpisode: false,
-              profileId: profileId,
-              mediaId: movieId,
-            )] = p;
+                  isEpisode: false,
+                  profileId: profileId,
+                  mediaId: movieId,
+                )] =
+                p;
           case EpisodeProgress(:final episodeId):
             cache[_keyFor(
-              isEpisode: true,
-              profileId: profileId,
-              mediaId: episodeId,
-            )] = p;
+                  isEpisode: true,
+                  profileId: profileId,
+                  mediaId: episodeId,
+                )] =
+                p;
         }
       }
       await _persistUnlocked(cache);
@@ -222,11 +221,11 @@ class JsonFileWatchProgressStore implements WatchProgressDiskStore {
   }
 
   Map<String, dynamic> _entryToJson(WatchProgress p) => {
-        'positionSeconds': p.positionSeconds,
-        'completed': p.completed,
-        'dismissed': p.dismissed,
-        'updatedAt': p.updatedAt.toUtc().toIso8601String(),
-      };
+    'positionSeconds': p.positionSeconds,
+    'completed': p.completed,
+    'dismissed': p.dismissed,
+    'updatedAt': p.updatedAt.toUtc().toIso8601String(),
+  };
 
   WatchProgress? _parseEntry(String key, Object? raw) {
     if (raw is! Map) return null;
@@ -267,21 +266,21 @@ class JsonFileWatchProgressStore implements WatchProgressDiskStore {
   WatchProgress _withDismissed(WatchProgress p, bool dismissed) {
     return switch (p) {
       MovieProgress() => MovieProgress(
-          profileId: p.profileId,
-          movieId: p.movieId,
-          positionSeconds: p.positionSeconds,
-          completed: p.completed,
-          dismissed: dismissed,
-          updatedAt: p.updatedAt,
-        ),
+        profileId: p.profileId,
+        movieId: p.movieId,
+        positionSeconds: p.positionSeconds,
+        completed: p.completed,
+        dismissed: dismissed,
+        updatedAt: p.updatedAt,
+      ),
       EpisodeProgress() => EpisodeProgress(
-          profileId: p.profileId,
-          episodeId: p.episodeId,
-          positionSeconds: p.positionSeconds,
-          completed: p.completed,
-          dismissed: dismissed,
-          updatedAt: p.updatedAt,
-        ),
+        profileId: p.profileId,
+        episodeId: p.episodeId,
+        positionSeconds: p.positionSeconds,
+        completed: p.completed,
+        dismissed: dismissed,
+        updatedAt: p.updatedAt,
+      ),
     };
   }
 }

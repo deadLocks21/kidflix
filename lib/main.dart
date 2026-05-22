@@ -21,10 +21,7 @@ void main() {
   logger.info('app.started');
 
   runApp(
-    UncontrolledProviderScope(
-      container: container,
-      child: const KidflixApp(),
-    ),
+    UncontrolledProviderScope(container: container, child: const KidflixApp()),
   );
 }
 

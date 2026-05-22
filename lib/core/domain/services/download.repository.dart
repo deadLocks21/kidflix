@@ -111,10 +111,7 @@ abstract interface class DownloadRepository {
   /// Bumps `lastPlayedAt` to `DateTime.now()` for the given media.
   /// Creates a manifest entry with `kind = cache` if absent. Other
   /// fields preserved.
-  Future<void> markPlayed({
-    required String mediaId,
-    required bool isEpisode,
-  });
+  Future<void> markPlayed({required String mediaId, required bool isEpisode});
 
   /// Caches display metadata on the manifest entry for the given media.
   /// Used by callers that hold the `Movie` / `Episode` object at the

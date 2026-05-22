@@ -14,8 +14,7 @@ Map<String, dynamic> _asterixJson() => {
   'poster_url': 'https://image.tmdb.org/t/p/original/poster.jpg',
   'backdrop_url': 'https://image.tmdb.org/t/p/original/backdrop.jpg',
   'logo_url': 'https://image.tmdb.org/t/p/original/logo.png',
-  'trailer_url':
-      'plugin://plugin.video.youtube/play/?video_id=fet2dxgJGNk',
+  'trailer_url': 'plugin://plugin.video.youtube/play/?video_id=fet2dxgJGNk',
   'age_category': 'enfant',
   'genres': ['Familial', 'Comédie', 'Aventure', 'Fantastique'],
   'saga_id': 'asterix',
@@ -27,7 +26,11 @@ Map<String, dynamic> _asterixJson() => {
     {'name': 'Vincent Cassel', 'role': 'Jules César', 'photo_url': null},
     {'name': 'Jonathan Cohen', 'role': 'Graindemaïs', 'photo_url': null},
     {'name': 'Julie Chen', 'role': 'Princesse Fu Yi', 'photo_url': null},
-    {'name': 'Marion Cotillard', 'role': 'Cléopâtre / Bibine', 'photo_url': null},
+    {
+      'name': 'Marion Cotillard',
+      'role': 'Cléopâtre / Bibine',
+      'photo_url': null,
+    },
     {'name': 'Pierre Richard', 'role': 'Panoramix', 'photo_url': null},
   ],
   'added_at': '2026-04-20T00:00:00Z',

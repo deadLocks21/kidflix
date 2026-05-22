@@ -10,10 +10,7 @@ void main() {
 
     test('fromJson round-trips known values', () {
       expect(DownloadKind.fromJson('cache'), equals(DownloadKind.cache));
-      expect(
-        DownloadKind.fromJson('download'),
-        equals(DownloadKind.download),
-      );
+      expect(DownloadKind.fromJson('download'), equals(DownloadKind.download));
     });
 
     test('fromJson defaults to cache for unknown values', () {

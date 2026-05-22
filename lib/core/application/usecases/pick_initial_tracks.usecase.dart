@@ -37,11 +37,7 @@ class PickInitialTracksUseCase {
       return (audioId: audioId, subtitleId: null, disableSubtitles: true);
     }
     final subtitleId = _matchByLanguage(subtitle, preferences.subtitleLanguage);
-    return (
-      audioId: audioId,
-      subtitleId: subtitleId,
-      disableSubtitles: false,
-    );
+    return (audioId: audioId, subtitleId: subtitleId, disableSubtitles: false);
   }
 
   String? _matchByLanguage(List<MediaTrack> tracks, String? language) {

@@ -9,38 +9,34 @@ import 'package:kidflix/core/domain/services/series.repository.dart';
 import 'package:kidflix/core/domain/services/watch_progress.repository.dart';
 
 Movie _movie({String id = 'nemo', String title = 'Nemo'}) => Movie(
-      id: id,
-      title: title,
-      duration: const Duration(minutes: 100),
-      synopsis: '',
-      ageCategory: AgeCategory.enfant,
-      genres: const [],
-      director: const [],
-      cast: const [],
-      addedAt: DateTime(2026, 4, 1),
-    );
+  id: id,
+  title: title,
+  duration: const Duration(minutes: 100),
+  synopsis: '',
+  ageCategory: AgeCategory.enfant,
+  genres: const [],
+  director: const [],
+  cast: const [],
+  addedAt: DateTime(2026, 4, 1),
+);
 
 Episode _ep({
   required String id,
   String seriesId = 'pingu',
   required int seasonNumber,
   required int episodeNumber,
-}) =>
-    Episode(
-      id: id,
-      seriesId: seriesId,
-      seasonNumber: seasonNumber,
-      episodeNumber: episodeNumber,
-      title: 'Ep $seasonNumber.$episodeNumber',
-      duration: const Duration(minutes: 5),
-      ageCategory: AgeCategory.enfant,
-      addedAt: DateTime(2026, 5, 1),
-    );
+}) => Episode(
+  id: id,
+  seriesId: seriesId,
+  seasonNumber: seasonNumber,
+  episodeNumber: episodeNumber,
+  title: 'Ep $seasonNumber.$episodeNumber',
+  duration: const Duration(minutes: 5),
+  ageCategory: AgeCategory.enfant,
+  addedAt: DateTime(2026, 5, 1),
+);
 
-Series _seriesWith({
-  required String id,
-  required List<Season> seasons,
-}) {
+Series _seriesWith({required String id, required List<Season> seasons}) {
   final epCount = seasons.fold<int>(0, (s, sn) => s + sn.episodes.length);
   return Series(
     id: id,
@@ -201,8 +197,9 @@ void main() {
       );
       final uc = ResolveContinueWatchingUseCase(
         progressRepo: _FakeProgress([progress]),
-        catalogRepo:
-            _FakeCatalog([_seriesWith(id: 'pingu', seasons: const [])]),
+        catalogRepo: _FakeCatalog([
+          _seriesWith(id: 'pingu', seasons: const []),
+        ]),
         seriesRepo: _FakeSeries({'pingu': series}),
       );
 
@@ -231,54 +228,63 @@ void main() {
       expect(result, isEmpty);
     });
 
-    test('in-progress episode produces an inProgress EpisodeContinueDto',
-        () async {
-      final s1e3 = _ep(id: 's1e3', seasonNumber: 1, episodeNumber: 3);
-      final series = _seriesWith(
-        id: 'pingu',
-        seasons: [
-          Season(seasonNumber: 1, episodes: [
-            _ep(id: 's1e1', seasonNumber: 1, episodeNumber: 1),
-            _ep(id: 's1e2', seasonNumber: 1, episodeNumber: 2),
-            s1e3,
-            _ep(id: 's1e4', seasonNumber: 1, episodeNumber: 4),
+    test(
+      'in-progress episode produces an inProgress EpisodeContinueDto',
+      () async {
+        final s1e3 = _ep(id: 's1e3', seasonNumber: 1, episodeNumber: 3);
+        final series = _seriesWith(
+          id: 'pingu',
+          seasons: [
+            Season(
+              seasonNumber: 1,
+              episodes: [
+                _ep(id: 's1e1', seasonNumber: 1, episodeNumber: 1),
+                _ep(id: 's1e2', seasonNumber: 1, episodeNumber: 2),
+                s1e3,
+                _ep(id: 's1e4', seasonNumber: 1, episodeNumber: 4),
+              ],
+            ),
+          ],
+        );
+        final progress = EpisodeProgress(
+          profileId: 'p1',
+          episodeId: 's1e3',
+          positionSeconds: 240,
+          completed: false,
+          updatedAt: DateTime(2026, 5, 4),
+        );
+        final uc = ResolveContinueWatchingUseCase(
+          progressRepo: _FakeProgress([progress]),
+          // Catalog projection: series id only (no seasons).
+          catalogRepo: _FakeCatalog([
+            _seriesWith(id: 'pingu', seasons: const []),
           ]),
-        ],
-      );
-      final progress = EpisodeProgress(
-        profileId: 'p1',
-        episodeId: 's1e3',
-        positionSeconds: 240,
-        completed: false,
-        updatedAt: DateTime(2026, 5, 4),
-      );
-      final uc = ResolveContinueWatchingUseCase(
-        progressRepo: _FakeProgress([progress]),
-        // Catalog projection: series id only (no seasons).
-        catalogRepo:
-            _FakeCatalog([_seriesWith(id: 'pingu', seasons: const [])]),
-        seriesRepo: _FakeSeries({'pingu': series}),
-      );
+          seriesRepo: _FakeSeries({'pingu': series}),
+        );
 
-      final result = await uc.execute('p1');
+        final result = await uc.execute('p1');
 
-      expect(result, hasLength(1));
-      final e = result.single as EpisodeContinueDto;
-      expect(e.episode.id, 's1e3');
-      expect(e.resumeSeconds, 240);
-      expect(e.kind, ContinueWatchingState.inProgress);
-    });
+        expect(result, hasLength(1));
+        final e = result.single as EpisodeContinueDto;
+        expect(e.episode.id, 's1e3');
+        expect(e.resumeSeconds, 240);
+        expect(e.kind, ContinueWatchingState.inProgress);
+      },
+    );
 
     test('completed episode mid-season → next episode same season', () async {
       final series = _seriesWith(
         id: 'pingu',
         seasons: [
-          Season(seasonNumber: 1, episodes: [
-            _ep(id: 's1e1', seasonNumber: 1, episodeNumber: 1),
-            _ep(id: 's1e2', seasonNumber: 1, episodeNumber: 2),
-            _ep(id: 's1e3', seasonNumber: 1, episodeNumber: 3),
-            _ep(id: 's1e4', seasonNumber: 1, episodeNumber: 4),
-          ]),
+          Season(
+            seasonNumber: 1,
+            episodes: [
+              _ep(id: 's1e1', seasonNumber: 1, episodeNumber: 1),
+              _ep(id: 's1e2', seasonNumber: 1, episodeNumber: 2),
+              _ep(id: 's1e3', seasonNumber: 1, episodeNumber: 3),
+              _ep(id: 's1e4', seasonNumber: 1, episodeNumber: 4),
+            ],
+          ),
         ],
       );
       final progress = EpisodeProgress(
@@ -290,8 +296,9 @@ void main() {
       );
       final uc = ResolveContinueWatchingUseCase(
         progressRepo: _FakeProgress([progress]),
-        catalogRepo:
-            _FakeCatalog([_seriesWith(id: 'pingu', seasons: const [])]),
+        catalogRepo: _FakeCatalog([
+          _seriesWith(id: 'pingu', seasons: const []),
+        ]),
         seriesRepo: _FakeSeries({'pingu': series}),
       );
 
@@ -303,47 +310,57 @@ void main() {
       expect(e.resumeSeconds, 0);
     });
 
-    test('completed last episode of season → first episode of next season',
-        () async {
-      final series = _seriesWith(
-        id: 'pingu',
-        seasons: [
-          Season(seasonNumber: 1, episodes: [
-            _ep(id: 's1e1', seasonNumber: 1, episodeNumber: 1),
-            _ep(id: 's1e2', seasonNumber: 1, episodeNumber: 2),
+    test(
+      'completed last episode of season → first episode of next season',
+      () async {
+        final series = _seriesWith(
+          id: 'pingu',
+          seasons: [
+            Season(
+              seasonNumber: 1,
+              episodes: [
+                _ep(id: 's1e1', seasonNumber: 1, episodeNumber: 1),
+                _ep(id: 's1e2', seasonNumber: 1, episodeNumber: 2),
+              ],
+            ),
+            Season(
+              seasonNumber: 2,
+              episodes: [_ep(id: 's2e1', seasonNumber: 2, episodeNumber: 1)],
+            ),
+          ],
+        );
+        final progress = EpisodeProgress(
+          profileId: 'p1',
+          episodeId: 's1e2',
+          positionSeconds: 290,
+          completed: true,
+          updatedAt: DateTime(2026, 5, 4),
+        );
+        final uc = ResolveContinueWatchingUseCase(
+          progressRepo: _FakeProgress([progress]),
+          catalogRepo: _FakeCatalog([
+            _seriesWith(id: 'pingu', seasons: const []),
           ]),
-          Season(seasonNumber: 2, episodes: [
-            _ep(id: 's2e1', seasonNumber: 2, episodeNumber: 1),
-          ]),
-        ],
-      );
-      final progress = EpisodeProgress(
-        profileId: 'p1',
-        episodeId: 's1e2',
-        positionSeconds: 290,
-        completed: true,
-        updatedAt: DateTime(2026, 5, 4),
-      );
-      final uc = ResolveContinueWatchingUseCase(
-        progressRepo: _FakeProgress([progress]),
-        catalogRepo:
-            _FakeCatalog([_seriesWith(id: 'pingu', seasons: const [])]),
-        seriesRepo: _FakeSeries({'pingu': series}),
-      );
+          seriesRepo: _FakeSeries({'pingu': series}),
+        );
 
-      final e = (await uc.execute('p1')).single as EpisodeContinueDto;
-      expect(e.episode.id, 's2e1');
-      expect(e.kind, ContinueWatchingState.nextAfterCompleted);
-    });
+        final e = (await uc.execute('p1')).single as EpisodeContinueDto;
+        expect(e.episode.id, 's2e1');
+        expect(e.kind, ContinueWatchingState.nextAfterCompleted);
+      },
+    );
 
     test('completed end of series → restart at S1E1', () async {
       final series = _seriesWith(
         id: 'pingu',
         seasons: [
-          Season(seasonNumber: 1, episodes: [
-            _ep(id: 's1e1', seasonNumber: 1, episodeNumber: 1),
-            _ep(id: 's1e2', seasonNumber: 1, episodeNumber: 2),
-          ]),
+          Season(
+            seasonNumber: 1,
+            episodes: [
+              _ep(id: 's1e1', seasonNumber: 1, episodeNumber: 1),
+              _ep(id: 's1e2', seasonNumber: 1, episodeNumber: 2),
+            ],
+          ),
         ],
       );
       final progress = EpisodeProgress(
@@ -355,8 +372,9 @@ void main() {
       );
       final uc = ResolveContinueWatchingUseCase(
         progressRepo: _FakeProgress([progress]),
-        catalogRepo:
-            _FakeCatalog([_seriesWith(id: 'pingu', seasons: const [])]),
+        catalogRepo: _FakeCatalog([
+          _seriesWith(id: 'pingu', seasons: const []),
+        ]),
         seriesRepo: _FakeSeries({'pingu': series}),
       );
 
@@ -371,12 +389,15 @@ void main() {
       final series = _seriesWith(
         id: 'pingu',
         seasons: [
-          Season(seasonNumber: 0, name: 'Specials', episodes: [
-            _ep(id: 'sp1', seasonNumber: 0, episodeNumber: 1),
-          ]),
-          Season(seasonNumber: 1, episodes: [
-            _ep(id: 's1e1', seasonNumber: 1, episodeNumber: 1),
-          ]),
+          Season(
+            seasonNumber: 0,
+            name: 'Specials',
+            episodes: [_ep(id: 'sp1', seasonNumber: 0, episodeNumber: 1)],
+          ),
+          Season(
+            seasonNumber: 1,
+            episodes: [_ep(id: 's1e1', seasonNumber: 1, episodeNumber: 1)],
+          ),
         ],
       );
       final progress = EpisodeProgress(
@@ -388,8 +409,9 @@ void main() {
       );
       final uc = ResolveContinueWatchingUseCase(
         progressRepo: _FakeProgress([progress]),
-        catalogRepo:
-            _FakeCatalog([_seriesWith(id: 'pingu', seasons: const [])]),
+        catalogRepo: _FakeCatalog([
+          _seriesWith(id: 'pingu', seasons: const []),
+        ]),
         seriesRepo: _FakeSeries({'pingu': series}),
       );
 
@@ -401,55 +423,61 @@ void main() {
     });
 
     test(
-        'two progressions on the same series → most recent wins after dedup',
-        () async {
-      final series = _seriesWith(
-        id: 'pingu',
-        seasons: [
-          Season(seasonNumber: 1, episodes: [
-            _ep(id: 's1e2', seasonNumber: 1, episodeNumber: 2),
-            _ep(id: 's1e3', seasonNumber: 1, episodeNumber: 3),
+      'two progressions on the same series → most recent wins after dedup',
+      () async {
+        final series = _seriesWith(
+          id: 'pingu',
+          seasons: [
+            Season(
+              seasonNumber: 1,
+              episodes: [
+                _ep(id: 's1e2', seasonNumber: 1, episodeNumber: 2),
+                _ep(id: 's1e3', seasonNumber: 1, episodeNumber: 3),
+              ],
+            ),
+          ],
+        );
+        final older = EpisodeProgress(
+          profileId: 'p1',
+          episodeId: 's1e2',
+          positionSeconds: 290,
+          completed: true,
+          updatedAt: DateTime(2026, 5, 1),
+        );
+        final newer = EpisodeProgress(
+          profileId: 'p1',
+          episodeId: 's1e3',
+          positionSeconds: 100,
+          completed: false,
+          updatedAt: DateTime(2026, 5, 4),
+        );
+        final uc = ResolveContinueWatchingUseCase(
+          progressRepo: _FakeProgress([older, newer]),
+          catalogRepo: _FakeCatalog([
+            _seriesWith(id: 'pingu', seasons: const []),
           ]),
-        ],
-      );
-      final older = EpisodeProgress(
-        profileId: 'p1',
-        episodeId: 's1e2',
-        positionSeconds: 290,
-        completed: true,
-        updatedAt: DateTime(2026, 5, 1),
-      );
-      final newer = EpisodeProgress(
-        profileId: 'p1',
-        episodeId: 's1e3',
-        positionSeconds: 100,
-        completed: false,
-        updatedAt: DateTime(2026, 5, 4),
-      );
-      final uc = ResolveContinueWatchingUseCase(
-        progressRepo: _FakeProgress([older, newer]),
-        catalogRepo:
-            _FakeCatalog([_seriesWith(id: 'pingu', seasons: const [])]),
-        seriesRepo: _FakeSeries({'pingu': series}),
-      );
+          seriesRepo: _FakeSeries({'pingu': series}),
+        );
 
-      final result = await uc.execute('p1');
+        final result = await uc.execute('p1');
 
-      expect(result, hasLength(1));
-      final e = result.single as EpisodeContinueDto;
-      // The newer entry (s1e3 in-progress) wins.
-      expect(e.episode.id, 's1e3');
-      expect(e.kind, ContinueWatchingState.inProgress);
-      expect(e.resumeSeconds, 100);
-    });
+        expect(result, hasLength(1));
+        final e = result.single as EpisodeContinueDto;
+        // The newer entry (s1e3 in-progress) wins.
+        expect(e.episode.id, 's1e3');
+        expect(e.kind, ContinueWatchingState.inProgress);
+        expect(e.resumeSeconds, 100);
+      },
+    );
 
     test('series.findById throws → entry omitted, others kept', () async {
       final pinguSeries = _seriesWith(
         id: 'pingu',
         seasons: [
-          Season(seasonNumber: 1, episodes: [
-            _ep(id: 's1e1', seasonNumber: 1, episodeNumber: 1),
-          ]),
+          Season(
+            seasonNumber: 1,
+            episodes: [_ep(id: 's1e1', seasonNumber: 1, episodeNumber: 1)],
+          ),
         ],
       );
       final progressA = EpisodeProgress(
@@ -487,46 +515,48 @@ void main() {
     });
 
     test(
-        'mixed movie and episode entries are sorted by updatedAt desc',
-        () async {
-      final pinguSeries = _seriesWith(
-        id: 'pingu',
-        seasons: [
-          Season(seasonNumber: 1, episodes: [
-            _ep(id: 's1e3', seasonNumber: 1, episodeNumber: 3),
+      'mixed movie and episode entries are sorted by updatedAt desc',
+      () async {
+        final pinguSeries = _seriesWith(
+          id: 'pingu',
+          seasons: [
+            Season(
+              seasonNumber: 1,
+              episodes: [_ep(id: 's1e3', seasonNumber: 1, episodeNumber: 3)],
+            ),
+          ],
+        );
+        final movieProgress = MovieProgress(
+          profileId: 'p1',
+          movieId: 'nemo',
+          positionSeconds: 1000,
+          completed: false,
+          updatedAt: DateTime(2026, 5, 3),
+        );
+        final episodeProgress = EpisodeProgress(
+          profileId: 'p1',
+          episodeId: 's1e3',
+          positionSeconds: 100,
+          completed: false,
+          updatedAt: DateTime(2026, 5, 4),
+        );
+
+        final uc = ResolveContinueWatchingUseCase(
+          progressRepo: _FakeProgress([movieProgress, episodeProgress]),
+          catalogRepo: _FakeCatalog([
+            _movie(id: 'nemo'),
+            _seriesWith(id: 'pingu', seasons: const []),
           ]),
-        ],
-      );
-      final movieProgress = MovieProgress(
-        profileId: 'p1',
-        movieId: 'nemo',
-        positionSeconds: 1000,
-        completed: false,
-        updatedAt: DateTime(2026, 5, 3),
-      );
-      final episodeProgress = EpisodeProgress(
-        profileId: 'p1',
-        episodeId: 's1e3',
-        positionSeconds: 100,
-        completed: false,
-        updatedAt: DateTime(2026, 5, 4),
-      );
+          seriesRepo: _FakeSeries({'pingu': pinguSeries}),
+        );
 
-      final uc = ResolveContinueWatchingUseCase(
-        progressRepo: _FakeProgress([movieProgress, episodeProgress]),
-        catalogRepo: _FakeCatalog([
-          _movie(id: 'nemo'),
-          _seriesWith(id: 'pingu', seasons: const []),
-        ]),
-        seriesRepo: _FakeSeries({'pingu': pinguSeries}),
-      );
+        final result = await uc.execute('p1');
 
-      final result = await uc.execute('p1');
-
-      expect(result, hasLength(2));
-      // Episode entry is newer → first.
-      expect(result[0], isA<EpisodeContinueDto>());
-      expect(result[1], isA<MovieContinueDto>());
-    });
+        expect(result, hasLength(2));
+        // Episode entry is newer → first.
+        expect(result[0], isA<EpisodeContinueDto>());
+        expect(result[1], isA<MovieContinueDto>());
+      },
+    );
   });
 }

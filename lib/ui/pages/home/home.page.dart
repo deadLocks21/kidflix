@@ -36,10 +36,9 @@ class HomePage extends ConsumerWidget {
     final isSearching = ref.watch(
       searchUiControllerProvider.select((s) => s.active),
     );
-    final online = ref.watch(connectivityProvider).maybeWhen(
-          data: (v) => v,
-          orElse: () => true,
-        );
+    final online = ref
+        .watch(connectivityProvider)
+        .maybeWhen(data: (v) => v, orElse: () => true);
     return Scaffold(
       appBar: isSearching
           ? const SearchAppBar()
@@ -49,9 +48,8 @@ class HomePage extends ConsumerWidget {
                 IconButton(
                   tooltip: 'Chercher un film',
                   icon: const Icon(Icons.search),
-                  onPressed: () => ref
-                      .read(searchUiControllerProvider.notifier)
-                      .activate(),
+                  onPressed: () =>
+                      ref.read(searchUiControllerProvider.notifier).activate(),
                 ),
                 const HomeProfileMenu(),
                 const SizedBox(width: 4),
@@ -94,18 +92,19 @@ class HomePage extends ConsumerWidget {
     try {
       final pool = await repository.listCatalog();
       domain = pool.whereType<Movie>().cast<Movie?>().firstWhere(
-            (m) => m?.id == movie.id,
-            orElse: () => null,
-          );
+        (m) => m?.id == movie.id,
+        orElse: () => null,
+      );
     } catch (_) {
       // Network failure while nominally online — try the offline source
       // so the modal still opens for a downloaded movie.
-      final pool =
-          await ref.read(offlineCatalogRepositoryProvider).listCatalog();
+      final pool = await ref
+          .read(offlineCatalogRepositoryProvider)
+          .listCatalog();
       domain = pool.whereType<Movie>().cast<Movie?>().firstWhere(
-            (m) => m?.id == movie.id,
-            orElse: () => null,
-          );
+        (m) => m?.id == movie.id,
+        orElse: () => null,
+      );
     }
     if (domain == null) return;
     if (!context.mounted) return;
@@ -127,18 +126,19 @@ class HomePage extends ConsumerWidget {
     try {
       final pool = await repository.listCatalog();
       domain = pool.whereType<Series>().cast<Series?>().firstWhere(
-            (s) => s?.id == series.id,
-            orElse: () => null,
-          );
+        (s) => s?.id == series.id,
+        orElse: () => null,
+      );
     } catch (_) {
       // Network failure while nominally online — fall back to the
       // manifest so a downloaded series still opens.
-      final pool =
-          await ref.read(offlineCatalogRepositoryProvider).listCatalog();
+      final pool = await ref
+          .read(offlineCatalogRepositoryProvider)
+          .listCatalog();
       domain = pool.whereType<Series>().cast<Series?>().firstWhere(
-            (s) => s?.id == series.id,
-            orElse: () => null,
-          );
+        (s) => s?.id == series.id,
+        orElse: () => null,
+      );
     }
     if (domain == null) return;
     if (!context.mounted) return;

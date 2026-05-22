@@ -49,7 +49,8 @@ class ConsoleLoggerService implements LoggerService {
     developer.log(
       buf.toString(),
       name: name,
-      level: level.otelSeverityNumber * 100, // dart:developer expects 0..2000-ish
+      level:
+          level.otelSeverityNumber * 100, // dart:developer expects 0..2000-ish
       error: error,
       stackTrace: stack,
     );

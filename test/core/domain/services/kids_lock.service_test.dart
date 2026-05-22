@@ -3,12 +3,15 @@ import 'package:kidflix/core/domain/services/kids_lock.service.dart';
 
 void main() {
   group('KidsLockService contract', () {
-    test('any subclass can be instantiated and exposes the three methods', () async {
-      final KidsLockService service = _FakeKidsLockService();
-      expect(await service.startLock(), isTrue);
-      expect(await service.stopLock(), isTrue);
-      expect(await service.isLocked(), isFalse);
-    });
+    test(
+      'any subclass can be instantiated and exposes the three methods',
+      () async {
+        final KidsLockService service = _FakeKidsLockService();
+        expect(await service.startLock(), isTrue);
+        expect(await service.stopLock(), isTrue);
+        expect(await service.isLocked(), isFalse);
+      },
+    );
   });
 }
 

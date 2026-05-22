@@ -27,15 +27,17 @@ Episode? pickNextShuffleEpisode({
   if (all.isEmpty) return null;
 
   final rng = random ?? Random();
-  final candidates =
-      all.where((e) => !alreadyPlayedIds.contains(e.id)).toList();
+  final candidates = all
+      .where((e) => !alreadyPlayedIds.contains(e.id))
+      .toList();
   if (candidates.isNotEmpty) {
     return candidates[rng.nextInt(candidates.length)];
   }
 
   if (all.length == 1) return all.first;
-  final pool =
-      all.where((e) => e.id != currentEpisodeId).toList(growable: false);
+  final pool = all
+      .where((e) => e.id != currentEpisodeId)
+      .toList(growable: false);
   if (pool.isEmpty) return all[rng.nextInt(all.length)];
   return pool[rng.nextInt(pool.length)];
 }

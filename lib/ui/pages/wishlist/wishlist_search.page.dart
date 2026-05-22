@@ -65,9 +65,7 @@ class _WishlistSearchPageState extends ConsumerState<WishlistSearchPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Ajouter à la liste'),
-      ),
+      appBar: AppBar(title: const Text('Ajouter à la liste')),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -102,10 +100,7 @@ class _WishlistSearchPageState extends ConsumerState<WishlistSearchPage> {
                   ),
                 ),
                 Expanded(
-                  child: _ResultsBody(
-                    query: _activeQuery,
-                    results: _results,
-                  ),
+                  child: _ResultsBody(query: _activeQuery, results: _results),
                 ),
               ],
             ),
@@ -173,9 +168,7 @@ class _Hint extends StatelessWidget {
           Text(
             message,
             textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.hintColor,
-            ),
+            style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
           ),
         ],
       ),
@@ -196,11 +189,7 @@ class _Error extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.error_outline,
-            size: 48,
-            color: theme.colorScheme.error,
-          ),
+          Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
           const SizedBox(height: 12),
           Text(
             'Erreur de recherche',

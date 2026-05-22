@@ -9,10 +9,7 @@ class MarkAsCacheUseCase {
 
   const MarkAsCacheUseCase(this._repository);
 
-  Future<void> execute({
-    required String mediaId,
-    required bool isEpisode,
-  }) {
+  Future<void> execute({required String mediaId, required bool isEpisode}) {
     if (isEpisode) {
       return _repository.setEpisodeKind(mediaId, DownloadKind.cache);
     }

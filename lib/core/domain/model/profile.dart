@@ -9,9 +9,8 @@ enum AgeCategory { bebe, enfant, ado, jeuneAdulte, adulte }
 extension AgeCategoryHierarchy on AgeCategory {
   /// All categories with `index <= this.index`, in enum order. Includes
   /// this category itself.
-  List<AgeCategory> get lowerOrEqual => AgeCategory.values
-      .where((c) => c.index <= index)
-      .toList(growable: false);
+  List<AgeCategory> get lowerOrEqual =>
+      AgeCategory.values.where((c) => c.index <= index).toList(growable: false);
 }
 
 /// A viewer profile attached to an authenticated user account.

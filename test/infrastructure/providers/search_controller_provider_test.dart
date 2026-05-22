@@ -57,10 +57,7 @@ void main() {
       final container = _makeContainer();
       container.read(searchUiControllerProvider.notifier).updateQuery('to');
       await Future.delayed(_pastDebounce);
-      expect(
-        container.read(searchUiControllerProvider).debouncedQuery,
-        'to',
-      );
+      expect(container.read(searchUiControllerProvider).debouncedQuery, 'to');
     });
 
     test('rapid updates coalesce to the latest value', () async {

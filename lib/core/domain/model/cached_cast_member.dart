@@ -10,17 +10,13 @@ class CachedCastMember {
   final String? role;
   final String? photoUrl;
 
-  const CachedCastMember({
-    required this.name,
-    this.role,
-    this.photoUrl,
-  });
+  const CachedCastMember({required this.name, this.role, this.photoUrl});
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        if (role != null) 'role': role,
-        if (photoUrl != null) 'photoUrl': photoUrl,
-      };
+    'name': name,
+    if (role != null) 'role': role,
+    if (photoUrl != null) 'photoUrl': photoUrl,
+  };
 
   static CachedCastMember? fromJson(Map<String, dynamic> json) {
     final name = json['name'];

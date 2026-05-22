@@ -57,8 +57,7 @@ class MovieDownload {
   /// `true` when [status] allows the player to open [localPath] — either
   /// the ready threshold has been reached or the download is complete.
   bool get isPlayable =>
-      status == DownloadStatus.readyToPlay ||
-      status == DownloadStatus.complete;
+      status == DownloadStatus.readyToPlay || status == DownloadStatus.complete;
 
   @override
   bool operator ==(Object other) =>
@@ -70,8 +69,7 @@ class MovieDownload {
           other.updatedAt == updatedAt);
 
   @override
-  int get hashCode =>
-      Object.hash(movieId, status, bytesReceived, updatedAt);
+  int get hashCode => Object.hash(movieId, status, bytesReceived, updatedAt);
 
   @override
   String toString() =>

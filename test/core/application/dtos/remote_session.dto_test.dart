@@ -108,7 +108,10 @@ void main() {
         final session = dto.toDomain();
 
         expect(session.jwt, 'eyJabc');
-        expect(session.device, const Device(id: '9b2-uuid', name: 'iPhone de Papa'));
+        expect(
+          session.device,
+          const Device(id: '9b2-uuid', name: 'iPhone de Papa'),
+        );
         expect(session.profiles, hasLength(2));
         expect(session.profiles[0].id, 'papa');
         expect(session.profiles[1].id, 'ar');

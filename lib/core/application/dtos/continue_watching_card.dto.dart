@@ -65,8 +65,5 @@ class SeriesDismissTarget extends ContinueWatchingDismissTarget {
   /// actual stored progresses so unrelated dismiss calls don't fire.
   final List<String> episodeIds;
 
-  const SeriesDismissTarget({
-    required this.seriesId,
-    required this.episodeIds,
-  });
+  const SeriesDismissTarget({required this.seriesId, required this.episodeIds});
 }

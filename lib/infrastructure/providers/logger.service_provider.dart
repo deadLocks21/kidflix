@@ -31,8 +31,10 @@ const String _kEnvOverride = String.fromEnvironment('SIGNOZ_ENV');
 /// The codemagic build can inject the real value via
 /// `--dart-define=APP_VERSION=$VERSION+$BUILD_NUMBER`. Defaults to a
 /// sentinel so unconfigured local builds are obvious in Signoz.
-const String _kAppVersion =
-    String.fromEnvironment('APP_VERSION', defaultValue: 'dev');
+const String _kAppVersion = String.fromEnvironment(
+  'APP_VERSION',
+  defaultValue: 'dev',
+);
 
 /// Single app-wide [LoggerService].
 ///

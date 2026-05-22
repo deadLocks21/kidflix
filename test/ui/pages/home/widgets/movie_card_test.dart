@@ -18,23 +18,21 @@ void main() {
         posterUrl: null,
         ageCategory: 'enfant',
       );
-      await tester.pumpWidget(
-        _harness(MovieCard(movie: dto, onTap: () {})),
-      );
+      await tester.pumpWidget(_harness(MovieCard(movie: dto, onTap: () {})));
       expect(find.text('Astérix'), findsOneWidget);
       expect(find.text('2023 · 1h52'), findsOneWidget);
     });
 
-    testWidgets('caption shows duration only when year is null', (tester) async {
+    testWidgets('caption shows duration only when year is null', (
+      tester,
+    ) async {
       const dto = MovieDto(
         id: 'm',
         title: 'Inconnu',
         duration: Duration(minutes: 92),
         ageCategory: 'enfant',
       );
-      await tester.pumpWidget(
-        _harness(MovieCard(movie: dto, onTap: () {})),
-      );
+      await tester.pumpWidget(_harness(MovieCard(movie: dto, onTap: () {})));
       expect(find.text('1h32'), findsOneWidget);
       expect(find.textContaining('·'), findsNothing);
     });
@@ -61,9 +59,7 @@ void main() {
         duration: Duration(minutes: 80),
         ageCategory: 'enfant',
       );
-      await tester.pumpWidget(
-        _harness(MovieCard(movie: dto, onTap: () {})),
-      );
+      await tester.pumpWidget(_harness(MovieCard(movie: dto, onTap: () {})));
       expect(find.byIcon(Icons.movie_outlined), findsOneWidget);
     });
 
@@ -74,9 +70,7 @@ void main() {
         duration: Duration(minutes: 80),
         ageCategory: 'enfant',
       );
-      await tester.pumpWidget(
-        _harness(MovieCard(movie: dto, onTap: () {})),
-      );
+      await tester.pumpWidget(_harness(MovieCard(movie: dto, onTap: () {})));
       expect(find.byType(LinearProgressIndicator), findsNothing);
     });
 

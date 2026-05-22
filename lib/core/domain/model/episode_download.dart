@@ -44,8 +44,7 @@ class EpisodeDownload {
 
   /// `true` when [status] allows the player to open [localPath].
   bool get isPlayable =>
-      status == DownloadStatus.readyToPlay ||
-      status == DownloadStatus.complete;
+      status == DownloadStatus.readyToPlay || status == DownloadStatus.complete;
 
   @override
   bool operator ==(Object other) =>
@@ -57,8 +56,7 @@ class EpisodeDownload {
           other.updatedAt == updatedAt);
 
   @override
-  int get hashCode =>
-      Object.hash(episodeId, status, bytesReceived, updatedAt);
+  int get hashCode => Object.hash(episodeId, status, bytesReceived, updatedAt);
 
   @override
   String toString() =>

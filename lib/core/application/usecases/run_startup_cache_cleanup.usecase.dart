@@ -16,8 +16,8 @@ class RunStartupCacheCleanupUseCase {
   const RunStartupCacheCleanupUseCase({
     required DownloadCleanupService service,
     required CacheCleanupPreferences preferences,
-  })  : _service = service,
-        _preferences = preferences;
+  }) : _service = service,
+       _preferences = preferences;
 
   /// Returns the number of items deleted in this pass. Always
   /// completes; never throws.

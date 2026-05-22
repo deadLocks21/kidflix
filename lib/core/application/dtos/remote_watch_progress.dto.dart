@@ -66,6 +66,6 @@ WatchProgress watchProgressFromJson(Map<String, dynamic> json) {
 /// `updated_at` (the server stamps its own clock — any client-supplied
 /// value would be ignored).
 Map<String, dynamic> watchProgressToWireBody(WatchProgress progress) => {
-      'position_seconds': progress.positionSeconds,
-      'completed': progress.completed,
-    };
+  'position_seconds': progress.positionSeconds,
+  'completed': progress.completed,
+};

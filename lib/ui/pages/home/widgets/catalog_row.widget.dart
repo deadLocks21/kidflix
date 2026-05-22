@@ -43,10 +43,7 @@ class CatalogRowWidget extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Text(
-              row.label,
-              style: theme.textTheme.titleLarge,
-            ),
+            child: Text(row.label, style: theme.textTheme.titleLarge),
           ),
           SizedBox(
             height: _rowHeight,

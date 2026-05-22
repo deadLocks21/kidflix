@@ -71,9 +71,7 @@ class InMemoryAuthRepository implements AuthRepository {
     await _store.ensureSeeded(_pin);
     final account = _store.currentAccount;
     if (account == null) {
-      throw StateError(
-        'fetchProfiles called before any successful verifyOtp',
-      );
+      throw StateError('fetchProfiles called before any successful verifyOtp');
     }
     return List.unmodifiable(account.profiles);
   }

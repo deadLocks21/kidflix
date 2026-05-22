@@ -76,10 +76,7 @@ class _SeasonDownloadButtonState extends ConsumerState<SeasonDownloadButton> {
               width: 60,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(2),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 4,
-                ),
+                child: LinearProgressIndicator(value: progress, minHeight: 4),
               ),
             ),
             const SizedBox(width: 8),

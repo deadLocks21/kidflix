@@ -77,8 +77,10 @@ Future<void> setKind({
   required DownloadKind kind,
   File? mediaFileForCreate,
 }) async {
-  final existing =
-      await manifest.findFor(mediaId: mediaId, isEpisode: isEpisode);
+  final existing = await manifest.findFor(
+    mediaId: mediaId,
+    isEpisode: isEpisode,
+  );
   if (existing != null) {
     if (existing.kind == kind) return;
     await manifest.upsert(
@@ -95,10 +97,7 @@ Future<void> setKind({
   await manifest.upsert(
     mediaId: mediaId,
     isEpisode: isEpisode,
-    entry: DownloadManifestEntry(
-      kind: kind,
-      lastPlayedAt: seedLastPlayedAt,
-    ),
+    entry: DownloadManifestEntry(kind: kind, lastPlayedAt: seedLastPlayedAt),
   );
 }
 
@@ -110,16 +109,15 @@ Future<void> markPlayed({
   required bool isEpisode,
   required DateTime now,
 }) async {
-  final existing =
-      await manifest.findFor(mediaId: mediaId, isEpisode: isEpisode);
+  final existing = await manifest.findFor(
+    mediaId: mediaId,
+    isEpisode: isEpisode,
+  );
   if (existing == null) {
     await manifest.upsert(
       mediaId: mediaId,
       isEpisode: isEpisode,
-      entry: DownloadManifestEntry(
-        kind: DownloadKind.cache,
-        lastPlayedAt: now,
-      ),
+      entry: DownloadManifestEntry(kind: DownloadKind.cache, lastPlayedAt: now),
     );
     return;
   }
@@ -161,8 +159,10 @@ Future<void> cacheMetadata({
   int? seasonNumber,
   int? episodeNumber,
 }) async {
-  final existing =
-      await manifest.findFor(mediaId: mediaId, isEpisode: isEpisode);
+  final existing = await manifest.findFor(
+    mediaId: mediaId,
+    isEpisode: isEpisode,
+  );
   if (existing == null) {
     await manifest.upsert(
       mediaId: mediaId,
@@ -210,11 +210,7 @@ Future<void> cacheMetadata({
     cachedEpisodeNumber: episodeNumber,
   );
   if (next == existing) return;
-  await manifest.upsert(
-    mediaId: mediaId,
-    isEpisode: isEpisode,
-    entry: next,
-  );
+  await manifest.upsert(mediaId: mediaId, isEpisode: isEpisode, entry: next);
 }
 
 /// Persists a full series snapshot under the dedicated `series/`
@@ -293,16 +289,15 @@ Future<void> markCompleted({
   required bool isEpisode,
   required DateTime now,
 }) async {
-  final existing =
-      await manifest.findFor(mediaId: mediaId, isEpisode: isEpisode);
+  final existing = await manifest.findFor(
+    mediaId: mediaId,
+    isEpisode: isEpisode,
+  );
   if (existing == null) {
     await manifest.upsert(
       mediaId: mediaId,
       isEpisode: isEpisode,
-      entry: DownloadManifestEntry(
-        kind: DownloadKind.cache,
-        completedAt: now,
-      ),
+      entry: DownloadManifestEntry(kind: DownloadKind.cache, completedAt: now),
     );
     return;
   }
@@ -321,8 +316,7 @@ Future<DownloadKind> resolveKind({
   required String mediaId,
   required bool isEpisode,
 }) async {
-  final entry =
-      await manifest.findFor(mediaId: mediaId, isEpisode: isEpisode);
+  final entry = await manifest.findFor(mediaId: mediaId, isEpisode: isEpisode);
   return entry?.kind ?? DownloadKind.cache;
 }
 
@@ -360,20 +354,24 @@ Future<List<DownloadInventoryRecord>> _scanKind({
   for (final entry in byId.entries) {
     final mediaId = entry.key;
     final agg = entry.value;
-    final manifestEntry =
-        await manifest.findFor(mediaId: mediaId, isEpisode: isEpisode);
-    out.add(DownloadInventoryRecord(
+    final manifestEntry = await manifest.findFor(
       mediaId: mediaId,
       isEpisode: isEpisode,
-      bytesOnDisk: agg.bytes,
-      kind: manifestEntry?.kind ?? DownloadKind.cache,
-      completedAt: manifestEntry?.completedAt,
-      lastPlayedAt: manifestEntry?.lastPlayedAt ?? agg.lastModified,
-      triggeredByProfileId: manifestEntry?.triggeredByProfileId,
-      cachedTitle: manifestEntry?.cachedTitle,
-      cachedPosterUrl: manifestEntry?.cachedPosterUrl,
-      cachedParentSeriesTitle: manifestEntry?.cachedParentSeriesTitle,
-    ));
+    );
+    out.add(
+      DownloadInventoryRecord(
+        mediaId: mediaId,
+        isEpisode: isEpisode,
+        bytesOnDisk: agg.bytes,
+        kind: manifestEntry?.kind ?? DownloadKind.cache,
+        completedAt: manifestEntry?.completedAt,
+        lastPlayedAt: manifestEntry?.lastPlayedAt ?? agg.lastModified,
+        triggeredByProfileId: manifestEntry?.triggeredByProfileId,
+        cachedTitle: manifestEntry?.cachedTitle,
+        cachedPosterUrl: manifestEntry?.cachedPosterUrl,
+        cachedParentSeriesTitle: manifestEntry?.cachedParentSeriesTitle,
+      ),
+    );
   }
   return out;
 }

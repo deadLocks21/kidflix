@@ -65,9 +65,7 @@ void main() {
     testWidgets('loading state shows spinner', (tester) async {
       final pending = Completer<List<MovieDto>>();
       await tester.pumpWidget(
-        _app([
-          searchResultsProvider.overrideWith((ref, q) => pending.future),
-        ]),
+        _app([searchResultsProvider.overrideWith((ref, q) => pending.future)]),
       );
       final container = ProviderScope.containerOf(
         tester.element(find.byType(SearchResults)),
@@ -81,9 +79,7 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        _app([
-          searchResultsProvider.overrideWith((ref, q) async => const []),
-        ]),
+        _app([searchResultsProvider.overrideWith((ref, q) async => const [])]),
       );
       final container = ProviderScope.containerOf(
         tester.element(find.byType(SearchResults)),

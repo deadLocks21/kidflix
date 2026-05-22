@@ -26,20 +26,19 @@ void main() {
         profiles.map((p) => p.id),
         containsAllInOrder(['papa', 'ar', 'ro']),
       );
-      expect(
-        profiles.firstWhere((p) => p.id == 'papa').isMain,
-        isTrue,
-      );
+      expect(profiles.firstWhere((p) => p.id == 'papa').isMain, isTrue);
     });
 
-    test('throws StateError when called before any successful verifyOtp',
-        () async {
-      final repo = InMemoryAuthRepository(
-        BcryptProfilePinService(),
-        InMemoryAccountsStore(),
-      );
+    test(
+      'throws StateError when called before any successful verifyOtp',
+      () async {
+        final repo = InMemoryAuthRepository(
+          BcryptProfilePinService(),
+          InMemoryAccountsStore(),
+        );
 
-      await expectLater(repo.fetchProfiles(), throwsStateError);
-    });
+        await expectLater(repo.fetchProfiles(), throwsStateError);
+      },
+    );
   });
 }

@@ -8,10 +8,7 @@ import 'package:kidflix/ui/avatars/widgets/avatar_image.widget.dart';
 
 /// Opens the avatar picker modal sheet. Returns the chosen avatar id, or
 /// `null` if the user dismissed without picking.
-Future<String?> showAvatarPicker(
-  BuildContext context, {
-  String? currentId,
-}) {
+Future<String?> showAvatarPicker(BuildContext context, {String? currentId}) {
   return showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
@@ -40,7 +37,12 @@ class _AvatarPickerSheet extends ConsumerWidget {
           children: [
             const _Header(),
             const Divider(height: 1),
-            Expanded(child: _Grid(scrollController: scrollController, currentId: currentId)),
+            Expanded(
+              child: _Grid(
+                scrollController: scrollController,
+                currentId: currentId,
+              ),
+            ),
           ],
         );
       },
@@ -128,10 +130,8 @@ class _Grid extends ConsumerWidget {
             mainAxisSpacing: 12,
           ),
           itemCount: options.length,
-          itemBuilder: (context, i) => _Cell(
-            option: options[i],
-            selected: options[i].id == currentId,
-          ),
+          itemBuilder: (context, i) =>
+              _Cell(option: options[i], selected: options[i].id == currentId),
         );
       },
     );
@@ -165,7 +165,10 @@ class _Cell extends StatelessWidget {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: theme.colorScheme.primary, width: 3),
+                  border: Border.all(
+                    color: theme.colorScheme.primary,
+                    width: 3,
+                  ),
                 ),
               ),
             ),

@@ -23,9 +23,7 @@ class MediaKitPlayerEngine implements PlayerEngine {
     // [MPVLogLevel.none] silently drops everything, leaving us blind on
     // pre-roll stalls.
     _player = Player(
-      configuration: const PlayerConfiguration(
-        logLevel: MPVLogLevel.warn,
-      ),
+      configuration: const PlayerConfiguration(logLevel: MPVLogLevel.warn),
     );
     _controller = VideoController(_player);
     // Use MaterialVideoControls (default via AdaptiveVideoControls).
@@ -39,9 +37,7 @@ class MediaKitPlayerEngine implements PlayerEngine {
       (e) => debugPrint('[kidflix.player] mpv error: $e'),
     );
     _logSub = _player.stream.log.listen(
-      (l) => debugPrint(
-        '[kidflix.player] [${l.level}] ${l.prefix}: ${l.text}',
-      ),
+      (l) => debugPrint('[kidflix.player] [${l.level}] ${l.prefix}: ${l.text}'),
     );
   }
 

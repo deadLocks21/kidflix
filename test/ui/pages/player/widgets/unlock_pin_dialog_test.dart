@@ -89,7 +89,9 @@ void main() {
     expect(pin.calls, 1);
   });
 
-  testWidgets('incorrect PIN keeps the dialog open and shows error', (tester) async {
+  testWidgets('incorrect PIN keeps the dialog open and shows error', (
+    tester,
+  ) async {
     final pin = _FakePinService(validPin: '1234');
     final captured = await openAndCapture(tester, pin);
 

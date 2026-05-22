@@ -84,10 +84,11 @@ void main() {
       ]);
       final service = SearchApplicationService(repo);
       final result = await service.searchFor(query: 'q', profile: _profile);
-      expect(
-        result.map((i) => i.title).toList(),
-        ['Astérix', 'Harry Potter', 'Totoro'],
-      );
+      expect(result.map((i) => i.title).toList(), [
+        'Astérix',
+        'Harry Potter',
+        'Totoro',
+      ]);
     });
 
     test('returns mixed CatalogItemDto (movies + series)', () async {
@@ -110,8 +111,11 @@ void main() {
       ]);
       final service = SearchApplicationService(repo);
       final result = await service.searchFor(query: 'q', profile: _profile);
-      expect(result.map((i) => i.title).toList(),
-          ['Astérix', 'Pingu', 'Zelda']);
+      expect(result.map((i) => i.title).toList(), [
+        'Astérix',
+        'Pingu',
+        'Zelda',
+      ]);
     });
 
     test('empty repository result yields empty dto list', () async {

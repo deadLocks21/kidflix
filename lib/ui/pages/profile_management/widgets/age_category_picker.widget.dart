@@ -29,9 +29,7 @@ class AgeCategoryPicker extends StatelessWidget {
         border: OutlineInputBorder(),
       ),
       items: AgeCategory.values
-          .map(
-            (c) => DropdownMenuItem(value: c, child: Text(labelFor(c))),
-          )
+          .map((c) => DropdownMenuItem(value: c, child: Text(labelFor(c))))
           .toList(growable: false),
       onChanged: (c) {
         if (c != null) onChanged(c);

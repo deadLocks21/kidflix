@@ -86,7 +86,10 @@ class DioAuthRepository implements AuthRepository {
     final response = await _dio.get<Map<String, dynamic>>('/profiles');
     final raw = response.data!['profiles'] as List<dynamic>;
     return raw
-        .map((e) => RemoteProfileDto.fromJson(e as Map<String, dynamic>).toDomain())
+        .map(
+          (e) =>
+              RemoteProfileDto.fromJson(e as Map<String, dynamic>).toDomain(),
+        )
         .toList(growable: false);
   }
 }

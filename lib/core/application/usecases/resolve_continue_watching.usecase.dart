@@ -38,9 +38,9 @@ class ResolveContinueWatchingUseCase {
     required WatchProgressRepository progressRepo,
     required CatalogRepository catalogRepo,
     required SeriesRepository seriesRepo,
-  })  : _progressRepo = progressRepo,
-        _catalogRepo = catalogRepo,
-        _seriesRepo = seriesRepo;
+  }) : _progressRepo = progressRepo,
+       _catalogRepo = catalogRepo,
+       _seriesRepo = seriesRepo;
 
   Future<List<ContinueWatchingItemDto>> execute(String profileId) async {
     final progresses = await _progressRepo.listForProfile(profileId);
@@ -208,9 +208,7 @@ ContinueWatchingResolution? resolveContinueWatchingForSeries({
 /// last episode of season 1 does NOT lead to season 0, but to season 2
 /// if it exists, otherwise [null] (end of series).
 Episode? findNextEpisode(Series series, {required Episode after}) {
-  final seasons = series.seasons
-      .where((s) => s.seasonNumber > 0)
-      .toList()
+  final seasons = series.seasons.where((s) => s.seasonNumber > 0).toList()
     ..sort((a, b) => a.seasonNumber.compareTo(b.seasonNumber));
 
   if (after.seasonNumber == 0) {
@@ -248,9 +246,7 @@ Episode? findNextEpisode(Series series, {required Episode after}) {
 /// back within the season, then to the last episode of the previous
 /// season, returning `null` at the start of the rotation.
 Episode? findPreviousEpisode(Series series, {required Episode before}) {
-  final seasons = series.seasons
-      .where((s) => s.seasonNumber > 0)
-      .toList()
+  final seasons = series.seasons.where((s) => s.seasonNumber > 0).toList()
     ..sort((a, b) => a.seasonNumber.compareTo(b.seasonNumber));
 
   if (before.seasonNumber == 0) return null;
@@ -283,9 +279,7 @@ Episode? findPreviousEpisode(Series series, {required Episode before}) {
 /// Specials (season 0) are excluded, matching [findNextEpisode] /
 /// [findPreviousEpisode].
 List<Episode> flatRotationEpisodes(Series series) {
-  final seasons = series.seasons
-      .where((s) => s.seasonNumber > 0)
-      .toList()
+  final seasons = series.seasons.where((s) => s.seasonNumber > 0).toList()
     ..sort((a, b) => a.seasonNumber.compareTo(b.seasonNumber));
   final episodes = <Episode>[];
   for (final season in seasons) {

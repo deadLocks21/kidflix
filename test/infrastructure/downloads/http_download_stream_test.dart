@@ -205,35 +205,15 @@ void main() {
       expect(events.single.localPath, endsWith('abc.mp4'));
     });
 
-    test('does not mutate dio.options.responseType when overriding to stream', () async {
-      const totalBytes = 3 * 1024 * 1024;
-      final adapter = _FakeAdapter(totalBytes: totalBytes);
-      final dio = _newDio(adapter);
-      dio.options.responseType = ResponseType.json;
-
-      await streamHttpDownload(
-        dio: dio,
-        url: 'https://example.test/abc.mp4',
-        movieId: 'abc',
-        downloadsDir: tempDir,
-        cancelToken: CancelToken(),
-        isCancelled: () => false,
-      ).toList();
-
-      expect(dio.options.responseType, ResponseType.json);
-    });
-
     test(
-      'emits failed and preserves .partial on a network error',
+      'does not mutate dio.options.responseType when overriding to stream',
       () async {
-        final adapter = _FakeAdapter(totalBytes: 0, throwOnFetch: true);
+        const totalBytes = 3 * 1024 * 1024;
+        final adapter = _FakeAdapter(totalBytes: totalBytes);
         final dio = _newDio(adapter);
+        dio.options.responseType = ResponseType.json;
 
-        // Pre-seed a .partial so we can verify it is preserved.
-        final partialFile = File('${tempDir.path}/abc.mp4.partial');
-        await partialFile.writeAsBytes(Uint8List(5 * 1024 * 1024));
-
-        final events = await streamHttpDownload(
+        await streamHttpDownload(
           dio: dio,
           url: 'https://example.test/abc.mp4',
           movieId: 'abc',
@@ -242,12 +222,32 @@ void main() {
           isCancelled: () => false,
         ).toList();
 
-        expect(events.last.status, DownloadStatus.failed);
-        expect(events.last.errorMessage, isNotNull);
-        expect(partialFile.existsSync(), isTrue);
-        expect(partialFile.lengthSync(), greaterThanOrEqualTo(5 * 1024 * 1024));
+        expect(dio.options.responseType, ResponseType.json);
       },
     );
+
+    test('emits failed and preserves .partial on a network error', () async {
+      final adapter = _FakeAdapter(totalBytes: 0, throwOnFetch: true);
+      final dio = _newDio(adapter);
+
+      // Pre-seed a .partial so we can verify it is preserved.
+      final partialFile = File('${tempDir.path}/abc.mp4.partial');
+      await partialFile.writeAsBytes(Uint8List(5 * 1024 * 1024));
+
+      final events = await streamHttpDownload(
+        dio: dio,
+        url: 'https://example.test/abc.mp4',
+        movieId: 'abc',
+        downloadsDir: tempDir,
+        cancelToken: CancelToken(),
+        isCancelled: () => false,
+      ).toList();
+
+      expect(events.last.status, DownloadStatus.failed);
+      expect(events.last.errorMessage, isNotNull);
+      expect(partialFile.existsSync(), isTrue);
+      expect(partialFile.lengthSync(), greaterThanOrEqualTo(5 * 1024 * 1024));
+    });
 
     test(
       'emits cancelled and preserves .partial when cancel token fires',
@@ -418,9 +418,7 @@ class _FakeAdapter implements HttpClientAdapter {
       Headers.contentLengthHeader: [remaining.toString()],
       if (contentType != null) Headers.contentTypeHeader: [contentType!],
       if (statusCode == 206)
-        'content-range': [
-          'bytes $reportedStart-${totalBytes - 1}/$totalBytes',
-        ],
+        'content-range': ['bytes $reportedStart-${totalBytes - 1}/$totalBytes'],
     };
 
     return ResponseBody(buildStream(), statusCode, headers: headers);

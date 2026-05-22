@@ -47,9 +47,9 @@ class InMemoryDownloadRepository implements DownloadRepository {
     required DownloadManifestStore manifest,
     Dio? dio,
     Directory? downloadsDirectory,
-  })  : _dio = dio ?? Dio(),
-        _manifest = manifest,
-        _downloadsDirOverride = downloadsDirectory;
+  }) : _dio = dio ?? Dio(),
+       _manifest = manifest,
+       _downloadsDirOverride = downloadsDirectory;
 
   // ── Movie pipeline ────────────────────────────────────────────────
 
@@ -60,8 +60,10 @@ class InMemoryDownloadRepository implements DownloadRepository {
       return active.currentSnapshot;
     }
     final dir = await _resolveMoviesDir();
-    final raw =
-        await inspectDownloadOnDisk(movieId: movieId, downloadsDir: dir);
+    final raw = await inspectDownloadOnDisk(
+      movieId: movieId,
+      downloadsDir: dir,
+    );
     if (raw == null) return null;
     final kind = await inv.resolveKind(
       manifest: _manifest,
@@ -394,26 +396,26 @@ class InMemoryDownloadRepository implements DownloadRepository {
   /// are typed on [MovieDownload]. We re-key the snapshot into an
   /// [EpisodeDownload] here. Pure projection — no behavior change.
   EpisodeDownload _episodeFromMovieDownload(MovieDownload m) => EpisodeDownload(
-        episodeId: m.movieId,
-        status: m.status,
-        bytesReceived: m.bytesReceived,
-        bytesTotal: m.bytesTotal,
-        localPath: m.localPath,
-        errorMessage: m.errorMessage,
-        updatedAt: m.updatedAt,
-        kind: m.kind,
-      );
+    episodeId: m.movieId,
+    status: m.status,
+    bytesReceived: m.bytesReceived,
+    bytesTotal: m.bytesTotal,
+    localPath: m.localPath,
+    errorMessage: m.errorMessage,
+    updatedAt: m.updatedAt,
+    kind: m.kind,
+  );
 
   MovieDownload _withKind(MovieDownload m, DownloadKind kind) => MovieDownload(
-        movieId: m.movieId,
-        status: m.status,
-        bytesReceived: m.bytesReceived,
-        bytesTotal: m.bytesTotal,
-        localPath: m.localPath,
-        errorMessage: m.errorMessage,
-        updatedAt: m.updatedAt,
-        kind: kind,
-      );
+    movieId: m.movieId,
+    status: m.status,
+    bytesReceived: m.bytesReceived,
+    bytesTotal: m.bytesTotal,
+    localPath: m.localPath,
+    errorMessage: m.errorMessage,
+    updatedAt: m.updatedAt,
+    kind: kind,
+  );
 }
 
 class _ActiveMovie {

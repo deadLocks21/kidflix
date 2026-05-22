@@ -78,8 +78,9 @@ class ProfileSelectionPage extends ConsumerWidget {
   }
 
   void _enterManagement(BuildContext context, WidgetRef ref) {
-    final result =
-        ref.read(sessionControllerProvider.notifier).enterManagementMode();
+    final result = ref
+        .read(sessionControllerProvider.notifier)
+        .enterManagementMode();
     switch (result) {
       case EnterManagementModeSuccess():
         // Router redirects automatically on state change.
@@ -87,9 +88,7 @@ class ProfileSelectionPage extends ConsumerWidget {
       case EnterManagementModeNoMainProfile():
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              'Aucun profil principal détecté sur ce compte',
-            ),
+            content: Text('Aucun profil principal détecté sur ce compte'),
           ),
         );
       case EnterManagementModeInvalidState():

@@ -94,8 +94,7 @@ class _TrackSelectorContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title =
-        kind == MediaTrackKind.audio ? 'Piste audio' : 'Sous-titres';
+    final title = kind == MediaTrackKind.audio ? 'Piste audio' : 'Sous-titres';
     final labels = _buildLabels(tracks);
     return Theme(
       data: ThemeData.dark(useMaterial3: true).copyWith(
@@ -110,25 +109,22 @@ class _TrackSelectorContent extends StatelessWidget {
             child: Text(
               title,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           for (final track in tracks)
             _TrackTile(
               label: labels[track.id] ?? 'Piste ${track.id}',
               isSelected: !subtitlesDisabled && track.id == selectedId,
-              onTap: () => Navigator.of(context).pop(
-                (id: track.id, disable: false),
-              ),
+              onTap: () =>
+                  Navigator.of(context).pop((id: track.id, disable: false)),
             ),
           if (kind == MediaTrackKind.subtitle)
             _DisableSubtitlesTile(
               isSelected: subtitlesDisabled,
-              onTap: () => Navigator.of(context).pop(
-                (id: null, disable: true),
-              ),
+              onTap: () => Navigator.of(context).pop((id: null, disable: true)),
             ),
         ],
       ),
@@ -180,9 +176,7 @@ class _TrackTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       leading: Icon(
-        isSelected
-            ? Icons.radio_button_checked
-            : Icons.radio_button_unchecked,
+        isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
         color: isSelected
             ? Theme.of(context).colorScheme.primary
             : Colors.white70,
@@ -197,26 +191,18 @@ class _DisableSubtitlesTile extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
 
-  const _DisableSubtitlesTile({
-    required this.isSelected,
-    required this.onTap,
-  });
+  const _DisableSubtitlesTile({required this.isSelected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
       leading: Icon(
-        isSelected
-            ? Icons.radio_button_checked
-            : Icons.radio_button_unchecked,
+        isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
         color: isSelected
             ? Theme.of(context).colorScheme.primary
             : Colors.white70,
       ),
-      title: const Text(
-        'Désactivés',
-        style: TextStyle(color: Colors.white),
-      ),
+      title: const Text('Désactivés', style: TextStyle(color: Colors.white)),
       onTap: onTap,
     );
   }

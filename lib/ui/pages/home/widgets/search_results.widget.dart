@@ -42,7 +42,9 @@ class SearchResults extends ConsumerWidget {
       ),
       data: (list) {
         if (list.isEmpty) {
-          return _MessageState(text: 'Aucun résultat ne correspond à « $trimmed ».');
+          return _MessageState(
+            text: 'Aucun résultat ne correspond à « $trimmed ».',
+          );
         }
         return ListView.separated(
           itemCount: list.length,
@@ -70,9 +72,7 @@ class SearchResults extends ConsumerWidget {
       // search lets us locate the full Movie regardless of category.
       final repository = ref.read(catalogRepositoryProvider);
       final pool = await repository.searchCatalog(query: item.title);
-      final domain = pool
-          .whereType<Movie>()
-          .firstWhere((m) => m.id == item.id);
+      final domain = pool.whereType<Movie>().firstWhere((m) => m.id == item.id);
       if (!context.mounted) return;
       await showMovieDetailModal(context, MovieDetailDto.fromDomain(domain));
       return;
@@ -82,9 +82,9 @@ class SearchResults extends ConsumerWidget {
       // hand off to the modal. Re-issue the search to get it.
       final repository = ref.read(catalogRepositoryProvider);
       final pool = await repository.searchCatalog(query: item.title);
-      final domain = pool
-          .whereType<Series>()
-          .firstWhere((s) => s.id == item.id);
+      final domain = pool.whereType<Series>().firstWhere(
+        (s) => s.id == item.id,
+      );
       if (!context.mounted) return;
       // Modal will load the full hierarchy via seriesRepositoryProvider.
       ref.read(seriesRepositoryProvider);

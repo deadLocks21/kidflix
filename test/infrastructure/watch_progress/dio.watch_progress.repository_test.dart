@@ -83,13 +83,10 @@ Map<String, dynamic> _progressJson({
 void main() {
   group('DioWatchProgressRepository.findFor', () {
     test('issues GET on the correct path and parses a 200 body', () async {
-      final adapter = _FakeAdapter(
-        (_) => _jsonResponse(200, _progressJson()),
-      );
+      final adapter = _FakeAdapter((_) => _jsonResponse(200, _progressJson()));
       final repo = DioWatchProgressRepository(dio: _makeDio(adapter));
 
-      final result =
-          await repo.findForMovie(profileId: 'p1', movieId: 'm1');
+      final result = await repo.findForMovie(profileId: 'p1', movieId: 'm1');
 
       expect(result, isNotNull);
       expect(result!.profileId, 'p1');
@@ -162,10 +159,7 @@ void main() {
       final request = adapter.requests.single;
       expect(request.method, 'PUT');
       expect(request.path, '/profiles/p1/progress/movies/m1');
-      expect(request.data, {
-        'position_seconds': 1900,
-        'completed': false,
-      });
+      expect(request.data, {'position_seconds': 1900, 'completed': false});
     });
 
     test('PUT body omits path-only and server-stamped fields', () async {
@@ -287,9 +281,7 @@ void main() {
 
   group('DioWatchProgressRepository auth headers', () {
     test('repo never sets Authorization explicitly', () async {
-      final adapter = _FakeAdapter(
-        (_) => _jsonResponse(200, _progressJson()),
-      );
+      final adapter = _FakeAdapter((_) => _jsonResponse(200, _progressJson()));
       final repo = DioWatchProgressRepository(dio: _makeDio(adapter));
 
       await repo.findForMovie(profileId: 'p1', movieId: 'm1');
@@ -307,7 +299,8 @@ void main() {
         expect(
           request.headers.containsKey('Authorization'),
           isFalse,
-          reason: 'Auth header injection is the AuthInterceptor\'s job, '
+          reason:
+              'Auth header injection is the AuthInterceptor\'s job, '
               'not the repo\'s.',
         );
         expect(request.headers.containsKey('X-Device-Id'), isFalse);
@@ -325,22 +318,28 @@ void main() {
       );
       final repo = DioWatchProgressRepository(dio: _makeDio(adapter));
 
-      final result =
-          await repo.findForEpisode(profileId: 'p1', episodeId: 'ep-uuid-2');
+      final result = await repo.findForEpisode(
+        profileId: 'p1',
+        episodeId: 'ep-uuid-2',
+      );
 
       expect(result, isNotNull);
       expect(result!.episodeId, 'ep-uuid-2');
       expect(adapter.requests.single.method, 'GET');
-      expect(adapter.requests.single.path,
-          '/profiles/p1/progress/episodes/ep-uuid-2');
+      expect(
+        adapter.requests.single.path,
+        '/profiles/p1/progress/episodes/ep-uuid-2',
+      );
     });
 
     test('returns null on 204', () async {
       final adapter = _FakeAdapter((_) => _emptyResponse(204));
       final repo = DioWatchProgressRepository(dio: _makeDio(adapter));
 
-      final result =
-          await repo.findForEpisode(profileId: 'p1', episodeId: 'ghost');
+      final result = await repo.findForEpisode(
+        profileId: 'p1',
+        episodeId: 'ghost',
+      );
       expect(result, isNull);
     });
   });

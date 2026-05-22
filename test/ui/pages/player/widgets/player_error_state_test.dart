@@ -4,7 +4,9 @@ import 'package:kidflix/core/application/dtos/movie_download.dto.dart';
 import 'package:kidflix/ui/pages/player/widgets/player_error_state.widget.dart';
 
 void main() {
-  testWidgets('failed status shows the download-failed message', (tester) async {
+  testWidgets('failed status shows the download-failed message', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -21,7 +23,9 @@ void main() {
     expect(find.text('Retour'), findsOneWidget);
   });
 
-  testWidgets('cancelled status shows the cancellation message', (tester) async {
+  testWidgets('cancelled status shows the cancellation message', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(

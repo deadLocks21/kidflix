@@ -63,25 +63,21 @@ class InMemoryWishlistRepository implements WishlistRepository {
     final normalised = normalizeForSearch(query);
     final wishlistTmdbIds = _entries.map((e) => e.tmdbId).toSet();
     return _searchFixtures
-        .where(
-          (f) => normalizeForSearch(f.title).contains(normalised),
-        )
-        .map(
-          (f) {
-            final hit = _availableCatalogIds[f.tmdbId];
-            final isAvailable = hit != null && hit.kind == f.kind;
-            return WishlistSearchResult(
-              tmdbId: f.tmdbId,
-              kind: f.kind,
-              title: f.title,
-              year: f.year,
-              posterUrl: f.posterUrl,
-              availableInCatalog: isAvailable,
-              catalogId: isAvailable ? hit.catalogId : null,
-              alreadyInWishlist: wishlistTmdbIds.contains(f.tmdbId),
-            );
-          },
-        )
+        .where((f) => normalizeForSearch(f.title).contains(normalised))
+        .map((f) {
+          final hit = _availableCatalogIds[f.tmdbId];
+          final isAvailable = hit != null && hit.kind == f.kind;
+          return WishlistSearchResult(
+            tmdbId: f.tmdbId,
+            kind: f.kind,
+            title: f.title,
+            year: f.year,
+            posterUrl: f.posterUrl,
+            availableInCatalog: isAvailable,
+            catalogId: isAvailable ? hit.catalogId : null,
+            alreadyInWishlist: wishlistTmdbIds.contains(f.tmdbId),
+          );
+        })
         .toList(growable: false);
   }
 
@@ -105,10 +101,11 @@ class InMemoryWishlistRepository implements WishlistRepository {
         posterUrl: null,
       ),
     );
-    final nextId = _entries.fold<int>(
-      100,
-      (max, e) => e.watcharrId > max ? e.watcharrId : max,
-    ) +
+    final nextId =
+        _entries.fold<int>(
+          100,
+          (max, e) => e.watcharrId > max ? e.watcharrId : max,
+        ) +
         1;
     final hit = _availableCatalogIds[fixture.tmdbId];
     final created = WishlistEntry(
@@ -121,7 +118,9 @@ class InMemoryWishlistRepository implements WishlistRepository {
       status: WatchedStatus.planned,
       rating: 0,
       availableInCatalog: hit != null && hit.kind == fixture.kind,
-      catalogId: (hit != null && hit.kind == fixture.kind) ? hit.catalogId : null,
+      catalogId: (hit != null && hit.kind == fixture.kind)
+          ? hit.catalogId
+          : null,
     );
     _entries.add(created);
     return created;

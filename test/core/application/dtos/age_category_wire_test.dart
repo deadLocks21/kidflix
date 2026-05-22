@@ -26,15 +26,13 @@ void main() {
       expect(
         () => ageCategoryFromWire('teen'),
         throwsA(
-          isA<FormatException>().having(
-            (e) => e.message,
-            'message',
-            contains('Unknown age_category'),
-          ).having(
-            (e) => e.message,
-            'message',
-            contains('teen'),
-          ),
+          isA<FormatException>()
+              .having(
+                (e) => e.message,
+                'message',
+                contains('Unknown age_category'),
+              )
+              .having((e) => e.message, 'message', contains('teen')),
         ),
       );
     });

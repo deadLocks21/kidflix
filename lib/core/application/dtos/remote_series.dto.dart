@@ -81,27 +81,27 @@ class RemoteSeriesCatalogDto {
       );
 
   Series toDomain() => Series(
-        id: id,
-        title: title,
-        originalTitle: originalTitle,
-        year: year,
-        synopsis: synopsis,
-        tagline: tagline,
-        posterUrl: posterUrl,
-        backdropUrl: backdropUrl,
-        logoUrl: logoUrl,
-        trailerUrl: trailerUrl,
-        ageCategory: ageCategory,
-        genres: genres,
-        sagaId: sagaId,
-        sagaLabel: sagaLabel,
-        director: director,
-        cast: cast.map((c) => c.toDomain()).toList(growable: false),
-        addedAt: addedAt,
-        seasonsCount: seasonsCount,
-        episodesCount: episodesCount,
-        seasons: const [],
-      );
+    id: id,
+    title: title,
+    originalTitle: originalTitle,
+    year: year,
+    synopsis: synopsis,
+    tagline: tagline,
+    posterUrl: posterUrl,
+    backdropUrl: backdropUrl,
+    logoUrl: logoUrl,
+    trailerUrl: trailerUrl,
+    ageCategory: ageCategory,
+    genres: genres,
+    sagaId: sagaId,
+    sagaLabel: sagaLabel,
+    director: director,
+    cast: cast.map((c) => c.toDomain()).toList(growable: false),
+    addedAt: addedAt,
+    seasonsCount: seasonsCount,
+    episodesCount: episodesCount,
+    seasons: const [],
+  );
 }
 
 /// Wire-format DTO for the response of `GET /series/{id}` — carries the
@@ -182,9 +182,7 @@ class RemoteSeriesDetailDto {
 
   Series toDomain() {
     final domainSeasons = seasons
-        .map(
-          (s) => s.toDomain(seriesId: id, ageCategory: ageCategory),
-        )
+        .map((s) => s.toDomain(seriesId: id, ageCategory: ageCategory))
         .toList(growable: false);
     final episodesCount = domainSeasons.fold<int>(
       0,

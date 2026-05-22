@@ -12,7 +12,8 @@ void main() {
   late int invocationCount;
 
   setUp(() {
-    messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     channel = const MethodChannel(_channelName);
     invocationCount = 0;
   });
@@ -75,54 +76,78 @@ void main() {
   });
 
   group('MissingPluginException disables future calls', () {
-    test('startLock catches MissingPluginException, future calls short-circuit', () async {
-      mockHandler((_) async {
-        throw PlatformException(code: 'MissingPluginException');
-      });
-      final service = PlatformChannelKidsLockService();
+    test(
+      'startLock catches MissingPluginException, future calls short-circuit',
+      () async {
+        mockHandler((_) async {
+          throw PlatformException(code: 'MissingPluginException');
+        });
+        final service = PlatformChannelKidsLockService();
 
-      expect(await service.startLock(), isFalse);
-      expect(invocationCount, 1);
+        expect(await service.startLock(), isFalse);
+        expect(invocationCount, 1);
 
-      expect(await service.startLock(), isFalse);
-      expect(invocationCount, 1, reason: 'second call must not invoke channel');
-    });
+        expect(await service.startLock(), isFalse);
+        expect(
+          invocationCount,
+          1,
+          reason: 'second call must not invoke channel',
+        );
+      },
+    );
 
-    test('stopLock returns true after MissingPlugin (nothing to stop)', () async {
-      mockHandler((_) async {
-        throw PlatformException(code: 'MissingPluginException');
-      });
-      final service = PlatformChannelKidsLockService();
+    test(
+      'stopLock returns true after MissingPlugin (nothing to stop)',
+      () async {
+        mockHandler((_) async {
+          throw PlatformException(code: 'MissingPluginException');
+        });
+        final service = PlatformChannelKidsLockService();
 
-      expect(await service.stopLock(), isTrue);
-      expect(await service.stopLock(), isTrue);
-      expect(invocationCount, 1, reason: 'second call must not invoke channel');
-    });
+        expect(await service.stopLock(), isTrue);
+        expect(await service.stopLock(), isTrue);
+        expect(
+          invocationCount,
+          1,
+          reason: 'second call must not invoke channel',
+        );
+      },
+    );
 
-    test('isLocked returns false after MissingPlugin and short-circuits', () async {
-      mockHandler((_) async {
-        throw PlatformException(code: 'MissingPluginException');
-      });
-      final service = PlatformChannelKidsLockService();
+    test(
+      'isLocked returns false after MissingPlugin and short-circuits',
+      () async {
+        mockHandler((_) async {
+          throw PlatformException(code: 'MissingPluginException');
+        });
+        final service = PlatformChannelKidsLockService();
 
-      expect(await service.isLocked(), isFalse);
-      expect(await service.isLocked(), isFalse);
-      expect(invocationCount, 1);
-    });
+        expect(await service.isLocked(), isFalse);
+        expect(await service.isLocked(), isFalse);
+        expect(invocationCount, 1);
+      },
+    );
   });
 
   group('Other PlatformException does NOT disable the service', () {
-    test('SecurityException returns false but next call hits channel again', () async {
-      mockHandler((_) async {
-        throw PlatformException(code: 'SecurityException');
-      });
-      final service = PlatformChannelKidsLockService();
+    test(
+      'SecurityException returns false but next call hits channel again',
+      () async {
+        mockHandler((_) async {
+          throw PlatformException(code: 'SecurityException');
+        });
+        final service = PlatformChannelKidsLockService();
 
-      expect(await service.startLock(), isFalse);
-      expect(invocationCount, 1);
+        expect(await service.startLock(), isFalse);
+        expect(invocationCount, 1);
 
-      expect(await service.startLock(), isFalse);
-      expect(invocationCount, 2, reason: 'service must remain available for retry');
-    });
+        expect(await service.startLock(), isFalse);
+        expect(
+          invocationCount,
+          2,
+          reason: 'service must remain available for retry',
+        );
+      },
+    );
   });
 }

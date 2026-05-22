@@ -134,31 +134,34 @@ void main() {
       });
     });
 
-    test('maps 404 unknown_phone_number to UnknownPhoneNumberException',
-        () async {
-      final adapter = _FakeAdapter(
-        (_, _) => _jsonResponse(404, {
-          'error': {'code': 'unknown_phone_number'},
-        }),
-      );
-      final repo = DioAuthRepository(_makeDio(adapter));
+    test(
+      'maps 404 unknown_phone_number to UnknownPhoneNumberException',
+      () async {
+        final adapter = _FakeAdapter(
+          (_, _) => _jsonResponse(404, {
+            'error': {'code': 'unknown_phone_number'},
+          }),
+        );
+        final repo = DioAuthRepository(_makeDio(adapter));
 
-      await expectLater(
-        repo.requestOtp(PhoneNumber.parse('0699999999')),
-        throwsA(
-          isA<UnknownPhoneNumberException>().having(
-            (e) => e.phoneNumber.e164,
-            'phoneNumber.e164',
-            '+33699999999',
+        await expectLater(
+          repo.requestOtp(PhoneNumber.parse('0699999999')),
+          throwsA(
+            isA<UnknownPhoneNumberException>().having(
+              (e) => e.phoneNumber.e164,
+              'phoneNumber.e164',
+              '+33699999999',
+            ),
           ),
-        ),
-      );
-    });
+        );
+      },
+    );
 
     test('rethrows DioException on 429 rate_limited', () async {
       final adapter = _FakeAdapter(
-        (_, _) =>
-            _jsonResponse(429, {'error': {'code': 'rate_limited'}}),
+        (_, _) => _jsonResponse(429, {
+          'error': {'code': 'rate_limited'},
+        }),
       );
       final repo = DioAuthRepository(_makeDio(adapter));
 
@@ -208,77 +211,79 @@ void main() {
       'is_main': isMain,
     };
 
-    test('returns Session with Device sourced from the JSON response',
-        () async {
-      final adapter = _FakeAdapter(
-        (_, _) => _jsonResponse(200, {
-          'jwt': 'eyJabc',
-          'device': {
-            'id': '9b2-uuid',
-            'name': 'iPhone backend-normalized',
-          },
-          'profiles': [
-            profileJson(
-              id: 'papa',
-              name: 'Papa',
-              ageCategory: 'adulte',
-              pinHash: r'$2b$12$X',
-              isMain: true,
-            ),
-          ],
-        }),
-      );
-      final repo = DioAuthRepository(_makeDio(adapter));
+    test(
+      'returns Session with Device sourced from the JSON response',
+      () async {
+        final adapter = _FakeAdapter(
+          (_, _) => _jsonResponse(200, {
+            'jwt': 'eyJabc',
+            'device': {'id': '9b2-uuid', 'name': 'iPhone backend-normalized'},
+            'profiles': [
+              profileJson(
+                id: 'papa',
+                name: 'Papa',
+                ageCategory: 'adulte',
+                pinHash: r'$2b$12$X',
+                isMain: true,
+              ),
+            ],
+          }),
+        );
+        final repo = DioAuthRepository(_makeDio(adapter));
 
-      final session = await repo.verifyOtp(
-        PhoneNumber.parse('0612345678'),
-        OtpCode.parse('123456'),
-        const Device(id: '9b2-uuid', name: 'iPhone client-side'),
-      );
+        final session = await repo.verifyOtp(
+          PhoneNumber.parse('0612345678'),
+          OtpCode.parse('123456'),
+          const Device(id: '9b2-uuid', name: 'iPhone client-side'),
+        );
 
-      expect(session.jwt, 'eyJabc');
-      expect(
-        session.device,
-        const Device(id: '9b2-uuid', name: 'iPhone backend-normalized'),
-        reason: 'Device must come from response, not the parameter',
-      );
-      expect(session.profiles, hasLength(1));
-      expect(session.profiles.single.id, 'papa');
-      expect(session.profiles.single.hasPin, isTrue);
-    });
+        expect(session.jwt, 'eyJabc');
+        expect(
+          session.device,
+          const Device(id: '9b2-uuid', name: 'iPhone backend-normalized'),
+          reason: 'Device must come from response, not the parameter',
+        );
+        expect(session.profiles, hasLength(1));
+        expect(session.profiles.single.id, 'papa');
+        expect(session.profiles.single.hasPin, isTrue);
+      },
+    );
 
-    test('omits device_name from request body when device.name is null',
-        () async {
-      final adapter = _FakeAdapter(
-        (_, _) => _jsonResponse(200, {
-          'jwt': 'jwt',
-          'device': {'id': 'abc', 'name': null},
-          'profiles': <Map<String, dynamic>>[],
-        }),
-      );
-      final repo = DioAuthRepository(_makeDio(adapter));
+    test(
+      'omits device_name from request body when device.name is null',
+      () async {
+        final adapter = _FakeAdapter(
+          (_, _) => _jsonResponse(200, {
+            'jwt': 'jwt',
+            'device': {'id': 'abc', 'name': null},
+            'profiles': <Map<String, dynamic>>[],
+          }),
+        );
+        final repo = DioAuthRepository(_makeDio(adapter));
 
-      await repo.verifyOtp(
-        PhoneNumber.parse('0612345678'),
-        OtpCode.parse('123456'),
-        const Device(id: 'abc'),
-      );
+        await repo.verifyOtp(
+          PhoneNumber.parse('0612345678'),
+          OtpCode.parse('123456'),
+          const Device(id: 'abc'),
+        );
 
-      final body = adapter.requests.single.bodyJson;
-      expect(body.containsKey('phone_number'), isTrue);
-      expect(body.containsKey('code'), isTrue);
-      expect(body.containsKey('device_id'), isTrue);
-      expect(
-        body.containsKey('device_name'),
-        isFalse,
-        reason: 'device_name must be omitted when null',
-      );
-    });
+        final body = adapter.requests.single.bodyJson;
+        expect(body.containsKey('phone_number'), isTrue);
+        expect(body.containsKey('code'), isTrue);
+        expect(body.containsKey('device_id'), isTrue);
+        expect(
+          body.containsKey('device_name'),
+          isFalse,
+          reason: 'device_name must be omitted when null',
+        );
+      },
+    );
 
     test('maps 401 invalid_otp to InvalidOtpException', () async {
       final adapter = _FakeAdapter(
-        (_, _) =>
-            _jsonResponse(401, {'error': {'code': 'invalid_otp'}}),
+        (_, _) => _jsonResponse(401, {
+          'error': {'code': 'invalid_otp'},
+        }),
       );
       final repo = DioAuthRepository(_makeDio(adapter));
 
@@ -294,8 +299,9 @@ void main() {
 
     test('maps 410 otp_expired to OtpExpiredException', () async {
       final adapter = _FakeAdapter(
-        (_, _) =>
-            _jsonResponse(410, {'error': {'code': 'otp_expired'}}),
+        (_, _) => _jsonResponse(410, {
+          'error': {'code': 'otp_expired'},
+        }),
       );
       final repo = DioAuthRepository(_makeDio(adapter));
 
@@ -309,30 +315,32 @@ void main() {
       );
     });
 
-    test('maps 404 unknown_phone_number to UnknownPhoneNumberException',
-        () async {
-      final adapter = _FakeAdapter(
-        (_, _) => _jsonResponse(404, {
-          'error': {'code': 'unknown_phone_number'},
-        }),
-      );
-      final repo = DioAuthRepository(_makeDio(adapter));
+    test(
+      'maps 404 unknown_phone_number to UnknownPhoneNumberException',
+      () async {
+        final adapter = _FakeAdapter(
+          (_, _) => _jsonResponse(404, {
+            'error': {'code': 'unknown_phone_number'},
+          }),
+        );
+        final repo = DioAuthRepository(_makeDio(adapter));
 
-      await expectLater(
-        repo.verifyOtp(
-          PhoneNumber.parse('0699999999'),
-          OtpCode.parse('123456'),
-          const Device(id: 'abc'),
-        ),
-        throwsA(
-          isA<UnknownPhoneNumberException>().having(
-            (e) => e.phoneNumber.e164,
-            'phoneNumber.e164',
-            '+33699999999',
+        await expectLater(
+          repo.verifyOtp(
+            PhoneNumber.parse('0699999999'),
+            OtpCode.parse('123456'),
+            const Device(id: 'abc'),
           ),
-        ),
-      );
-    });
+          throwsA(
+            isA<UnknownPhoneNumberException>().having(
+              (e) => e.phoneNumber.e164,
+              'phoneNumber.e164',
+              '+33699999999',
+            ),
+          ),
+        );
+      },
+    );
 
     test('rethrows DioException on 500', () async {
       final adapter = _FakeAdapter((_, _) => _emptyResponse(500));
@@ -354,25 +362,22 @@ void main() {
       );
     });
 
-    test(
-      'survives a malformed (non-JSON) error body — rethrows DioException, '
-      'not _CastError',
-      () async {
-        final adapter = _FakeAdapter(
-          (_, _) => _rawResponse(401, 'plain text not json'),
-        );
-        final repo = DioAuthRepository(_makeDio(adapter));
+    test('survives a malformed (non-JSON) error body — rethrows DioException, '
+        'not _CastError', () async {
+      final adapter = _FakeAdapter(
+        (_, _) => _rawResponse(401, 'plain text not json'),
+      );
+      final repo = DioAuthRepository(_makeDio(adapter));
 
-        await expectLater(
-          repo.verifyOtp(
-            PhoneNumber.parse('0612345678'),
-            OtpCode.parse('123456'),
-            const Device(id: 'abc'),
-          ),
-          throwsA(isA<DioException>()),
-        );
-      },
-    );
+      await expectLater(
+        repo.verifyOtp(
+          PhoneNumber.parse('0612345678'),
+          OtpCode.parse('123456'),
+          const Device(id: 'abc'),
+        ),
+        throwsA(isA<DioException>()),
+      );
+    });
   });
 
   group('DioAuthRepository.fetchProfiles', () {
@@ -392,8 +397,7 @@ void main() {
       'is_main': isMain,
     };
 
-    test('targets GET /profiles with no body and no query parameter',
-        () async {
+    test('targets GET /profiles with no body and no query parameter', () async {
       final adapter = _FakeAdapter(
         (_, _) => _jsonResponse(200, {'profiles': <Map<String, dynamic>>[]}),
       );

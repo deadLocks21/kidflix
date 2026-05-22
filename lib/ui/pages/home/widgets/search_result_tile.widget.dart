@@ -18,11 +18,7 @@ class SearchResultTile extends StatelessWidget {
   final CatalogItemDto item;
   final VoidCallback onTap;
 
-  const SearchResultTile({
-    super.key,
-    required this.item,
-    required this.onTap,
-  });
+  const SearchResultTile({super.key, required this.item, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -83,11 +79,10 @@ class SearchResultTile extends StatelessWidget {
     }
     if (item is SeriesDto) {
       final seasons = item.seasonsCount;
-      final saisonsLabel =
-          seasons <= 1 ? '$seasons saison' : '$seasons saisons';
-      return item.year == null
-          ? saisonsLabel
-          : '${item.year} · $saisonsLabel';
+      final saisonsLabel = seasons <= 1
+          ? '$seasons saison'
+          : '$seasons saisons';
+      return item.year == null ? saisonsLabel : '${item.year} · $saisonsLabel';
     }
     return '';
   }

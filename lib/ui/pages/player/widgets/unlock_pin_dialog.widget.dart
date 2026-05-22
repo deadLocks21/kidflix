@@ -18,10 +18,8 @@ Future<bool> showUnlockPinDialog(
   final result = await showDialog<bool>(
     context: context,
     barrierDismissible: false,
-    builder: (context) => _UnlockPinDialog(
-      mainProfile: mainProfile,
-      pinService: pinService,
-    ),
+    builder: (context) =>
+        _UnlockPinDialog(mainProfile: mainProfile, pinService: pinService),
   );
   return result ?? false;
 }
@@ -30,10 +28,7 @@ class _UnlockPinDialog extends StatefulWidget {
   final Profile mainProfile;
   final ProfilePinService pinService;
 
-  const _UnlockPinDialog({
-    required this.mainProfile,
-    required this.pinService,
-  });
+  const _UnlockPinDialog({required this.mainProfile, required this.pinService});
 
   @override
   State<_UnlockPinDialog> createState() => _UnlockPinDialogState();

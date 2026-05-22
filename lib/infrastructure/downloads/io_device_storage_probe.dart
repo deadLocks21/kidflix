@@ -16,8 +16,8 @@ class IoDeviceStorageProbe implements DeviceStorageProbe {
   IoDeviceStorageProbe({
     required DownloadRepository repository,
     DiskSpacePlus? diskSpace,
-  })  : _repository = repository,
-        _diskSpace = diskSpace ?? DiskSpacePlus();
+  }) : _repository = repository,
+       _diskSpace = diskSpace ?? DiskSpacePlus();
 
   @override
   Future<int> appDownloadsBytes() async {

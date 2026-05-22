@@ -15,12 +15,7 @@ import 'package:kidflix/core/domain/model/media.dart';
 ///   or first of the next season). Start that next episode at 0.
 /// * [restart] — the most recent episode is completed and there is no
 ///   next episode (end of series, ignoring Specials). Restart at S1E1.
-enum ContinueWatchingState {
-  never,
-  inProgress,
-  nextAfterCompleted,
-  restart,
-}
+enum ContinueWatchingState { never, inProgress, nextAfterCompleted, restart }
 
 /// Sealed projection of one entry in the Continue Watching row.
 sealed class ContinueWatchingItemDto {

@@ -37,20 +37,20 @@ class WishlistEntryDto {
   /// against the watch progress (e.g. the `add` flow before the
   /// next refresh). Defaults the category based on availability only.
   factory WishlistEntryDto.fromDomain(WishlistEntry entry) => WishlistEntryDto(
-        watcharrId: entry.watcharrId,
-        tmdbId: entry.tmdbId,
-        kind: entry.kind,
-        title: entry.title,
-        year: entry.year,
-        posterUrl: entry.posterUrl,
-        status: entry.status,
-        rating: entry.rating,
-        availableInCatalog: entry.availableInCatalog,
-        catalogId: entry.catalogId,
-        category: entry.availableInCatalog
-            ? WishlistCategory.toWatch
-            : WishlistCategory.toAcquire,
-      );
+    watcharrId: entry.watcharrId,
+    tmdbId: entry.tmdbId,
+    kind: entry.kind,
+    title: entry.title,
+    year: entry.year,
+    posterUrl: entry.posterUrl,
+    status: entry.status,
+    rating: entry.rating,
+    availableInCatalog: entry.availableInCatalog,
+    catalogId: entry.catalogId,
+    category: entry.availableInCatalog
+        ? WishlistCategory.toWatch
+        : WishlistCategory.toAcquire,
+  );
 
   /// `true` when the same TMDB item already ships in the local
   /// catalog and a [catalogId] is resolvable to a playable target.
@@ -77,8 +77,4 @@ class WishlistEntryDto {
 /// - `watched` — movies only: in the catalog, and at least one
 ///   profile of the foyer has a `MovieProgress` with
 ///   `completed == true` for the resolved `catalogId`.
-enum WishlistCategory {
-  toAcquire,
-  toWatch,
-  watched,
-}
+enum WishlistCategory { toAcquire, toWatch, watched }

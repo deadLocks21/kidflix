@@ -28,8 +28,5 @@ DownloadRepository downloadRepository(Ref ref) {
   if (isInMemoryBaseUrl(baseUrl)) {
     return InMemoryDownloadRepository(manifest: manifest);
   }
-  return DioDownloadRepository(
-    dio: ref.watch(dioProvider),
-    manifest: manifest,
-  );
+  return DioDownloadRepository(dio: ref.watch(dioProvider), manifest: manifest);
 }

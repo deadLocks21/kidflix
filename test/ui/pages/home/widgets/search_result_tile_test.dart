@@ -3,9 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/ui/pages/home/widgets/search_result_tile.widget.dart';
 
-Widget _hostOf(Widget child) => MaterialApp(
-  home: Scaffold(body: child),
-);
+Widget _hostOf(Widget child) => MaterialApp(home: Scaffold(body: child));
 
 void main() {
   group('SearchResultTile', () {
@@ -24,7 +22,9 @@ void main() {
       expect(find.text('1988 · 1h26'), findsOneWidget);
     });
 
-    testWidgets('caption shows duration only when year is null', (tester) async {
+    testWidgets('caption shows duration only when year is null', (
+      tester,
+    ) async {
       const movie = MovieDto(
         id: 'x',
         title: 'Sans année',

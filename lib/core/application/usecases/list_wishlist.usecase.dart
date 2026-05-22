@@ -43,8 +43,8 @@ class ListWishlistUseCase {
   const ListWishlistUseCase({
     required WishlistRepository wishlistRepo,
     required WatchProgressRepository progressRepo,
-  })  : _wishlistRepo = wishlistRepo,
-        _progressRepo = progressRepo;
+  }) : _wishlistRepo = wishlistRepo,
+       _progressRepo = progressRepo;
 
   /// Fetches and categorises the wishlist.
   ///
@@ -56,29 +56,31 @@ class ListWishlistUseCase {
     required List<String> profileIds,
   }) async {
     final entries = await _wishlistRepo.list();
-    final planned = entries
-        .where((e) => e.status == WatchedStatus.planned)
-        .toList()
-      ..sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+    final planned =
+        entries.where((e) => e.status == WatchedStatus.planned).toList()..sort(
+          (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+        );
     if (planned.isEmpty) return const [];
 
     final watchedMovieIds = await _resolveWatchedMovieIds(profileIds);
 
-    return planned.map((entry) {
-      return WishlistEntryDto(
-        watcharrId: entry.watcharrId,
-        tmdbId: entry.tmdbId,
-        kind: entry.kind,
-        title: entry.title,
-        year: entry.year,
-        posterUrl: entry.posterUrl,
-        status: entry.status,
-        rating: entry.rating,
-        availableInCatalog: entry.availableInCatalog,
-        catalogId: entry.catalogId,
-        category: _resolveCategory(entry, watchedMovieIds),
-      );
-    }).toList(growable: false);
+    return planned
+        .map((entry) {
+          return WishlistEntryDto(
+            watcharrId: entry.watcharrId,
+            tmdbId: entry.tmdbId,
+            kind: entry.kind,
+            title: entry.title,
+            year: entry.year,
+            posterUrl: entry.posterUrl,
+            status: entry.status,
+            rating: entry.rating,
+            availableInCatalog: entry.availableInCatalog,
+            catalogId: entry.catalogId,
+            category: _resolveCategory(entry, watchedMovieIds),
+          );
+        })
+        .toList(growable: false);
   }
 
   /// Aggregates `(profile, movie) → completed` across every profile

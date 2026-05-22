@@ -9,17 +9,16 @@ Episode _ep({
   required String id,
   required int seasonNumber,
   required int episodeNumber,
-}) =>
-    Episode(
-      id: id,
-      seriesId: 'pingu',
-      seasonNumber: seasonNumber,
-      episodeNumber: episodeNumber,
-      title: 'Ep $seasonNumber.$episodeNumber',
-      duration: const Duration(minutes: 5),
-      ageCategory: AgeCategory.enfant,
-      addedAt: DateTime(2026, 5, 1),
-    );
+}) => Episode(
+  id: id,
+  seriesId: 'pingu',
+  seasonNumber: seasonNumber,
+  episodeNumber: episodeNumber,
+  title: 'Ep $seasonNumber.$episodeNumber',
+  duration: const Duration(minutes: 5),
+  ageCategory: AgeCategory.enfant,
+  addedAt: DateTime(2026, 5, 1),
+);
 
 Series _series(List<Season> seasons) {
   final epCount = seasons.fold<int>(0, (s, sn) => s + sn.episodes.length);
@@ -51,9 +50,10 @@ void main() {
   group('playLabelFor', () {
     test('no progress → "Lire S1E1"', () {
       final series = _series([
-        Season(seasonNumber: 1, episodes: [
-          _ep(id: 's1e1', seasonNumber: 1, episodeNumber: 1),
-        ]),
+        Season(
+          seasonNumber: 1,
+          episodes: [_ep(id: 's1e1', seasonNumber: 1, episodeNumber: 1)],
+        ),
       ]);
       final label = playLabelFor(series: series, latestProgress: null);
       expect(label, isNotNull);
@@ -65,9 +65,10 @@ void main() {
 
     test('in-progress → "Reprendre S{n}E{m}"', () {
       final series = _series([
-        Season(seasonNumber: 1, episodes: [
-          _ep(id: 's1e3', seasonNumber: 1, episodeNumber: 3),
-        ]),
+        Season(
+          seasonNumber: 1,
+          episodes: [_ep(id: 's1e3', seasonNumber: 1, episodeNumber: 3)],
+        ),
       ]);
       final label = playLabelFor(
         series: series,
@@ -81,10 +82,13 @@ void main() {
 
     test('completed mid-season → "Lire S{n}E{m+1}"', () {
       final series = _series([
-        Season(seasonNumber: 1, episodes: [
-          _ep(id: 's1e3', seasonNumber: 1, episodeNumber: 3),
-          _ep(id: 's1e4', seasonNumber: 1, episodeNumber: 4),
-        ]),
+        Season(
+          seasonNumber: 1,
+          episodes: [
+            _ep(id: 's1e3', seasonNumber: 1, episodeNumber: 3),
+            _ep(id: 's1e4', seasonNumber: 1, episodeNumber: 4),
+          ],
+        ),
       ]);
       final label = playLabelFor(
         series: series,
@@ -97,10 +101,13 @@ void main() {
 
     test('completed last → "Revoir S1E1"', () {
       final series = _series([
-        Season(seasonNumber: 1, episodes: [
-          _ep(id: 's1e1', seasonNumber: 1, episodeNumber: 1),
-          _ep(id: 's1e2', seasonNumber: 1, episodeNumber: 2),
-        ]),
+        Season(
+          seasonNumber: 1,
+          episodes: [
+            _ep(id: 's1e1', seasonNumber: 1, episodeNumber: 1),
+            _ep(id: 's1e2', seasonNumber: 1, episodeNumber: 2),
+          ],
+        ),
       ]);
       final label = playLabelFor(
         series: series,
@@ -113,9 +120,11 @@ void main() {
 
     test('series with only Specials → null', () {
       final series = _series([
-        Season(seasonNumber: 0, name: 'Specials', episodes: [
-          _ep(id: 'sp1', seasonNumber: 0, episodeNumber: 1),
-        ]),
+        Season(
+          seasonNumber: 0,
+          name: 'Specials',
+          episodes: [_ep(id: 'sp1', seasonNumber: 0, episodeNumber: 1)],
+        ),
       ]);
       final label = playLabelFor(series: series, latestProgress: null);
       expect(label, isNull);

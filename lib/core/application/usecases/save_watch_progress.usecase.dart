@@ -46,19 +46,19 @@ class SaveWatchProgressUseCase {
   }) {
     final WatchProgress progress = switch (media) {
       Movie() => MovieProgress(
-          profileId: profileId,
-          movieId: media.id,
-          positionSeconds: positionSeconds,
-          completed: completed,
-          updatedAt: DateTime.now(),
-        ),
+        profileId: profileId,
+        movieId: media.id,
+        positionSeconds: positionSeconds,
+        completed: completed,
+        updatedAt: DateTime.now(),
+      ),
       Episode() => EpisodeProgress(
-          profileId: profileId,
-          episodeId: media.id,
-          positionSeconds: positionSeconds,
-          completed: completed,
-          updatedAt: DateTime.now(),
-        ),
+        profileId: profileId,
+        episodeId: media.id,
+        positionSeconds: positionSeconds,
+        completed: completed,
+        updatedAt: DateTime.now(),
+      ),
     };
     return _repository.save(progress);
   }

@@ -41,8 +41,8 @@ class DownloadSeasonUseCase {
   const DownloadSeasonUseCase({
     required SeriesRepository series,
     required DownloadRepository downloads,
-  })  : _series = series,
-        _downloads = downloads;
+  }) : _series = series,
+       _downloads = downloads;
 
   Stream<DownloadSeasonProgress> execute({
     required String seriesId,
@@ -67,7 +67,8 @@ class DownloadSeasonUseCase {
         final season = series.seasons.firstWhere(
           (s) => s.seasonNumber == seasonNumber,
           orElse: () => throw StateError(
-              'Season $seasonNumber not found in series $seriesId'),
+            'Season $seasonNumber not found in series $seriesId',
+          ),
         );
         final episodes = [...season.episodes]
           ..sort((a, b) => a.episodeNumber.compareTo(b.episodeNumber));
@@ -128,12 +129,14 @@ class DownloadSeasonUseCase {
     final sub = stream.listen(
       (snapshot) {
         if (controller.isClosed) return;
-        controller.add(DownloadSeasonProgress(
-          totalEpisodes: total,
-          doneEpisodes: done,
-          currentEpisodeId: episode.id,
-          currentSnapshot: snapshot,
-        ));
+        controller.add(
+          DownloadSeasonProgress(
+            totalEpisodes: total,
+            doneEpisodes: done,
+            currentEpisodeId: episode.id,
+            currentSnapshot: snapshot,
+          ),
+        );
         if (snapshot.status == DownloadStatus.complete ||
             snapshot.status == DownloadStatus.failed ||
             snapshot.status == DownloadStatus.cancelled) {

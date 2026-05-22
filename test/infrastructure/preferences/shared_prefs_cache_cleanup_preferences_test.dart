@@ -34,9 +34,6 @@ void main() {
     final prefs = SharedPrefsCacheCleanupPreferences();
     await prefs.setAutoDeleteEnabled(false);
     final raw = await SharedPreferences.getInstance();
-    expect(
-      raw.getBool('download_cleanup.cache_auto_delete_enabled'),
-      isFalse,
-    );
+    expect(raw.getBool('download_cleanup.cache_auto_delete_enabled'), isFalse);
   });
 }

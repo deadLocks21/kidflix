@@ -98,10 +98,9 @@ class _WishlistSearchResultTileState
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _adding = true);
     try {
-      await ref.read(wishlistControllerProvider.notifier).add(
-            tmdbId: widget.result.tmdbId,
-            kind: widget.result.kind,
-          );
+      await ref
+          .read(wishlistControllerProvider.notifier)
+          .add(tmdbId: widget.result.tmdbId, kind: widget.result.kind);
       if (!mounted) return;
       // Success: the trailing "+" flips to a "✓" — sufficient feedback,
       // no snackbar needed.

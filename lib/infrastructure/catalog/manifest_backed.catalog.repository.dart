@@ -79,9 +79,7 @@ class ManifestBackedCatalogRepository implements CatalogRepository {
       if (entry.completedAt == null) continue;
       final seriesId = entry.cachedSeriesId;
       if (seriesId == null) continue;
-      completedEpisodesBySeries
-          .putIfAbsent(seriesId, () => [])
-          .add(record);
+      completedEpisodesBySeries.putIfAbsent(seriesId, () => []).add(record);
     }
     for (final record in records) {
       if (record.kind != ManifestEntryKind.series) continue;
@@ -101,14 +99,16 @@ class ManifestBackedCatalogRepository implements CatalogRepository {
     final normalizedQuery = normalizeForSearch(query);
     if (normalizedQuery.isEmpty) return const [];
     final all = await listCatalog();
-    return all.where((item) {
-      final title = normalizeForSearch(item.title);
-      final original = item.originalTitle == null
-          ? ''
-          : normalizeForSearch(item.originalTitle!);
-      return title.contains(normalizedQuery) ||
-          original.contains(normalizedQuery);
-    }).toList(growable: false);
+    return all
+        .where((item) {
+          final title = normalizeForSearch(item.title);
+          final original = item.originalTitle == null
+              ? ''
+              : normalizeForSearch(item.originalTitle!);
+          return title.contains(normalizedQuery) ||
+              original.contains(normalizedQuery);
+        })
+        .toList(growable: false);
   }
 
   @override
@@ -132,7 +132,8 @@ class ManifestBackedCatalogRepository implements CatalogRepository {
       for (final c in entry.cachedTopCast)
         CastMember(name: c.name, role: c.role, photoUrl: c.photoUrl),
     ];
-    final addedAt = entry.completedAt ??
+    final addedAt =
+        entry.completedAt ??
         entry.lastPlayedAt ??
         DateTime.fromMillisecondsSinceEpoch(0).toUtc();
     return Movie(
@@ -202,7 +203,8 @@ class ManifestBackedCatalogRepository implements CatalogRepository {
       for (final c in entry.cachedTopCast)
         CastMember(name: c.name, role: c.role, photoUrl: c.photoUrl),
     ];
-    final addedAt = entry.completedAt ??
+    final addedAt =
+        entry.completedAt ??
         entry.lastPlayedAt ??
         DateTime.fromMillisecondsSinceEpoch(0).toUtc();
     return Series(
@@ -249,7 +251,8 @@ class ManifestBackedCatalogRepository implements CatalogRepository {
     // re-adds the ref. Falls back verbatim when no prefix matches.
     final rawTitle = entry.cachedTitle ?? '';
     final title = _stripEpisodePrefix(rawTitle);
-    final addedAt = entry.completedAt ??
+    final addedAt =
+        entry.completedAt ??
         entry.lastPlayedAt ??
         DateTime.fromMillisecondsSinceEpoch(0).toUtc();
     return Episode(

@@ -30,18 +30,14 @@ void main() {
 
     test('returns null when the video_id query param is empty', () {
       expect(
-        extractYouTubeVideoId(
-          'plugin://plugin.video.youtube/play/?video_id=',
-        ),
+        extractYouTubeVideoId('plugin://plugin.video.youtube/play/?video_id='),
         isNull,
       );
     });
 
     test('returns null when the host is not plugin.video.youtube', () {
       expect(
-        extractYouTubeVideoId(
-          'plugin://plugin.video.vimeo/play/?video_id=abc',
-        ),
+        extractYouTubeVideoId('plugin://plugin.video.vimeo/play/?video_id=abc'),
         isNull,
       );
     });
@@ -71,9 +67,7 @@ void main() {
 
     test('extracts v= from a music.youtube.com/watch URL', () {
       expect(
-        extractYouTubeVideoId(
-          'https://music.youtube.com/watch?v=8B1EtVPBSMw',
-        ),
+        extractYouTubeVideoId('https://music.youtube.com/watch?v=8B1EtVPBSMw'),
         '8B1EtVPBSMw',
       );
     });
@@ -88,17 +82,11 @@ void main() {
     });
 
     test('returns null when v= is missing', () {
-      expect(
-        extractYouTubeVideoId('https://www.youtube.com/watch'),
-        isNull,
-      );
+      expect(extractYouTubeVideoId('https://www.youtube.com/watch'), isNull);
     });
 
     test('returns null when v= is empty', () {
-      expect(
-        extractYouTubeVideoId('https://www.youtube.com/watch?v='),
-        isNull,
-      );
+      expect(extractYouTubeVideoId('https://www.youtube.com/watch?v='), isNull);
     });
 
     test('returns null for a non-watch path on youtube.com', () {

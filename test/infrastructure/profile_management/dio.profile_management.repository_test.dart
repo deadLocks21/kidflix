@@ -124,10 +124,8 @@ void main() {
   group('DioProfileManagementRepository.create', () {
     test('posts the body and returns the parsed profile', () async {
       final adapter = _FakeAdapter(
-        (_, _) => _jsonResponse(
-          200,
-          _profilePayload(id: 'new-uuid', name: 'Léa'),
-        ),
+        (_, _) =>
+            _jsonResponse(200, _profilePayload(id: 'new-uuid', name: 'Léa')),
       );
       final repo = DioProfileManagementRepository(_makeDio(adapter));
 
@@ -151,13 +149,12 @@ void main() {
     });
 
     test('omits raw_pin when rawPin is null', () async {
-      final adapter = _FakeAdapter((_, _) => _jsonResponse(200, _profilePayload()));
+      final adapter = _FakeAdapter(
+        (_, _) => _jsonResponse(200, _profilePayload()),
+      );
       final repo = DioProfileManagementRepository(_makeDio(adapter));
 
-      await repo.create(
-        name: 'Léa',
-        ageCategory: AgeCategory.enfant,
-      );
+      await repo.create(name: 'Léa', ageCategory: AgeCategory.enfant);
 
       final body = adapter.requests.single.bodyJson!;
       expect(body.containsKey('raw_pin'), isFalse);
@@ -166,22 +163,14 @@ void main() {
 
     test('serializes jeune_adulte in snake_case', () async {
       final adapter = _FakeAdapter(
-        (_, _) => _jsonResponse(
-          200,
-          _profilePayload(ageCategory: 'jeune_adulte'),
-        ),
+        (_, _) =>
+            _jsonResponse(200, _profilePayload(ageCategory: 'jeune_adulte')),
       );
       final repo = DioProfileManagementRepository(_makeDio(adapter));
 
-      await repo.create(
-        name: 'Sky',
-        ageCategory: AgeCategory.jeuneAdulte,
-      );
+      await repo.create(name: 'Sky', ageCategory: AgeCategory.jeuneAdulte);
 
-      expect(
-        adapter.requests.single.bodyJson!['age_category'],
-        'jeune_adulte',
-      );
+      expect(adapter.requests.single.bodyJson!['age_category'], 'jeune_adulte');
     });
 
     test('rethrows DioException on network failure', () async {
@@ -195,7 +184,9 @@ void main() {
     });
 
     test('includes avatar_id in the body when provided', () async {
-      final adapter = _FakeAdapter((_, _) => _jsonResponse(200, _profilePayload()));
+      final adapter = _FakeAdapter(
+        (_, _) => _jsonResponse(200, _profilePayload()),
+      );
       final repo = DioProfileManagementRepository(_makeDio(adapter));
 
       await repo.create(
@@ -212,12 +203,17 @@ void main() {
     });
 
     test('omits avatar_id when not provided', () async {
-      final adapter = _FakeAdapter((_, _) => _jsonResponse(200, _profilePayload()));
+      final adapter = _FakeAdapter(
+        (_, _) => _jsonResponse(200, _profilePayload()),
+      );
       final repo = DioProfileManagementRepository(_makeDio(adapter));
 
       await repo.create(name: 'Léa', ageCategory: AgeCategory.enfant);
 
-      expect(adapter.requests.single.bodyJson!.containsKey('avatar_id'), isFalse);
+      expect(
+        adapter.requests.single.bodyJson!.containsKey('avatar_id'),
+        isFalse,
+      );
     });
   });
 
@@ -261,7 +257,10 @@ void main() {
         avatar: const AvatarUnchanged(),
       );
 
-      expect(adapter.requests.single.bodyJson!.containsKey('avatar_id'), isFalse);
+      expect(
+        adapter.requests.single.bodyJson!.containsKey('avatar_id'),
+        isFalse,
+      );
     });
 
     test('AvatarSetTo sends avatar_id as string', () async {
@@ -362,10 +361,7 @@ void main() {
   group('DioProfileManagementRepository.clearPin', () {
     test('DELETE /profiles/{id}/pin returns the cleared profile', () async {
       final adapter = _FakeAdapter(
-        (_, _) => _jsonResponse(
-          200,
-          _profilePayload(id: 'ar'),
-        ),
+        (_, _) => _jsonResponse(200, _profilePayload(id: 'ar')),
       );
       final repo = DioProfileManagementRepository(_makeDio(adapter));
 
@@ -415,20 +411,14 @@ void main() {
       );
       final repo = DioProfileManagementRepository(_makeDio(adapter));
 
-      await expectLater(
-        repo.clearPin(id: 'ar'),
-        throwsA(isA<DioException>()),
-      );
+      await expectLater(repo.clearPin(id: 'ar'), throwsA(isA<DioException>()));
     });
 
     test('rethrows DioException on malformed 422 body', () async {
       final adapter = _FakeAdapter((_, _) => _rawResponse(422, 'plain text'));
       final repo = DioProfileManagementRepository(_makeDio(adapter));
 
-      await expectLater(
-        repo.clearPin(id: 'ar'),
-        throwsA(isA<DioException>()),
-      );
+      await expectLater(repo.clearPin(id: 'ar'), throwsA(isA<DioException>()));
     });
   });
 
@@ -477,10 +467,7 @@ void main() {
       final adapter = _FakeAdapter((_, _) => _rawResponse(422, 'plain text'));
       final repo = DioProfileManagementRepository(_makeDio(adapter));
 
-      await expectLater(
-        repo.delete(id: 'ar'),
-        throwsA(isA<DioException>()),
-      );
+      await expectLater(repo.delete(id: 'ar'), throwsA(isA<DioException>()));
     });
 
     test('rethrows DioException on 5xx', () async {

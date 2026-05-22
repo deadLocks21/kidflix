@@ -24,17 +24,12 @@ class StartMovieDownloadUseCase {
   const StartMovieDownloadUseCase({
     required DownloadRepository repository,
     required DownloadManifestStore manifest,
-  })  : _repository = repository,
-        _manifest = manifest;
+  }) : _repository = repository,
+       _manifest = manifest;
 
-  Stream<MovieDownloadDto> execute(
-    String movieId, {
-    String? activeProfileId,
-  }) {
+  Stream<MovieDownloadDto> execute(String movieId, {String? activeProfileId}) {
     unawaited(_recordPlaybackIntent(movieId, activeProfileId));
-    return _repository
-        .downloadMovie(movieId)
-        .map(MovieDownloadDto.fromDomain);
+    return _repository.downloadMovie(movieId).map(MovieDownloadDto.fromDomain);
   }
 
   Future<void> _recordPlaybackIntent(
@@ -43,8 +38,10 @@ class StartMovieDownloadUseCase {
   ) async {
     try {
       final now = DateTime.now();
-      final existing =
-          await _manifest.findFor(mediaId: movieId, isEpisode: false);
+      final existing = await _manifest.findFor(
+        mediaId: movieId,
+        isEpisode: false,
+      );
       if (existing == null) {
         await _manifest.upsert(
           mediaId: movieId,

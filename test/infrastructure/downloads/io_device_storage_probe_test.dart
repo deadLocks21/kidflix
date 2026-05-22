@@ -26,16 +26,18 @@ void main() {
       expect(await probe.appDownloadsBytes(), equals(0));
     });
 
-    test('deviceFreeBytes converts MB to bytes when plugin returns a value',
-        () async {
-      DiskSpacePlusPlatform.instance = _FakePlatform(freeMb: 12_288.0);
-      final probe = IoDeviceStorageProbe(
-        repository: _StubRepo(totalBytes: 0),
-        diskSpace: DiskSpacePlus(),
-      );
+    test(
+      'deviceFreeBytes converts MB to bytes when plugin returns a value',
+      () async {
+        DiskSpacePlusPlatform.instance = _FakePlatform(freeMb: 12_288.0);
+        final probe = IoDeviceStorageProbe(
+          repository: _StubRepo(totalBytes: 0),
+          diskSpace: DiskSpacePlus(),
+        );
 
-      expect(await probe.deviceFreeBytes(), equals(12_288 * 1024 * 1024));
-    });
+        expect(await probe.deviceFreeBytes(), equals(12_288 * 1024 * 1024));
+      },
+    );
 
     test('deviceFreeBytes returns null when plugin returns null', () async {
       DiskSpacePlusPlatform.instance = _FakePlatform(freeMb: null);

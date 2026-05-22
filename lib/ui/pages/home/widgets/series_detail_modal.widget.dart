@@ -33,10 +33,7 @@ const double _adaptiveBreakpointDp = 600;
 /// The modal triggers a fetch of the full series tree (with seasons +
 /// episodes) on open via `seriesRepositoryProvider.findById` — the
 /// [series] argument is the catalog projection (no episodes).
-Future<void> showSeriesDetailModal(
-  BuildContext context,
-  Series series,
-) async {
+Future<void> showSeriesDetailModal(BuildContext context, Series series) async {
   final width = MediaQuery.sizeOf(context).width;
   if (width < _adaptiveBreakpointDp) {
     return showModalBottomSheet<void>(
@@ -67,10 +64,7 @@ class _SheetContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FractionallySizedBox(
-      heightFactor: 0.92,
-      child: child,
-    );
+    return FractionallySizedBox(heightFactor: 0.92, child: child);
   }
 }
 
@@ -103,8 +97,7 @@ class _SeriesDetailContentState extends ConsumerState<SeriesDetailContent> {
     final seriesRepo = ref.read(seriesRepositoryProvider);
     final progressRepo = ref.read(watchProgressRepositoryProvider);
     final session = ref.read(sessionControllerProvider);
-    final profileId =
-        session is ProfileSelected ? session.profile.id : null;
+    final profileId = session is ProfileSelected ? session.profile.id : null;
     // When the catalog projection already carries the full seasons tree
     // (offline catalog reconstructed from the manifest) we skip the
     // network fetch entirely — `findById` would fail offline anyway.
@@ -123,13 +116,15 @@ class _SeriesDetailContentState extends ConsumerState<SeriesDetailContent> {
     if (profileId != null) {
       final progresses = await progressRepo.listForProfile(profileId);
       final ownIds = {
-        for (final s in series.seasons) for (final e in s.episodes) e.id,
+        for (final s in series.seasons)
+          for (final e in s.episodes) e.id,
       };
-      final ownEpisodes = progresses
-          .whereType<EpisodeProgress>()
-          .where((p) => ownIds.contains(p.episodeId))
-          .toList()
-        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      final ownEpisodes =
+          progresses
+              .whereType<EpisodeProgress>()
+              .where((p) => ownIds.contains(p.episodeId))
+              .toList()
+            ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       if (ownEpisodes.isNotEmpty) latest = ownEpisodes.first;
       progressByEpisodeId = {for (final p in ownEpisodes) p.episodeId: p};
     }
@@ -142,7 +137,9 @@ class _SeriesDetailContentState extends ConsumerState<SeriesDetailContent> {
 
   Future<void> _persistSeriesSnapshot(Series series) async {
     try {
-      await ref.read(downloadRepositoryProvider).cacheSeriesMetadata(
+      await ref
+          .read(downloadRepositoryProvider)
+          .cacheSeriesMetadata(
             seriesId: series.id,
             title: series.title,
             posterUrl: series.posterUrl,
@@ -238,8 +235,10 @@ class _SeriesDetailContentState extends ConsumerState<SeriesDetailContent> {
                 ),
                 const SizedBox(height: 16),
                 if (catalogSeries.synopsis.isNotEmpty)
-                  Text(catalogSeries.synopsis,
-                      style: theme.textTheme.bodyMedium),
+                  Text(
+                    catalogSeries.synopsis,
+                    style: theme.textTheme.bodyMedium,
+                  ),
                 if (catalogSeries.genres.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   Wrap(
@@ -366,10 +365,10 @@ class _MetaLine extends StatelessWidget {
     if (series.year != null) parts.add('${series.year}');
     final seasons = series.seasonsCount;
     final episodes = series.episodesCount;
-    final saisonsLabel =
-        seasons <= 1 ? '$seasons saison' : '$seasons saisons';
-    final episodesLabel =
-        episodes <= 1 ? '$episodes épisode' : '$episodes épisodes';
+    final saisonsLabel = seasons <= 1 ? '$seasons saison' : '$seasons saisons';
+    final episodesLabel = episodes <= 1
+        ? '$episodes épisode'
+        : '$episodes épisodes';
     parts.add(saisonsLabel);
     parts.add(episodesLabel);
     return Text(
@@ -399,9 +398,7 @@ class _SeasonList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final regular = series.seasons
-        .where((s) => s.seasonNumber > 0)
-        .toList()
+    final regular = series.seasons.where((s) => s.seasonNumber > 0).toList()
       ..sort((a, b) => a.seasonNumber.compareTo(b.seasonNumber));
     final specials = series.seasons.where((s) => s.seasonNumber == 0).toList();
     final ordered = [...regular, ...specials];
@@ -429,8 +426,7 @@ class _SeasonList extends StatelessWidget {
         }
       }
     }
-    final firstRegular =
-        ordered.where((s) => s.seasonNumber > 0).toList();
+    final firstRegular = ordered.where((s) => s.seasonNumber > 0).toList();
     if (firstRegular.isEmpty) return null;
     return firstRegular.first.seasonNumber;
   }
@@ -463,8 +459,9 @@ class _SeasonSection extends StatelessWidget {
             SeasonDownloadButton(
               seriesId: season.episodes.first.seriesId,
               seasonNumber: season.seasonNumber,
-              episodeIds:
-                  season.episodes.map((e) => e.id).toList(growable: false),
+              episodeIds: season.episodes
+                  .map((e) => e.id)
+                  .toList(growable: false),
             ),
         ],
       ),
@@ -504,7 +501,8 @@ class _EpisodeTile extends ConsumerWidget {
         : 'E${episode.episodeNumber}';
     final isWatched = progress?.completed ?? false;
     final totalSeconds = episode.duration.inSeconds;
-    final inProgress = progress != null &&
+    final inProgress =
+        progress != null &&
         !progress!.completed &&
         progress!.positionSeconds > 0 &&
         totalSeconds > 0;
@@ -569,7 +567,9 @@ class _EpisodeTile extends ConsumerWidget {
         // of the parent's /catalog visibility, AND so the offline
         // series detail modal can rebuild the seasons tree.
         unawaited(
-          ref.read(downloadRepositoryProvider).cacheMediaMetadata(
+          ref
+              .read(downloadRepositoryProvider)
+              .cacheMediaMetadata(
                 mediaId: episode.id,
                 isEpisode: true,
                 title: '$epRef · ${episode.title}',
@@ -585,9 +585,7 @@ class _EpisodeTile extends ConsumerWidget {
               ),
         );
         Navigator.of(context).pop();
-        context.go(
-          '/player/episode/${episode.id}?series=${episode.seriesId}',
-        );
+        context.go('/player/episode/${episode.id}?series=${episode.seriesId}');
       },
     );
   }
@@ -617,9 +615,7 @@ class _EpisodeThumb extends StatelessWidget {
 class _ThumbFallback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Theme.of(context).colorScheme.surfaceContainerHigh,
-    );
+    return Container(color: Theme.of(context).colorScheme.surfaceContainerHigh);
   }
 }
 
@@ -645,4 +641,3 @@ class _SeasonsErrorState extends StatelessWidget {
     );
   }
 }
-

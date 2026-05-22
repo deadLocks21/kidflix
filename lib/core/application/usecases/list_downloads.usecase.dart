@@ -24,10 +24,7 @@ class DownloadInventory {
   final List<DownloadEntry> downloads; // kind == download
   final List<DownloadEntry> cache; // kind == cache
 
-  const DownloadInventory({
-    required this.downloads,
-    required this.cache,
-  });
+  const DownloadInventory({required this.downloads, required this.cache});
 
   bool get isEmpty => downloads.isEmpty && cache.isEmpty;
 }
@@ -55,14 +52,16 @@ class ListDownloadsUseCase {
     required DownloadRepository repository,
     required CatalogRepository catalog,
     required SeriesRepository series,
-  })  : _repository = repository,
-        _catalog = catalog,
-        _series = series;
+  }) : _repository = repository,
+       _catalog = catalog,
+       _series = series;
 
   /// [profileIds] is the family's profile ids — typically every profile
   /// in the current session. The empty list falls back to a single
   /// `listCatalog()` call (legacy / in-memory mode).
-  Future<DownloadInventory> execute({List<String> profileIds = const []}) async {
+  Future<DownloadInventory> execute({
+    List<String> profileIds = const [],
+  }) async {
     final inventory = await _repository.listAll();
     if (inventory.isEmpty) {
       return const DownloadInventory(downloads: [], cache: []);
@@ -161,9 +160,8 @@ class ListDownloadsUseCase {
     final movie = candidate is Movie ? candidate : null;
     // Resolution priority: cached manifest fields (captured at action
     // time, age-filter immune) → catalog lookup → fallback literal.
-    final title = record.cachedTitle ??
-        movie?.title ??
-        _unknownTitleFor(record.mediaId);
+    final title =
+        record.cachedTitle ?? movie?.title ?? _unknownTitleFor(record.mediaId);
     final poster = record.cachedPosterUrl ?? movie?.posterUrl;
     return DownloadEntry(
       mediaId: record.mediaId,
@@ -211,12 +209,12 @@ class ListDownloadsUseCase {
       if (episode != null) break;
     }
 
-    final title = record.cachedTitle ??
+    final title =
+        record.cachedTitle ??
         episode?.title ??
         _unknownTitleFor(record.mediaId);
-    final poster = record.cachedPosterUrl ??
-        episode?.thumbUrl ??
-        hostSeries?.posterUrl;
+    final poster =
+        record.cachedPosterUrl ?? episode?.thumbUrl ?? hostSeries?.posterUrl;
     final parentTitle = record.cachedParentSeriesTitle ?? hostSeries?.title;
     return DownloadEntry(
       mediaId: record.mediaId,
@@ -284,4 +282,3 @@ class _CatalogIndex {
 
   _CatalogIndex(this.itemsById, this.profileBySeriesId);
 }
-

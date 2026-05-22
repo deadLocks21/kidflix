@@ -27,11 +27,11 @@ class StorageSummary {
 
   @override
   int get hashCode => Object.hash(
-        appDownloadsBytes,
-        deviceFreeBytes,
-        downloadsCount,
-        cacheCount,
-      );
+    appDownloadsBytes,
+    deviceFreeBytes,
+    downloadsCount,
+    cacheCount,
+  );
 
   @override
   String toString() =>
@@ -48,8 +48,8 @@ class GetStorageSummaryUseCase {
   const GetStorageSummaryUseCase({
     required DeviceStorageProbe probe,
     required DownloadRepository repository,
-  })  : _probe = probe,
-        _repository = repository;
+  }) : _probe = probe,
+       _repository = repository;
 
   Future<StorageSummary> execute() async {
     final appBytesF = _probe.appDownloadsBytes();

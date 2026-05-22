@@ -29,10 +29,10 @@ class RefreshDownloadSnapshotsUseCase {
     required SeriesRepository series,
     required DownloadRepository downloads,
     required DownloadManifestStore manifest,
-  })  : _catalog = catalog,
-        _series = series,
-        _downloads = downloads,
-        _manifest = manifest;
+  }) : _catalog = catalog,
+       _series = series,
+       _downloads = downloads,
+       _manifest = manifest;
 
   /// Runs the backfill pass.
   ///
@@ -136,9 +136,7 @@ class RefreshDownloadSnapshotsUseCase {
       // series modal next time online.
       final seriesId = record.entry.cachedSeriesId;
       if (seriesId != null) {
-        completedEpisodesBySeries
-            .putIfAbsent(seriesId, () => [])
-            .add(record);
+        completedEpisodesBySeries.putIfAbsent(seriesId, () => []).add(record);
       }
       if (!_isEpisodeSnapshotComplete(record.entry)) {
         if (seriesId != null) seriesIdsToRefresh.add(seriesId);

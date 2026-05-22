@@ -74,13 +74,7 @@ void main() {
 
   group('RemoteProfileDto.toJson', () {
     test('round-trips losslessly for every age category', () {
-      for (final wire in [
-        'bebe',
-        'enfant',
-        'ado',
-        'jeune_adulte',
-        'adulte',
-      ]) {
+      for (final wire in ['bebe', 'enfant', 'ado', 'jeune_adulte', 'adulte']) {
         final json = {
           'id': 'p-$wire',
           'name': 'Profile $wire',

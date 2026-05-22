@@ -109,10 +109,7 @@ class WishlistEntry {
 
 /// What an entry refers to. Mirrors Watcharr's `content.type` after
 /// filtering out `tv_episode` and `game` upstream of the API surface.
-enum WishlistItemKind {
-  movie,
-  series,
-}
+enum WishlistItemKind { movie, series }
 
 /// Watcharr `Watched.status` enum. The wire format is uppercase
 /// (`PLANNED`, `WATCHING`, …) — translation lives in the DTO layer.

@@ -204,11 +204,7 @@ class _TrailerHeaderState extends State<TrailerHeader> {
     return Stack(
       children: [
         hero,
-        Positioned(
-          left: 16,
-          bottom: 16,
-          child: _LogoBadge(url: logo),
-        ),
+        Positioned(left: 16, bottom: 16, child: _LogoBadge(url: logo)),
       ],
     );
   }

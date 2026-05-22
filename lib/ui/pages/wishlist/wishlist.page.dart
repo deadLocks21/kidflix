@@ -39,7 +39,8 @@ class WishlistPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final asyncEntries = ref.watch(wishlistControllerProvider);
-    final hideFab = asyncEntries.hasError &&
+    final hideFab =
+        asyncEntries.hasError &&
         asyncEntries.error is WishlistNotConfiguredException;
     return Scaffold(
       appBar: AppBar(title: const Text("Liste d'envies")),
@@ -52,16 +53,14 @@ class WishlistPage extends ConsumerWidget {
             ),
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: () => ref
-              .read(wishlistControllerProvider.notifier)
-              .refresh(),
+          onRefresh: () =>
+              ref.read(wishlistControllerProvider.notifier).refresh(),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 720),
               child: asyncEntries.when(
-                loading: () => const _Centered(
-                  child: CircularProgressIndicator(),
-                ),
+                loading: () =>
+                    const _Centered(child: CircularProgressIndicator()),
                 error: (e, _) => _ErrorView(error: e, ref: ref),
                 data: (entries) => _Sections(entries: entries),
               ),
@@ -83,12 +82,15 @@ class _Sections extends StatelessWidget {
     if (entries.isEmpty) {
       return const _EmptyState();
     }
-    final toAcquire =
-        entries.where((e) => e.category == WishlistCategory.toAcquire).toList();
-    final toWatch =
-        entries.where((e) => e.category == WishlistCategory.toWatch).toList();
-    final watched =
-        entries.where((e) => e.category == WishlistCategory.watched).toList();
+    final toAcquire = entries
+        .where((e) => e.category == WishlistCategory.toAcquire)
+        .toList();
+    final toWatch = entries
+        .where((e) => e.category == WishlistCategory.toWatch)
+        .toList();
+    final watched = entries
+        .where((e) => e.category == WishlistCategory.watched)
+        .toList();
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -100,17 +102,9 @@ class _Sections extends StatelessWidget {
             keyPrefix: 'acquire',
           ),
         if (toWatch.isNotEmpty)
-          _Section(
-            label: 'À visionner',
-            entries: toWatch,
-            keyPrefix: 'watch',
-          ),
+          _Section(label: 'À visionner', entries: toWatch, keyPrefix: 'watch'),
         if (watched.isNotEmpty)
-          _Section(
-            label: 'Déjà vu',
-            entries: watched,
-            keyPrefix: 'watched',
-          ),
+          _Section(label: 'Déjà vu', entries: watched, keyPrefix: 'watched'),
       ],
     );
   }
@@ -149,10 +143,7 @@ class _Section extends StatelessWidget {
           ),
         ),
         for (final e in entries)
-          WishlistCard(
-            key: ValueKey('$keyPrefix-${e.watcharrId}'),
-            entry: e,
-          ),
+          WishlistCard(key: ValueKey('$keyPrefix-${e.watcharrId}'), entry: e),
       ],
     );
   }
@@ -183,9 +174,9 @@ class _EmptyState extends StatelessWidget {
           "Tape sur « Ajouter » en bas à droite pour rechercher un "
           "film ou une série et l'ajouter à ta liste.",
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).hintColor,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: Theme.of(context).hintColor),
         ),
       ],
     );
@@ -208,11 +199,7 @@ class _ErrorView extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       children: [
         const SizedBox(height: 80),
-        Icon(
-          Icons.error_outline,
-          size: 56,
-          color: theme.colorScheme.error,
-        ),
+        Icon(Icons.error_outline, size: 56, color: theme.colorScheme.error),
         const SizedBox(height: 16),
         Text(
           'Impossible de charger la liste',
@@ -228,9 +215,8 @@ class _ErrorView extends StatelessWidget {
         const SizedBox(height: 16),
         Center(
           child: FilledButton.tonalIcon(
-            onPressed: () => ref
-                .read(wishlistControllerProvider.notifier)
-                .refresh(),
+            onPressed: () =>
+                ref.read(wishlistControllerProvider.notifier).refresh(),
             icon: const Icon(Icons.refresh),
             label: const Text('Réessayer'),
           ),
@@ -248,11 +234,7 @@ class _NotConfiguredState extends StatelessWidget {
       padding: const EdgeInsets.all(24),
       children: [
         const SizedBox(height: 80),
-        Icon(
-          Icons.link_off,
-          size: 56,
-          color: theme.hintColor,
-        ),
+        Icon(Icons.link_off, size: 56, color: theme.hintColor),
         const SizedBox(height: 16),
         Text(
           'Liste d\'envies non activée',
@@ -264,9 +246,7 @@ class _NotConfiguredState extends StatelessWidget {
           "Cette fonctionnalité nécessite un compte Watcharr associé à "
           "ton numéro. Demande à l'admin de l'activer.",
           textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.hintColor,
-          ),
+          style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
         ),
       ],
     );

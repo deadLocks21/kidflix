@@ -67,20 +67,20 @@ typedef _DownloadView = ({
 });
 
 _DownloadView _viewFromMovie(MovieDownloadDto d) => (
-      status: d.status,
-      bytesReceived: d.bytesReceived,
-      bytesTotal: d.bytesTotal,
-      localPath: d.localPath,
-      errorMessage: d.errorMessage,
-    );
+  status: d.status,
+  bytesReceived: d.bytesReceived,
+  bytesTotal: d.bytesTotal,
+  localPath: d.localPath,
+  errorMessage: d.errorMessage,
+);
 
 _DownloadView _viewFromEpisode(EpisodeDownloadDto d) => (
-      status: d.status,
-      bytesReceived: d.bytesReceived,
-      bytesTotal: d.bytesTotal,
-      localPath: d.localPath,
-      errorMessage: d.errorMessage,
-    );
+  status: d.status,
+  bytesReceived: d.bytesReceived,
+  bytesTotal: d.bytesTotal,
+  localPath: d.localPath,
+  errorMessage: d.errorMessage,
+);
 
 /// Fullscreen player page. Orchestrates the download → play pipeline,
 /// the resume dialog, progress saves, and wires media_kit's built-in
@@ -107,10 +107,10 @@ class PlayerPage extends ConsumerStatefulWidget {
     required String movieId,
     PlayerEngineFactory engineFactory = defaultPlayerEngineFactory,
   }) : this(
-          key: key,
-          media: PlayerMediaRef.movie(movieId),
-          engineFactory: engineFactory,
-        );
+         key: key,
+         media: PlayerMediaRef.movie(movieId),
+         engineFactory: engineFactory,
+       );
 
   /// Convenience constructor for the new episode-based route.
   PlayerPage.episode({
@@ -119,13 +119,10 @@ class PlayerPage extends ConsumerStatefulWidget {
     SeriesPlaybackContext? seriesContext,
     PlayerEngineFactory engineFactory = defaultPlayerEngineFactory,
   }) : this(
-          key: key,
-          media: PlayerMediaRef.episode(
-            episodeId,
-            seriesContext: seriesContext,
-          ),
-          engineFactory: engineFactory,
-        );
+         key: key,
+         media: PlayerMediaRef.episode(episodeId, seriesContext: seriesContext),
+         engineFactory: engineFactory,
+       );
 
   @override
   ConsumerState<PlayerPage> createState() => _PlayerPageState();
@@ -267,8 +264,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     final session = ref.read(sessionControllerProvider);
     if (session is ProfileSelected) {
       _profileId = session.profile.id;
-      _mainProfile =
-          session.session.profiles.where((p) => p.isMain).firstOrNull;
+      _mainProfile = session.session.profiles
+          .where((p) => p.isMain)
+          .firstOrNull;
     }
 
     // Load persisted track preferences for the current profile so the
@@ -304,14 +302,16 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
 
   Future<_DownloadView?> _findExistingDownload() async {
     return switch (_currentMedia) {
-      PlayerMovieRef(:final movieId) => await ref
-          .read(findMovieDownloadUseCaseProvider)
-          .execute(movieId)
-          .then((d) => d == null ? null : _viewFromMovie(d)),
-      PlayerEpisodeRef(:final episodeId) => await ref
-          .read(findEpisodeDownloadUseCaseProvider)
-          .execute(episodeId)
-          .then((d) => d == null ? null : _viewFromEpisode(d)),
+      PlayerMovieRef(:final movieId) =>
+        await ref
+            .read(findMovieDownloadUseCaseProvider)
+            .execute(movieId)
+            .then((d) => d == null ? null : _viewFromMovie(d)),
+      PlayerEpisodeRef(:final episodeId) =>
+        await ref
+            .read(findEpisodeDownloadUseCaseProvider)
+            .execute(episodeId)
+            .then((d) => d == null ? null : _viewFromEpisode(d)),
     };
   }
 
@@ -342,14 +342,16 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         }
         if (series == null) {
           // Legacy/fallback: no context → walk the series catalog.
-          final catalog =
-              await ref.read(catalogRepositoryProvider).listCatalog();
+          final catalog = await ref
+              .read(catalogRepositoryProvider)
+              .listCatalog();
           final seriesRepo = ref.read(seriesRepositoryProvider);
           for (final item in catalog.whereType<Series>()) {
             try {
               final full = await seriesRepo.findById(item.id);
-              if (full.seasons
-                  .any((s) => s.episodes.any((e) => e.id == episodeId))) {
+              if (full.seasons.any(
+                (s) => s.episodes.any((e) => e.id == episodeId),
+              )) {
                 series = full;
                 break;
               }
@@ -390,17 +392,17 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         _movieDownloadSub = useCase
             .execute(movieId, activeProfileId: _profileId)
             .listen(
-          (dto) => _onDownloadEvent(_viewFromMovie(dto)),
-          onError: _onDownloadError,
-        );
+              (dto) => _onDownloadEvent(_viewFromMovie(dto)),
+              onError: _onDownloadError,
+            );
       case PlayerEpisodeRef(:final episodeId):
         final useCase = ref.read(startEpisodeDownloadUseCaseProvider);
         _episodeDownloadSub = useCase
             .execute(episodeId, activeProfileId: _profileId)
             .listen(
-          (dto) => _onDownloadEvent(_viewFromEpisode(dto)),
-          onError: _onDownloadError,
-        );
+              (dto) => _onDownloadEvent(_viewFromEpisode(dto)),
+              onError: _onDownloadError,
+            );
     }
   }
 
@@ -450,8 +452,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       final previous = _lastObservedPosition;
       setState(() => _position = p);
       _lastObservedPosition = p;
-      if (previous != null &&
-          (p - previous).abs() > _seekDetectionThreshold) {
+      if (previous != null && (p - previous).abs() > _seekDetectionThreshold) {
         // Seek detected (user scrub) — flush position out-of-band so
         // multi-device clients see it without waiting up to 10s.
         unawaited(_saveProgressNow());
@@ -520,7 +521,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   void _applyInitialTrackPreferences() {
     final engine = _engine;
     if (engine == null) return;
-    final selection = ref.read(pickInitialTracksUseCaseProvider).execute(
+    final selection = ref
+        .read(pickInitialTracksUseCaseProvider)
+        .execute(
           audio: _audioTracksNotifier.value,
           subtitle: _subtitleTracksNotifier.value,
           preferences: _trackPreferences,
@@ -557,13 +560,13 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     final progressRepo = ref.read(watchProgressRepositoryProvider);
     final progress = switch (_currentMedia) {
       PlayerMovieRef(:final movieId) => await progressRepo.findForMovie(
-          profileId: session.profile.id,
-          movieId: movieId,
-        ),
+        profileId: session.profile.id,
+        movieId: movieId,
+      ),
       PlayerEpisodeRef(:final episodeId) => await progressRepo.findForEpisode(
-          profileId: session.profile.id,
-          episodeId: episodeId,
-        ),
+        profileId: session.profile.id,
+        episodeId: episodeId,
+      ),
     };
     if (progress == null ||
         progress.positionSeconds < _resumeMinSeconds ||
@@ -951,7 +954,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
             .read(watchProgressRepositoryProvider)
             .listForProfile(profileId);
         final ownIds = {
-          for (final s in series.seasons) for (final e in s.episodes) e.id,
+          for (final s in series.seasons)
+            for (final e in s.episodes) e.id,
         };
         byId = {
           for (final p in entries.whereType<EpisodeProgress>())
@@ -1031,9 +1035,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     if (profileId == null) return;
     final next = (_trackPreferences ?? TrackPreferences(profileId: profileId))
         .copyWith(
-      audioLanguage: language,
-      clearAudioLanguage: language == null,
-    );
+          audioLanguage: language,
+          clearAudioLanguage: language == null,
+        );
     _trackPreferences = next;
     try {
       await ref.read(saveTrackPreferencesUseCaseProvider).execute(next);
@@ -1050,10 +1054,10 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     if (profileId == null) return;
     final next = (_trackPreferences ?? TrackPreferences(profileId: profileId))
         .copyWith(
-      subtitleLanguage: language,
-      clearSubtitleLanguage: language == null,
-      subtitlesDisabled: disabled,
-    );
+          subtitleLanguage: language,
+          clearSubtitleLanguage: language == null,
+          subtitlesDisabled: disabled,
+        );
     _trackPreferences = next;
     try {
       await ref.read(saveTrackPreferencesUseCaseProvider).execute(next);
@@ -1073,14 +1077,14 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   }
 
   List<Widget> _topButtonBar() => [
-        IconButton(
-          icon: const Icon(Icons.close, color: Colors.white),
-          tooltip: 'Fermer',
-          onPressed: _onClose,
-        ),
-        const SizedBox(width: 8),
-        Expanded(child: _titleText()),
-      ];
+    IconButton(
+      icon: const Icon(Icons.close, color: Colors.white),
+      tooltip: 'Fermer',
+      onPressed: _onClose,
+    ),
+    const SizedBox(width: 8),
+    Expanded(child: _titleText()),
+  ];
 
   /// `true` when the current playback should expose series-aware
   /// controls (prev/next around play, picker near fullscreen).
@@ -1109,9 +1113,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   Widget _audioTrackButton() {
     return ValueListenableBuilder<List<MediaTrack>>(
       valueListenable: _audioTracksNotifier,
-      builder: (_, tracks, _) => AudioTrackButton(
-        onTap: tracks.length > 1 ? _onAudioTrackTap : null,
-      ),
+      builder: (_, tracks, _) =>
+          AudioTrackButton(onTap: tracks.length > 1 ? _onAudioTrackTap : null),
     );
   }
 
@@ -1128,9 +1131,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       builder: (_, _) {
         final tracks = _subtitleTracksNotifier.value;
         final selectedId = _selectedSubtitleIdNotifier.value;
-        final isActive = selectedId != null &&
-            selectedId != 'no' &&
-            selectedId != 'auto';
+        final isActive =
+            selectedId != null && selectedId != 'no' && selectedId != 'auto';
         return SubtitleTrackButton(
           onTap: tracks.isNotEmpty ? _onSubtitleTrackTap : null,
           active: isActive,
@@ -1142,11 +1144,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   List<Widget> _lockedTopButtonBar() => [Expanded(child: _titleText())];
 
   Widget _titleText() => Text(
-        _mediaTitle ?? '',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(color: Colors.white, fontSize: 16),
-      );
+    _mediaTitle ?? '',
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
+    style: const TextStyle(color: Colors.white, fontSize: 16),
+  );
 
   EdgeInsets _safeInsets(BuildContext context) {
     if (defaultTargetPlatform == TargetPlatform.iOS) {
@@ -1257,23 +1259,21 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   /// above the bottom button row, both inside a Column that fills the
   /// bumped `buttonBarHeight`.
   List<Widget> _seekBarOverButtons(List<Widget> buttons) => [
-        Expanded(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.end,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              BufferedSeekBar(
-                downloadedFraction: _downloadedFractionNotifier,
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.max,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: buttons,
-              ),
-            ],
+    Expanded(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          BufferedSeekBar(downloadedFraction: _downloadedFractionNotifier),
+          Row(
+            mainAxisSize: MainAxisSize.max,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: buttons,
           ),
-        ),
-      ];
+        ],
+      ),
+    ),
+  ];
 
   MaterialDesktopVideoControlsThemeData _buildDesktopTheme(
     BuildContext context,
@@ -1382,10 +1382,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: _buildBody(),
-    );
+    return Scaffold(backgroundColor: Colors.black, body: _buildBody());
   }
 
   /// Three-zone tap layer rendered above the desktop controls. The
@@ -1404,9 +1401,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
                   unawaited(_seekRelative(-_doubleTapBackwardDuration)),
             ),
           ),
-          const Expanded(
-            child: SizedBox.expand(),
-          ),
+          const Expanded(child: SizedBox.expand()),
           Expanded(
             child: GestureDetector(
               behavior: HitTestBehavior.translucent,
@@ -1469,4 +1464,3 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     );
   }
 }
-

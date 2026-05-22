@@ -16,8 +16,8 @@ class StartEpisodeDownloadUseCase {
   const StartEpisodeDownloadUseCase({
     required DownloadRepository repository,
     required DownloadManifestStore manifest,
-  })  : _repository = repository,
-        _manifest = manifest;
+  }) : _repository = repository,
+       _manifest = manifest;
 
   Stream<EpisodeDownloadDto> execute(
     String episodeId, {
@@ -35,8 +35,10 @@ class StartEpisodeDownloadUseCase {
   ) async {
     try {
       final now = DateTime.now();
-      final existing =
-          await _manifest.findFor(mediaId: episodeId, isEpisode: true);
+      final existing = await _manifest.findFor(
+        mediaId: episodeId,
+        isEpisode: true,
+      );
       if (existing == null) {
         await _manifest.upsert(
           mediaId: episodeId,

@@ -20,18 +20,15 @@ void main() {
 
     test('contains the expected variants by name', () {
       final names = CatalogRowType.values.map((e) => e.name).toSet();
-      expect(
-        names,
-        {
-          'continueWatching',
-          'recentlyAdded',
-          'favorites',
-          'saga',
-          'genre',
-          'neverWatched',
-          'downloaded',
-        },
-      );
+      expect(names, {
+        'continueWatching',
+        'recentlyAdded',
+        'favorites',
+        'saga',
+        'genre',
+        'neverWatched',
+        'downloaded',
+      });
     });
   });
 }

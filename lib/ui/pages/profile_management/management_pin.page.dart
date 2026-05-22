@@ -92,73 +92,77 @@ class _ManagementPinPageState extends ConsumerState<ManagementPinPage>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                Text(
-                  'Saisis le code du profil principal\npour gérer les profils',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 48),
-                AnimatedBuilder(
-                  animation: _shake,
-                  builder: (context, child) {
-                    final t = _shake.value;
-                    final dx = t == 0 ? 0.0 : 8 * (1 - t) * (t < 0.5 ? 1 : -1);
-                    return Transform.translate(
-                      offset: Offset(dx, 0),
-                      child: child,
-                    );
-                  },
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(_pinLength, (i) {
-                      final isFilled = i < filled;
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 120),
-                          width: 20,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: isFilled
-                                ? theme.colorScheme.primary
-                                : Colors.transparent,
-                            border: Border.all(
-                              color: theme.colorScheme.primary,
-                              width: 2,
+                    Text(
+                      'Saisis le code du profil principal\npour gérer les profils',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 48),
+                    AnimatedBuilder(
+                      animation: _shake,
+                      builder: (context, child) {
+                        final t = _shake.value;
+                        final dx = t == 0
+                            ? 0.0
+                            : 8 * (1 - t) * (t < 0.5 ? 1 : -1);
+                        return Transform.translate(
+                          offset: Offset(dx, 0),
+                          child: child,
+                        );
+                      },
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(_pinLength, (i) {
+                          final isFilled = i < filled;
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 120),
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isFilled
+                                    ? theme.colorScheme.primary
+                                    : Colors.transparent,
+                                border: Border.all(
+                                  color: theme.colorScheme.primary,
+                                  width: 2,
+                                ),
+                              ),
                             ),
-                          ),
+                          );
+                        }),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: 1,
+                      height: 1,
+                      child: TextField(
+                        controller: _controller,
+                        focusNode: _focusNode,
+                        autofocus: true,
+                        keyboardType: TextInputType.number,
+                        obscureText: true,
+                        maxLength: _pinLength,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          counterText: '',
                         ),
-                      );
-                    }),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: 1,
-                  height: 1,
-                  child: TextField(
-                    controller: _controller,
-                    focusNode: _focusNode,
-                    autofocus: true,
-                    keyboardType: TextInputType.number,
-                    obscureText: true,
-                    maxLength: _pinLength,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      counterText: '',
+                        style: const TextStyle(
+                          color: Colors.transparent,
+                          height: 0.01,
+                        ),
+                        cursorColor: Colors.transparent,
+                        enableInteractiveSelection: false,
+                      ),
                     ),
-                    style: const TextStyle(
-                      color: Colors.transparent,
-                      height: 0.01,
-                    ),
-                    cursorColor: Colors.transparent,
-                    enableInteractiveSelection: false,
-                  ),
-                ),
                     const SizedBox(height: 24),
                     if (_isVerifying) const CircularProgressIndicator(),
                   ],

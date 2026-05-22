@@ -59,7 +59,8 @@ class _DownloadEntryTileState extends ConsumerState<DownloadEntryTile> {
                         memCacheWidth:
                             (56 * MediaQuery.devicePixelRatioOf(context))
                                 .round(),
-                        placeholder: (_, _) => Container(color: Colors.grey[300]),
+                        placeholder: (_, _) =>
+                            Container(color: Colors.grey[300]),
                         errorWidget: (_, _, _) =>
                             Container(color: Colors.grey[400]),
                       )
@@ -82,9 +83,7 @@ class _DownloadEntryTileState extends ConsumerState<DownloadEntryTile> {
               formatBytes(entry.bytesOnDisk),
               style: theme.textTheme.bodySmall,
             ),
-            onTap: _busy
-                ? null
-                : () => setState(() => _expanded = !_expanded),
+            onTap: _busy ? null : () => setState(() => _expanded = !_expanded),
           ),
           if (_expanded)
             Padding(
@@ -94,12 +93,14 @@ class _DownloadEntryTileState extends ConsumerState<DownloadEntryTile> {
                 children: [
                   TextButton.icon(
                     onPressed: _busy ? null : () => _toggleKind(context),
-                    icon: Icon(widget.isInDownloadsSection
-                        ? Icons.bookmark_remove_outlined
-                        : Icons.bookmark_add_outlined),
-                    label: Text(widget.isInDownloadsSection
-                        ? 'Ne plus garder'
-                        : 'Garder'),
+                    icon: Icon(
+                      widget.isInDownloadsSection
+                          ? Icons.bookmark_remove_outlined
+                          : Icons.bookmark_add_outlined,
+                    ),
+                    label: Text(
+                      widget.isInDownloadsSection ? 'Ne plus garder' : 'Garder',
+                    ),
                   ),
                   const SizedBox(width: 8),
                   TextButton.icon(
@@ -159,12 +160,16 @@ class _DownloadEntryTileState extends ConsumerState<DownloadEntryTile> {
     setState(() => _busy = true);
     try {
       if (widget.isInDownloadsSection) {
-        await ref.read(markAsCacheUseCaseProvider).execute(
+        await ref
+            .read(markAsCacheUseCaseProvider)
+            .execute(
               mediaId: widget.entry.mediaId,
               isEpisode: widget.entry.isEpisode,
             );
       } else {
-        await ref.read(markAsDownloadUseCaseProvider).execute(
+        await ref
+            .read(markAsDownloadUseCaseProvider)
+            .execute(
               mediaId: widget.entry.mediaId,
               isEpisode: widget.entry.isEpisode,
             );

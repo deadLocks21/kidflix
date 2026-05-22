@@ -15,24 +15,26 @@ void main() {
     expect(await repo.findForProfile('unknown'), isNull);
   });
 
-  test('round-trips audio + subtitle languages and the disabled flag',
-      () async {
-    final repo = SharedPrefsTrackPreferencesRepository();
-    await repo.save(
-      const TrackPreferences(
-        profileId: 'p1',
-        audioLanguage: 'fr',
-        subtitleLanguage: 'en',
-        subtitlesDisabled: true,
-      ),
-    );
+  test(
+    'round-trips audio + subtitle languages and the disabled flag',
+    () async {
+      final repo = SharedPrefsTrackPreferencesRepository();
+      await repo.save(
+        const TrackPreferences(
+          profileId: 'p1',
+          audioLanguage: 'fr',
+          subtitleLanguage: 'en',
+          subtitlesDisabled: true,
+        ),
+      );
 
-    final loaded = await repo.findForProfile('p1');
-    expect(loaded?.profileId, 'p1');
-    expect(loaded?.audioLanguage, 'fr');
-    expect(loaded?.subtitleLanguage, 'en');
-    expect(loaded?.subtitlesDisabled, isTrue);
-  });
+      final loaded = await repo.findForProfile('p1');
+      expect(loaded?.profileId, 'p1');
+      expect(loaded?.audioLanguage, 'fr');
+      expect(loaded?.subtitleLanguage, 'en');
+      expect(loaded?.subtitlesDisabled, isTrue);
+    },
+  );
 
   test('save replaces the previous entry for the same profile', () async {
     final repo = SharedPrefsTrackPreferencesRepository();

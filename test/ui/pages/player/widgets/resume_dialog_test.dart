@@ -29,7 +29,9 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('shows title and labels for a 30-minute progress', (tester) async {
+  testWidgets('shows title and labels for a 30-minute progress', (
+    tester,
+  ) async {
     await pumpDialogHost(
       tester,
       position: const Duration(minutes: 30),

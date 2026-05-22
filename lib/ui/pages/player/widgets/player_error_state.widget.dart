@@ -50,10 +50,7 @@ class PlayerErrorState extends StatelessWidget {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                OutlinedButton(
-                  onPressed: onBack,
-                  child: const Text('Retour'),
-                ),
+                OutlinedButton(onPressed: onBack, child: const Text('Retour')),
                 const SizedBox(width: 12),
                 FilledButton(
                   onPressed: onRetry,

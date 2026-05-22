@@ -106,10 +106,7 @@ class DioProfileManagementRepository implements ProfileManagementRepository {
   }
 
   @override
-  Future<Profile> setPin({
-    required String id,
-    required String rawPin,
-  }) async {
+  Future<Profile> setPin({required String id, required String rawPin}) async {
     try {
       final response = await _dio.put<Map<String, dynamic>>(
         '/profiles/$id/pin',

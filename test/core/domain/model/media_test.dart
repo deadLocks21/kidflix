@@ -120,13 +120,15 @@ void main() {
       expect(_series().seasons, isEmpty);
     });
 
-    test('seasonsCount and episodesCount may differ from local seasons.length',
-        () {
-      final s = _series(seasonsCount: 6, episodesCount: 105);
-      expect(s.seasonsCount, 6);
-      expect(s.episodesCount, 105);
-      expect(s.seasons.length, 0);
-    });
+    test(
+      'seasonsCount and episodesCount may differ from local seasons.length',
+      () {
+        final s = _series(seasonsCount: 6, episodesCount: 105);
+        expect(s.seasonsCount, 6);
+        expect(s.episodesCount, 105);
+        expect(s.seasons.length, 0);
+      },
+    );
 
     test('is a CatalogItem', () {
       final Object s = _series();

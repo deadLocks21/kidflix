@@ -80,32 +80,34 @@ Map<String, dynamic> _movieJson({
 
 void main() {
   group('DioCatalogRepository.listCatalog', () {
-    test('issues GET /catalog with no query parameter and parses envelope',
-        () async {
-      final adapter = _FakeAdapter(
-        (_) => _jsonResponse(200, {
-          'items': [
-            _movieJson(id: 'm1', title: 'Movie 1'),
-            _movieJson(id: 'm2', title: 'Movie 2'),
-          ],
-        }),
-      );
-      final repo = DioCatalogRepository(_makeDio(adapter));
+    test(
+      'issues GET /catalog with no query parameter and parses envelope',
+      () async {
+        final adapter = _FakeAdapter(
+          (_) => _jsonResponse(200, {
+            'items': [
+              _movieJson(id: 'm1', title: 'Movie 1'),
+              _movieJson(id: 'm2', title: 'Movie 2'),
+            ],
+          }),
+        );
+        final repo = DioCatalogRepository(_makeDio(adapter));
 
-      final movies = await repo.listCatalog();
+        final movies = await repo.listCatalog();
 
-      expect(movies, hasLength(2));
-      expect(movies[0].id, 'm1');
-      expect(movies[1].id, 'm2');
-      expect(adapter.requests, hasLength(1));
-      expect(adapter.requests.single.path, '/catalog');
-      expect(adapter.requests.single.method, 'GET');
-      expect(
-        adapter.requests.single.queryParameters,
-        isEmpty,
-        reason: 'no age_category param — server filters via X-Profile-Id',
-      );
-    });
+        expect(movies, hasLength(2));
+        expect(movies[0].id, 'm1');
+        expect(movies[1].id, 'm2');
+        expect(adapter.requests, hasLength(1));
+        expect(adapter.requests.single.path, '/catalog');
+        expect(adapter.requests.single.method, 'GET');
+        expect(
+          adapter.requests.single.queryParameters,
+          isEmpty,
+          reason: 'no age_category param — server filters via X-Profile-Id',
+        );
+      },
+    );
 
     test('preserves backend order (no client-side sort)', () async {
       final adapter = _FakeAdapter(
@@ -193,42 +195,43 @@ void main() {
   });
 
   group('DioCatalogRepository.searchMovies', () {
-    test('issues GET /catalog/search with only the q query parameter',
-        () async {
-      final adapter = _FakeAdapter(
-        (_) => _jsonResponse(200, {
-          'items': [_movieJson(id: 'asterix', title: 'Astérix')],
-        }),
-      );
-      final repo = DioCatalogRepository(_makeDio(adapter));
+    test(
+      'issues GET /catalog/search with only the q query parameter',
+      () async {
+        final adapter = _FakeAdapter(
+          (_) => _jsonResponse(200, {
+            'items': [_movieJson(id: 'asterix', title: 'Astérix')],
+          }),
+        );
+        final repo = DioCatalogRepository(_makeDio(adapter));
 
-      final movies = await repo.searchCatalog(query: 'astérix');
+        final movies = await repo.searchCatalog(query: 'astérix');
 
-      expect(movies, hasLength(1));
-      expect(movies.single.id, 'asterix');
-      expect(adapter.requests.single.path, '/catalog/search');
-      expect(adapter.requests.single.method, 'GET');
-      expect(adapter.requests.single.queryParameters, {'q': 'astérix'});
-      expect(
-        adapter.requests.single.queryParameters,
-        isNot(contains('up_to_age_category')),
-      );
-    });
+        expect(movies, hasLength(1));
+        expect(movies.single.id, 'asterix');
+        expect(adapter.requests.single.path, '/catalog/search');
+        expect(adapter.requests.single.method, 'GET');
+        expect(adapter.requests.single.queryParameters, {'q': 'astérix'});
+        expect(
+          adapter.requests.single.queryParameters,
+          isNot(contains('up_to_age_category')),
+        );
+      },
+    );
 
-    test('passes the query verbatim — no trim, no lowercase, no accent strip',
-        () async {
-      final adapter = _FakeAdapter(
-        (_) => _jsonResponse(200, {'items': <Map<String, dynamic>>[]}),
-      );
-      final repo = DioCatalogRepository(_makeDio(adapter));
+    test(
+      'passes the query verbatim — no trim, no lowercase, no accent strip',
+      () async {
+        final adapter = _FakeAdapter(
+          (_) => _jsonResponse(200, {'items': <Map<String, dynamic>>[]}),
+        );
+        final repo = DioCatalogRepository(_makeDio(adapter));
 
-      await repo.searchCatalog(query: '  ASTÉRIX  ');
+        await repo.searchCatalog(query: '  ASTÉRIX  ');
 
-      expect(
-        adapter.requests.single.queryParameters['q'],
-        '  ASTÉRIX  ',
-      );
-    });
+        expect(adapter.requests.single.queryParameters['q'], '  ASTÉRIX  ');
+      },
+    );
 
     test('forwards an empty query without bail-out', () async {
       final adapter = _FakeAdapter(

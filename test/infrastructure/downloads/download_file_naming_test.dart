@@ -38,25 +38,29 @@ void main() {
 
   group('parseMediaFileName', () {
     test('parses completed and partial media files', () {
-      expect(
-        parseMediaFileName('abc.mp4'),
-        (mediaId: 'abc', ext: 'mp4', isPartial: false),
-      );
-      expect(
-        parseMediaFileName('abc.mkv.partial'),
-        (mediaId: 'abc', ext: 'mkv', isPartial: true),
-      );
-      expect(
-        parseMediaFileName('ep-1.webm'),
-        (mediaId: 'ep-1', ext: 'webm', isPartial: false),
-      );
+      expect(parseMediaFileName('abc.mp4'), (
+        mediaId: 'abc',
+        ext: 'mp4',
+        isPartial: false,
+      ));
+      expect(parseMediaFileName('abc.mkv.partial'), (
+        mediaId: 'abc',
+        ext: 'mkv',
+        isPartial: true,
+      ));
+      expect(parseMediaFileName('ep-1.webm'), (
+        mediaId: 'ep-1',
+        ext: 'webm',
+        isPartial: false,
+      ));
     });
 
     test('strips suffixes from the right so dotted ids survive', () {
-      expect(
-        parseMediaFileName('tt100.5.mp4'),
-        (mediaId: 'tt100.5', ext: 'mp4', isPartial: false),
-      );
+      expect(parseMediaFileName('tt100.5.mp4'), (
+        mediaId: 'tt100.5',
+        ext: 'mp4',
+        isPartial: false,
+      ));
     });
 
     test('is case-insensitive on the extension', () {
@@ -74,14 +78,16 @@ void main() {
 
   group('file-name builders', () {
     test('round-trip through parseMediaFileName', () {
-      expect(
-        parseMediaFileName(mediaFileName('abc', 'mkv')),
-        (mediaId: 'abc', ext: 'mkv', isPartial: false),
-      );
-      expect(
-        parseMediaFileName(partialFileName('abc', 'mkv')),
-        (mediaId: 'abc', ext: 'mkv', isPartial: true),
-      );
+      expect(parseMediaFileName(mediaFileName('abc', 'mkv')), (
+        mediaId: 'abc',
+        ext: 'mkv',
+        isPartial: false,
+      ));
+      expect(parseMediaFileName(partialFileName('abc', 'mkv')), (
+        mediaId: 'abc',
+        ext: 'mkv',
+        isPartial: true,
+      ));
     });
   });
 
@@ -93,17 +99,20 @@ void main() {
       if (dir.existsSync()) dir.deleteSync(recursive: true);
     });
 
-    test('findCompletedMediaFile finds any extension, ignores partial', () async {
-      File('${dir.path}/abc.mkv').writeAsBytesSync([0]);
-      File('${dir.path}/other.mp4.partial').writeAsBytesSync([0]);
+    test(
+      'findCompletedMediaFile finds any extension, ignores partial',
+      () async {
+        File('${dir.path}/abc.mkv').writeAsBytesSync([0]);
+        File('${dir.path}/other.mp4.partial').writeAsBytesSync([0]);
 
-      final found = await findCompletedMediaFile(dir, 'abc');
-      expect(found, isNotNull);
-      expect(found!.path, endsWith('abc.mkv'));
+        final found = await findCompletedMediaFile(dir, 'abc');
+        expect(found, isNotNull);
+        expect(found!.path, endsWith('abc.mkv'));
 
-      expect(await findCompletedMediaFile(dir, 'other'), isNull);
-      expect(await findCompletedMediaFile(dir, 'missing'), isNull);
-    });
+        expect(await findCompletedMediaFile(dir, 'other'), isNull);
+        expect(await findCompletedMediaFile(dir, 'missing'), isNull);
+      },
+    );
 
     test('findPartialMediaFile finds the partial only', () async {
       File('${dir.path}/abc.mkv.partial').writeAsBytesSync([0]);

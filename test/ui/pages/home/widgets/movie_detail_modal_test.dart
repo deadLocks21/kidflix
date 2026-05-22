@@ -34,10 +34,10 @@ MovieDetailDto _detailWith({
 }
 
 Widget _harness(Widget child) => ProviderScope(
-      child: MaterialApp(
-        home: Scaffold(body: SingleChildScrollView(child: child)),
-      ),
-    );
+  child: MaterialApp(
+    home: Scaffold(body: SingleChildScrollView(child: child)),
+  ),
+);
 
 void main() {
   group('MovieDetailContent', () {
@@ -57,8 +57,9 @@ void main() {
       await tester.pumpWidget(
         _harness(MovieDetailContent(movie: _detailWith())),
       );
-      final button =
-          tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Lire'));
+      final button = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Lire'),
+      );
       expect(button.onPressed, isNotNull);
     });
 

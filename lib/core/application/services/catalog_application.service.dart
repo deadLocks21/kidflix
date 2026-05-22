@@ -47,9 +47,9 @@ class CatalogApplicationService {
     ResolveContinueWatchingUseCase? continueWatching,
     WatchProgressRepository? watchProgress,
     int dynamicMinItems = 4,
-  })  : _continueWatching = continueWatching,
-        _watchProgress = watchProgress,
-        _dynamicMinItems = dynamicMinItems;
+  }) : _continueWatching = continueWatching,
+       _watchProgress = watchProgress,
+       _dynamicMinItems = dynamicMinItems;
 
   static const int _recentlyAddedCap = 20;
 
@@ -70,7 +70,8 @@ class CatalogApplicationService {
     final cwFuture = _continueWatching == null
         ? Future<List<ContinueWatchingItemDto>>.value(const [])
         : _continueWatching.execute(profile.id);
-    final wpFuture = _watchProgress?.listForProfile(profile.id) ??
+    final wpFuture =
+        _watchProgress?.listForProfile(profile.id) ??
         Future<List<WatchProgress>>.value(const []);
     final results = await Future.wait([itemsFuture, cwFuture, wpFuture]);
     final items = results[0] as List<CatalogItem>;
@@ -98,20 +99,14 @@ class CatalogApplicationService {
     final downloadedDto = _buildDownloadedRowDto(downloads, items, profile.id);
     if (downloadedDto.items.isNotEmpty) fixed.add(downloadedDto);
 
-    final dynamicRows = <CatalogRow>[
-      ..._buildGenreRows(movies, rng),
-    ];
+    final dynamicRows = <CatalogRow>[..._buildGenreRows(movies, rng)];
     final neverWatched = _buildNeverWatchedRow(movies, watchedMovieIds, rng);
     if (neverWatched.items.isNotEmpty) dynamicRows.add(neverWatched);
-    final filteredDynamic = dynamicRows
-        .where((r) => r.items.length >= _dynamicMinItems)
-        .toList()
-      ..shuffle(rng);
+    final filteredDynamic =
+        dynamicRows.where((r) => r.items.length >= _dynamicMinItems).toList()
+          ..shuffle(rng);
 
-    return [
-      ...fixed,
-      ...filteredDynamic.map(_toDto),
-    ];
+    return [...fixed, ...filteredDynamic.map(_toDto)];
   }
 
   List<T> _shuffled<T>(Iterable<T> items, Random rng) {
@@ -190,8 +185,7 @@ class CatalogApplicationService {
   }
 
   CatalogRow _buildRecentlyAddedRowFromAll(List<CatalogItem> items) {
-    final sorted = [...items]
-      ..sort((a, b) => b.addedAt.compareTo(a.addedAt));
+    final sorted = [...items]..sort((a, b) => b.addedAt.compareTo(a.addedAt));
     return CatalogRow(
       label: 'Récemment ajoutés',
       type: CatalogRowType.recentlyAdded,
@@ -308,9 +302,7 @@ class CatalogApplicationService {
     List<CatalogItem> items,
     String activeProfileId,
   ) {
-    final byId = <String, CatalogItem>{
-      for (final it in items) it.id: it,
-    };
+    final byId = <String, CatalogItem>{for (final it in items) it.id: it};
     final seenSeriesIds = <String>{};
     final projected = <CatalogItemDto>[];
     for (final entry in downloads) {
@@ -342,13 +334,11 @@ class CatalogApplicationService {
   CatalogRowDto _toDto(CatalogRow row) => CatalogRowDto(
     label: row.label,
     type: row.type.name,
-    items: row.items
-        .map<CatalogItemDto>(_projectItem)
-        .toList(growable: false),
+    items: row.items.map<CatalogItemDto>(_projectItem).toList(growable: false),
   );
 
   CatalogItemDto _projectItem(CatalogItem item) => switch (item) {
-        Movie() => MovieDto.fromDomain(item),
-        Series() => SeriesDto.fromDomain(item),
-      };
+    Movie() => MovieDto.fromDomain(item),
+    Series() => SeriesDto.fromDomain(item),
+  };
 }

@@ -11,29 +11,35 @@ void main() {
       expect(InMemorySeriesRepository.seed.single.id, 'caminandes');
     });
 
-    test('findById returns the seeded Caminandes with full hierarchy',
-        () async {
-      final caminandes = await repo.findById('caminandes');
-      expect(caminandes.id, 'caminandes');
-      expect(caminandes.title, 'Caminandes');
-      expect(caminandes.ageCategory, AgeCategory.enfant);
-      // Specials + 1 regular season.
-      expect(caminandes.seasons.length, 2);
-      expect(caminandes.seasonsCount, 2);
-      // 1 specials + 3 regular episodes.
-      expect(caminandes.episodesCount, 4);
-    });
+    test(
+      'findById returns the seeded Caminandes with full hierarchy',
+      () async {
+        final caminandes = await repo.findById('caminandes');
+        expect(caminandes.id, 'caminandes');
+        expect(caminandes.title, 'Caminandes');
+        expect(caminandes.ageCategory, AgeCategory.enfant);
+        // Specials + 1 regular season.
+        expect(caminandes.seasons.length, 2);
+        expect(caminandes.seasonsCount, 2);
+        // 1 specials + 3 regular episodes.
+        expect(caminandes.episodesCount, 4);
+      },
+    );
 
-    test('seeded series has Specials season 0 and a regular season 1',
-        () async {
-      final caminandes = await repo.findById('caminandes');
-      final seasonNumbers =
-          caminandes.seasons.map((s) => s.seasonNumber).toSet();
-      expect(seasonNumbers, containsAll([0, 1]));
-      final specials =
-          caminandes.seasons.firstWhere((s) => s.seasonNumber == 0);
-      expect(specials.name, 'Specials');
-    });
+    test(
+      'seeded series has Specials season 0 and a regular season 1',
+      () async {
+        final caminandes = await repo.findById('caminandes');
+        final seasonNumbers = caminandes.seasons
+            .map((s) => s.seasonNumber)
+            .toSet();
+        expect(seasonNumbers, containsAll([0, 1]));
+        final specials = caminandes.seasons.firstWhere(
+          (s) => s.seasonNumber == 0,
+        );
+        expect(specials.name, 'Specials');
+      },
+    );
 
     test('every episode carries its series id and season number', () async {
       final caminandes = await repo.findById('caminandes');

@@ -104,15 +104,14 @@ class FavoriteButton extends ConsumerWidget {
     }
   }
 
-  static bool _isFavorited(
-    List<Favorite> list,
-    FavoriteToggleTarget target,
-  ) {
+  static bool _isFavorited(List<Favorite> list, FavoriteToggleTarget target) {
     return switch (target) {
-      MovieFavoriteTarget(:final movieId) =>
-        list.any((f) => f is MovieFavorite && f.movieId == movieId),
-      SeriesFavoriteTarget(:final seriesId) =>
-        list.any((f) => f is SeriesFavorite && f.seriesId == seriesId),
+      MovieFavoriteTarget(:final movieId) => list.any(
+        (f) => f is MovieFavorite && f.movieId == movieId,
+      ),
+      SeriesFavoriteTarget(:final seriesId) => list.any(
+        (f) => f is SeriesFavorite && f.seriesId == seriesId,
+      ),
     };
   }
 }

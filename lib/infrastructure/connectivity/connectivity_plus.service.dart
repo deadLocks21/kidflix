@@ -24,14 +24,13 @@ import 'package:kidflix/core/domain/services/connectivity.service.dart';
 /// auto-fallback to the offline catalog.
 class ConnectivityPlusService implements ConnectivityService {
   final Connectivity _connectivity;
-  final StreamController<bool> _controller =
-      StreamController<bool>.broadcast();
+  final StreamController<bool> _controller = StreamController<bool>.broadcast();
   StreamSubscription<List<ConnectivityResult>>? _subscription;
   bool _online = true;
   bool _hydrated = false;
 
   ConnectivityPlusService({Connectivity? connectivity})
-      : _connectivity = connectivity ?? Connectivity() {
+    : _connectivity = connectivity ?? Connectivity() {
     try {
       _subscription = _connectivity.onConnectivityChanged.listen(
         _handle,

@@ -29,8 +29,9 @@ Map<String, dynamic> _seriesPayload() => {
 void main() {
   group('RemoteWishlistSearchResultDto.fromJson', () {
     test('parses a movie result not yet in the wishlist', () {
-      final r = RemoteWishlistSearchResultDto.fromJson(_moviePayload())
-          .toDomain();
+      final r = RemoteWishlistSearchResultDto.fromJson(
+        _moviePayload(),
+      ).toDomain();
 
       expect(r.tmdbId, 22);
       expect(r.kind, WishlistItemKind.movie);
@@ -43,8 +44,9 @@ void main() {
     });
 
     test('parses a series result already in the wishlist and catalog', () {
-      final r = RemoteWishlistSearchResultDto.fromJson(_seriesPayload())
-          .toDomain();
+      final r = RemoteWishlistSearchResultDto.fromJson(
+        _seriesPayload(),
+      ).toDomain();
 
       expect(r.tmdbId, 1399);
       expect(r.kind, WishlistItemKind.series);

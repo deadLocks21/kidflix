@@ -60,18 +60,21 @@ void main() {
       expect(episode.isEpisode, isTrue);
     });
 
-    test('"Vidéo inconnue" fallback is just a literal — no special handling', () {
-      final unresolved = DownloadEntry(
-        mediaId: 'orphan',
-        mediaKind: DownloadMediaKind.movie,
-        kind: DownloadKind.cache,
-        bytesOnDisk: 12345,
-        displayTitle: 'Vidéo inconnue',
-      );
-      expect(unresolved.displayTitle, equals('Vidéo inconnue'));
-      expect(unresolved.displayPosterUrl, isNull);
-      expect(unresolved.parentSeriesTitle, isNull);
-    });
+    test(
+      '"Vidéo inconnue" fallback is just a literal — no special handling',
+      () {
+        final unresolved = DownloadEntry(
+          mediaId: 'orphan',
+          mediaKind: DownloadMediaKind.movie,
+          kind: DownloadKind.cache,
+          bytesOnDisk: 12345,
+          displayTitle: 'Vidéo inconnue',
+        );
+        expect(unresolved.displayTitle, equals('Vidéo inconnue'));
+        expect(unresolved.displayPosterUrl, isNull);
+        expect(unresolved.parentSeriesTitle, isNull);
+      },
+    );
 
     test('parentSeriesTitle is set for episodes', () {
       final entry = DownloadEntry(

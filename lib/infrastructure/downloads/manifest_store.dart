@@ -16,10 +16,10 @@ enum ManifestEntryKind {
   series;
 
   String get pathSegment => switch (this) {
-        ManifestEntryKind.movie => 'movies',
-        ManifestEntryKind.episode => 'episodes',
-        ManifestEntryKind.series => 'series',
-      };
+    ManifestEntryKind.movie => 'movies',
+    ManifestEntryKind.episode => 'episodes',
+    ManifestEntryKind.series => 'series',
+  };
 
   static ManifestEntryKind? fromPathSegment(String segment) =>
       switch (segment) {
@@ -86,10 +86,7 @@ abstract interface class DownloadManifestStore {
     required DownloadManifestEntry entry,
   });
 
-  Future<void> remove({
-    required String mediaId,
-    required bool isEpisode,
-  });
+  Future<void> remove({required String mediaId, required bool isEpisode});
 
   /// Returns every record across all three namespaces (movies, episodes,
   /// series). Consumers should switch on [DownloadManifestRecord.kind]
@@ -108,10 +105,7 @@ abstract interface class DownloadManifestStore {
   /// captured at the moment a parent series modal opens or one of its
   /// episodes is downloaded, so the offline home can rebuild the series
   /// card and detail modal.
-  Future<void> upsertSeries(
-    String seriesId,
-    DownloadManifestEntry entry,
-  );
+  Future<void> upsertSeries(String seriesId, DownloadManifestEntry entry);
 
   /// Removes the series snapshot for [seriesId]. Idempotent.
   Future<void> removeSeries(String seriesId);
@@ -154,9 +148,12 @@ class JsonFileDownloadManifestStore implements DownloadManifestStore {
     await _lock.synchronized(() async {
       final cache = await _ensureLoadedUnlocked();
       cache[_keyFor(
-        mediaId: mediaId,
-        kind: isEpisode ? ManifestEntryKind.episode : ManifestEntryKind.movie,
-      )] = entry;
+            mediaId: mediaId,
+            kind: isEpisode
+                ? ManifestEntryKind.episode
+                : ManifestEntryKind.movie,
+          )] =
+          entry;
       await _persistUnlocked(cache);
     });
   }
@@ -168,10 +165,12 @@ class JsonFileDownloadManifestStore implements DownloadManifestStore {
   }) async {
     await _lock.synchronized(() async {
       final cache = await _ensureLoadedUnlocked();
-      final removed = cache.remove(_keyFor(
-        mediaId: mediaId,
-        kind: isEpisode ? ManifestEntryKind.episode : ManifestEntryKind.movie,
-      ));
+      final removed = cache.remove(
+        _keyFor(
+          mediaId: mediaId,
+          kind: isEpisode ? ManifestEntryKind.episode : ManifestEntryKind.movie,
+        ),
+      );
       if (removed != null) {
         await _persistUnlocked(cache);
       }
@@ -188,11 +187,9 @@ class JsonFileDownloadManifestStore implements DownloadManifestStore {
       final kind = ManifestEntryKind.fromPathSegment(parts.first);
       if (kind == null) continue;
       final mediaId = parts.skip(1).join('/');
-      records.add(DownloadManifestRecord(
-        mediaId: mediaId,
-        kind: kind,
-        entry: e.value,
-      ));
+      records.add(
+        DownloadManifestRecord(mediaId: mediaId, kind: kind, entry: e.value),
+      );
     }
     return List.unmodifiable(records);
   }
@@ -258,9 +255,7 @@ class JsonFileDownloadManifestStore implements DownloadManifestStore {
       _cache = decoded.map((k, v) {
         return MapEntry(
           k,
-          DownloadManifestEntry.fromJson(
-            (v as Map).cast<String, dynamic>(),
-          ),
+          DownloadManifestEntry.fromJson((v as Map).cast<String, dynamic>()),
         );
       });
       return _cache!;

@@ -55,13 +55,25 @@ void main() {
 
   test('sorts each list by lastPlayedAt descending; nulls go last', () async {
     final repo = _StubRepo([
-      _record('a', false,
-          kind: DownloadKind.cache, lastPlayed: DateTime.utc(2026, 5, 1)),
-      _record('b', false,
-          kind: DownloadKind.cache, lastPlayed: DateTime.utc(2026, 5, 4)),
+      _record(
+        'a',
+        false,
+        kind: DownloadKind.cache,
+        lastPlayed: DateTime.utc(2026, 5, 1),
+      ),
+      _record(
+        'b',
+        false,
+        kind: DownloadKind.cache,
+        lastPlayed: DateTime.utc(2026, 5, 4),
+      ),
       _record('c', false, kind: DownloadKind.cache, lastPlayed: null),
-      _record('d', false,
-          kind: DownloadKind.cache, lastPlayed: DateTime.utc(2026, 5, 2)),
+      _record(
+        'd',
+        false,
+        kind: DownloadKind.cache,
+        lastPlayed: DateTime.utc(2026, 5, 2),
+      ),
     ]);
     final useCase = ListDownloadsUseCase(
       repository: repo,
@@ -128,33 +140,31 @@ DownloadInventoryRecord _record(
   bool isEpisode, {
   required DownloadKind kind,
   DateTime? lastPlayed,
-}) =>
-    DownloadInventoryRecord(
-      mediaId: id,
-      isEpisode: isEpisode,
-      bytesOnDisk: 100,
-      kind: kind,
-      lastPlayedAt: lastPlayed,
-    );
+}) => DownloadInventoryRecord(
+  mediaId: id,
+  isEpisode: isEpisode,
+  bytesOnDisk: 100,
+  kind: kind,
+  lastPlayedAt: lastPlayed,
+);
 
 Movie _movie({
   required String id,
   required String title,
   required String? poster,
-}) =>
-    Movie(
-      id: id,
-      title: title,
-      year: 2025,
-      duration: const Duration(minutes: 90),
-      synopsis: '',
-      ageCategory: AgeCategory.enfant,
-      genres: const [],
-      director: const [],
-      cast: const [],
-      addedAt: DateTime.utc(2026, 1, 1),
-      posterUrl: poster,
-    );
+}) => Movie(
+  id: id,
+  title: title,
+  year: 2025,
+  duration: const Duration(minutes: 90),
+  synopsis: '',
+  ageCategory: AgeCategory.enfant,
+  genres: const [],
+  director: const [],
+  cast: const [],
+  addedAt: DateTime.utc(2026, 1, 1),
+  posterUrl: poster,
+);
 
 class _StubRepo implements DownloadRepository {
   final List<DownloadInventoryRecord> inventory;
@@ -196,10 +206,7 @@ class _StubRepo implements DownloadRepository {
   Future<void> setEpisodeKind(String episodeId, DownloadKind kind) =>
       throw UnimplementedError();
   @override
-  Future<void> markPlayed({
-    required String mediaId,
-    required bool isEpisode,
-  }) =>
+  Future<void> markPlayed({required String mediaId, required bool isEpisode}) =>
       throw UnimplementedError();
 }
 

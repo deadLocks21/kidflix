@@ -71,16 +71,17 @@ class SignozLoggerService implements LoggerService {
     this.maxBatchSize = 50,
     this.maxQueueSize = 500,
     Dio? dio,
-  }) : _dio = dio ??
-            Dio(
-              BaseOptions(
-                connectTimeout: const Duration(seconds: 5),
-                sendTimeout: const Duration(seconds: 10),
-                receiveTimeout: const Duration(seconds: 10),
-                contentType: 'application/json',
-                responseType: ResponseType.plain,
-              ),
-            ) {
+  }) : _dio =
+           dio ??
+           Dio(
+             BaseOptions(
+               connectTimeout: const Duration(seconds: 5),
+               sendTimeout: const Duration(seconds: 10),
+               receiveTimeout: const Duration(seconds: 10),
+               contentType: 'application/json',
+               responseType: ResponseType.plain,
+             ),
+           ) {
     _timer = Timer.periodic(flushInterval, (_) => unawaited(flush()));
   }
 
@@ -157,9 +158,7 @@ class SignozLoggerService implements LoggerService {
     return {
       'resourceLogs': [
         {
-          'resource': {
-            'attributes': _otlpAttributes(resourceAttributes),
-          },
+          'resource': {'attributes': _otlpAttributes(resourceAttributes)},
           'scopeLogs': [
             {
               'scope': {'name': 'kidflix.app'},

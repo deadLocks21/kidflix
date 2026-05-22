@@ -291,8 +291,7 @@ class SessionController extends _$SessionController {
     final current = state;
     return switch (current) {
       ManagingProfiles() => current.session,
-      ProfileSelected() when current.profile.id == profileId =>
-        current.session,
+      ProfileSelected() when current.profile.id == profileId => current.session,
       _ => null,
     };
   }
@@ -485,10 +484,14 @@ class SessionController extends _$SessionController {
     await ref.read(sessionRepositoryProvider).write(next);
     state = switch (current) {
       Authenticated() => Authenticated(next),
-      PinRequired(:final profile) =>
-        PinRequired(profile: profile, session: next),
-      ProfileSelected(:final profile) =>
-        ProfileSelected(profile: profile, session: next),
+      PinRequired(:final profile) => PinRequired(
+        profile: profile,
+        session: next,
+      ),
+      ProfileSelected(:final profile) => ProfileSelected(
+        profile: profile,
+        session: next,
+      ),
       ManagementPinRequired() => ManagementPinRequired(next),
       ManagingProfiles() => ManagingProfiles(next),
       Anonymous() || OtpRequested() => current,
@@ -549,9 +552,7 @@ Future<void> bootstrap(Ref ref) async {
   final controller = ref.read(sessionControllerProvider.notifier);
   final restoredState = ref.read(sessionControllerProvider);
   if (restoredState is! Anonymous && restoredState is! OtpRequested) {
-    unawaited(
-      controller.refreshProfiles().catchError((Object _) {}),
-    );
+    unawaited(controller.refreshProfiles().catchError((Object _) {}));
   }
   // Start the watch-progress sync service. Subscribes to connectivity
   // and drains any queued writes once we're online — silent if there

@@ -39,76 +39,78 @@ void main() {
     required DateTime? lastPlayedAt,
   }) async {
     final dir = isEpisode ? 'episodes' : 'movies';
-    File('${tempDir.path}/$dir/$mediaId.mp4')
-        .writeAsBytesSync(List.filled(100, 0));
+    File(
+      '${tempDir.path}/$dir/$mediaId.mp4',
+    ).writeAsBytesSync(List.filled(100, 0));
     await manifest.upsert(
       mediaId: mediaId,
       isEpisode: isEpisode,
-      entry: DownloadManifestEntry(
-        kind: kind,
-        lastPlayedAt: lastPlayedAt,
-      ),
+      entry: DownloadManifestEntry(kind: kind, lastPlayedAt: lastPlayedAt),
     );
   }
 
   group('RepositoryDownloadCleanupService.runCacheCleanup', () {
-    test('removes only stale cache items (kind=cache and lastPlayedAt + 30j < now)',
-        () async {
-      final now = DateTime.utc(2026, 5, 6, 12);
+    test(
+      'removes only stale cache items (kind=cache and lastPlayedAt + 30j < now)',
+      () async {
+        final now = DateTime.utc(2026, 5, 6, 12);
 
-      await seed(
-        mediaId: 'm-keeps-as-download',
-        isEpisode: false,
-        kind: DownloadKind.download,
-        lastPlayedAt: now.subtract(const Duration(days: 60)),
-      );
-      await seed(
-        mediaId: 'm-stale-cache',
-        isEpisode: false,
-        kind: DownloadKind.cache,
-        lastPlayedAt: now.subtract(const Duration(days: 60)),
-      );
-      await seed(
-        mediaId: 'm-fresh-cache',
-        isEpisode: false,
-        kind: DownloadKind.cache,
-        lastPlayedAt: now.subtract(const Duration(days: 5)),
-      );
-      await seed(
-        mediaId: 'e-cache-never-played',
-        isEpisode: true,
-        kind: DownloadKind.cache,
-        lastPlayedAt: null,
-      );
+        await seed(
+          mediaId: 'm-keeps-as-download',
+          isEpisode: false,
+          kind: DownloadKind.download,
+          lastPlayedAt: now.subtract(const Duration(days: 60)),
+        );
+        await seed(
+          mediaId: 'm-stale-cache',
+          isEpisode: false,
+          kind: DownloadKind.cache,
+          lastPlayedAt: now.subtract(const Duration(days: 60)),
+        );
+        await seed(
+          mediaId: 'm-fresh-cache',
+          isEpisode: false,
+          kind: DownloadKind.cache,
+          lastPlayedAt: now.subtract(const Duration(days: 5)),
+        );
+        await seed(
+          mediaId: 'e-cache-never-played',
+          isEpisode: true,
+          kind: DownloadKind.cache,
+          lastPlayedAt: null,
+        );
 
-      final service = RepositoryDownloadCleanupService(repo);
-      final removed = await service.runCacheCleanup(
-        olderThan: const Duration(days: 30),
-        now: now,
-      );
+        final service = RepositoryDownloadCleanupService(repo);
+        final removed = await service.runCacheCleanup(
+          olderThan: const Duration(days: 30),
+          now: now,
+        );
 
-      expect(removed, equals(1));
-      expect(
-        File('${tempDir.path}/movies/m-keeps-as-download.mp4').existsSync(),
-        isTrue,
-        reason: 'download kind preserved',
-      );
-      expect(
-        File('${tempDir.path}/movies/m-stale-cache.mp4').existsSync(),
-        isFalse,
-        reason: 'stale cache deleted',
-      );
-      expect(
-        File('${tempDir.path}/movies/m-fresh-cache.mp4').existsSync(),
-        isTrue,
-        reason: 'fresh cache preserved',
-      );
-      expect(
-        File('${tempDir.path}/episodes/e-cache-never-played.mp4').existsSync(),
-        isTrue,
-        reason: 'never-played cache preserved',
-      );
-    });
+        expect(removed, equals(1));
+        expect(
+          File('${tempDir.path}/movies/m-keeps-as-download.mp4').existsSync(),
+          isTrue,
+          reason: 'download kind preserved',
+        );
+        expect(
+          File('${tempDir.path}/movies/m-stale-cache.mp4').existsSync(),
+          isFalse,
+          reason: 'stale cache deleted',
+        );
+        expect(
+          File('${tempDir.path}/movies/m-fresh-cache.mp4').existsSync(),
+          isTrue,
+          reason: 'fresh cache preserved',
+        );
+        expect(
+          File(
+            '${tempDir.path}/episodes/e-cache-never-played.mp4',
+          ).existsSync(),
+          isTrue,
+          reason: 'never-played cache preserved',
+        );
+      },
+    );
 
     test('is idempotent — second run returns 0', () async {
       final now = DateTime.utc(2026, 5, 6, 12);
@@ -194,9 +196,11 @@ class _ThrowingRepo implements DownloadRepository {
   }
 
   @override
-  dynamic noSuchMethod(Invocation invocation) =>
-      Function.apply(_methodFor(invocation.memberName),
-          invocation.positionalArguments, invocation.namedArguments);
+  dynamic noSuchMethod(Invocation invocation) => Function.apply(
+    _methodFor(invocation.memberName),
+    invocation.positionalArguments,
+    invocation.namedArguments,
+  );
 
   Function _methodFor(Symbol name) {
     return switch (name) {

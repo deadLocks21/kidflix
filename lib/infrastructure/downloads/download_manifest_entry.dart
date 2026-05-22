@@ -170,8 +170,9 @@ class DownloadManifestEntry {
     return DownloadManifestEntry(
       kind: kind ?? this.kind,
       completedAt: clearCompletedAt ? null : (completedAt ?? this.completedAt),
-      lastPlayedAt:
-          clearLastPlayedAt ? null : (lastPlayedAt ?? this.lastPlayedAt),
+      lastPlayedAt: clearLastPlayedAt
+          ? null
+          : (lastPlayedAt ?? this.lastPlayedAt),
       triggeredByProfileId: clearTriggeredByProfileId
           ? null
           : (triggeredByProfileId ?? this.triggeredByProfileId),
@@ -200,40 +201,34 @@ class DownloadManifestEntry {
   }
 
   Map<String, dynamic> toJson() => {
-        'kind': kind.jsonValue,
-        if (completedAt != null) 'completedAt': completedAt!.toIso8601String(),
-        if (lastPlayedAt != null)
-          'lastPlayedAt': lastPlayedAt!.toIso8601String(),
-        if (triggeredByProfileId != null)
-          'triggeredByProfileId': triggeredByProfileId,
-        if (cachedTitle != null) 'cachedTitle': cachedTitle,
-        if (cachedPosterUrl != null) 'cachedPosterUrl': cachedPosterUrl,
-        if (cachedParentSeriesTitle != null)
-          'cachedParentSeriesTitle': cachedParentSeriesTitle,
-        if (cachedOriginalTitle != null)
-          'cachedOriginalTitle': cachedOriginalTitle,
-        if (cachedYear != null) 'cachedYear': cachedYear,
-        if (cachedDurationSeconds != null)
-          'cachedDurationSeconds': cachedDurationSeconds,
-        if (cachedAgeCategory != null) 'cachedAgeCategory': cachedAgeCategory,
-        if (cachedSynopsis != null) 'cachedSynopsis': cachedSynopsis,
-        if (cachedTagline != null) 'cachedTagline': cachedTagline,
-        if (cachedBackdropUrl != null) 'cachedBackdropUrl': cachedBackdropUrl,
-        if (cachedLogoUrl != null) 'cachedLogoUrl': cachedLogoUrl,
-        if (cachedGenres.isNotEmpty) 'cachedGenres': cachedGenres,
-        if (cachedDirector.isNotEmpty) 'cachedDirector': cachedDirector,
-        if (cachedTopCast.isNotEmpty)
-          'cachedTopCast': cachedTopCast.map((c) => c.toJson()).toList(),
-        if (cachedSeriesId != null) 'cachedSeriesId': cachedSeriesId,
-        if (cachedSeasonNumber != null)
-          'cachedSeasonNumber': cachedSeasonNumber,
-        if (cachedEpisodeNumber != null)
-          'cachedEpisodeNumber': cachedEpisodeNumber,
-        if (cachedSeasonsCount != null)
-          'cachedSeasonsCount': cachedSeasonsCount,
-        if (cachedEpisodesCount != null)
-          'cachedEpisodesCount': cachedEpisodesCount,
-      };
+    'kind': kind.jsonValue,
+    if (completedAt != null) 'completedAt': completedAt!.toIso8601String(),
+    if (lastPlayedAt != null) 'lastPlayedAt': lastPlayedAt!.toIso8601String(),
+    if (triggeredByProfileId != null)
+      'triggeredByProfileId': triggeredByProfileId,
+    if (cachedTitle != null) 'cachedTitle': cachedTitle,
+    if (cachedPosterUrl != null) 'cachedPosterUrl': cachedPosterUrl,
+    if (cachedParentSeriesTitle != null)
+      'cachedParentSeriesTitle': cachedParentSeriesTitle,
+    if (cachedOriginalTitle != null) 'cachedOriginalTitle': cachedOriginalTitle,
+    if (cachedYear != null) 'cachedYear': cachedYear,
+    if (cachedDurationSeconds != null)
+      'cachedDurationSeconds': cachedDurationSeconds,
+    if (cachedAgeCategory != null) 'cachedAgeCategory': cachedAgeCategory,
+    if (cachedSynopsis != null) 'cachedSynopsis': cachedSynopsis,
+    if (cachedTagline != null) 'cachedTagline': cachedTagline,
+    if (cachedBackdropUrl != null) 'cachedBackdropUrl': cachedBackdropUrl,
+    if (cachedLogoUrl != null) 'cachedLogoUrl': cachedLogoUrl,
+    if (cachedGenres.isNotEmpty) 'cachedGenres': cachedGenres,
+    if (cachedDirector.isNotEmpty) 'cachedDirector': cachedDirector,
+    if (cachedTopCast.isNotEmpty)
+      'cachedTopCast': cachedTopCast.map((c) => c.toJson()).toList(),
+    if (cachedSeriesId != null) 'cachedSeriesId': cachedSeriesId,
+    if (cachedSeasonNumber != null) 'cachedSeasonNumber': cachedSeasonNumber,
+    if (cachedEpisodeNumber != null) 'cachedEpisodeNumber': cachedEpisodeNumber,
+    if (cachedSeasonsCount != null) 'cachedSeasonsCount': cachedSeasonsCount,
+    if (cachedEpisodesCount != null) 'cachedEpisodesCount': cachedEpisodesCount,
+  };
 
   /// Tolerant parser: any malformed/missing field falls back to its safe
   /// default. Unknown keys in [json] are silently ignored.
@@ -324,19 +319,19 @@ class DownloadManifestEntry {
 
   @override
   int get hashCode => Object.hash(
-        kind,
-        completedAt,
-        lastPlayedAt,
-        triggeredByProfileId,
-        cachedTitle,
-        cachedYear,
-        cachedDurationSeconds,
-        cachedAgeCategory,
-        cachedSynopsis,
-        Object.hashAll(cachedGenres),
-        Object.hashAll(cachedDirector),
-        Object.hashAll(cachedTopCast),
-      );
+    kind,
+    completedAt,
+    lastPlayedAt,
+    triggeredByProfileId,
+    cachedTitle,
+    cachedYear,
+    cachedDurationSeconds,
+    cachedAgeCategory,
+    cachedSynopsis,
+    Object.hashAll(cachedGenres),
+    Object.hashAll(cachedDirector),
+    Object.hashAll(cachedTopCast),
+  );
 
   @override
   String toString() =>
@@ -354,4 +349,3 @@ bool _listEq<T>(List<T> a, List<T> b) {
   }
   return true;
 }
-

@@ -25,9 +25,7 @@ class DownloadsPage extends ConsumerWidget {
     final summaryAsync = ref.watch(storageSummaryProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Téléchargements'),
-      ),
+      appBar: AppBar(title: const Text('Téléchargements')),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
@@ -107,10 +105,9 @@ class _EmptyPlaceholder extends StatelessWidget {
       child: Center(
         child: Text(
           text,
-          style: Theme.of(context)
-              .textTheme
-              .bodyMedium
-              ?.copyWith(color: Theme.of(context).hintColor),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: Theme.of(context).hintColor),
         ),
       ),
     );

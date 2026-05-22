@@ -19,10 +19,7 @@ abstract interface class FavoritesRepository {
   Future<List<Favorite>> listForProfile(String profileId);
 
   /// Adds a movie to the profile's favorites. Idempotent.
-  Future<void> addMovie({
-    required String profileId,
-    required String movieId,
-  });
+  Future<void> addMovie({required String profileId, required String movieId});
 
   /// Removes a movie from the profile's favorites. Idempotent.
   Future<void> removeMovie({
@@ -31,10 +28,7 @@ abstract interface class FavoritesRepository {
   });
 
   /// Adds a series to the profile's favorites. Idempotent.
-  Future<void> addSeries({
-    required String profileId,
-    required String seriesId,
-  });
+  Future<void> addSeries({required String profileId, required String seriesId});
 
   /// Removes a series from the profile's favorites. Idempotent.
   Future<void> removeSeries({

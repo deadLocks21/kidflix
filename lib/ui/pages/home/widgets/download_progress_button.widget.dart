@@ -29,8 +29,9 @@ class DownloadProgressButton extends StatelessWidget {
     final progress = (total != null && total > 0)
         ? (bytesReceived / total).clamp(0.0, 1.0)
         : null;
-    final label =
-        progress != null ? '${(progress * 100).round()} %' : _formatMo(bytesReceived);
+    final label = progress != null
+        ? '${(progress * 100).round()} %'
+        : _formatMo(bytesReceived);
     final cancellable = onCancel != null;
     final button = OutlinedButton(
       onPressed: onCancel,
@@ -51,18 +52,12 @@ class DownloadProgressButton extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          SizedBox(
-            width: 56,
-            child: Text(label, textAlign: TextAlign.end),
-          ),
+          SizedBox(width: 56, child: Text(label, textAlign: TextAlign.end)),
         ],
       ),
     );
     if (!cancellable) return button;
-    return Tooltip(
-      message: 'Annuler le téléchargement',
-      child: button,
-    );
+    return Tooltip(message: 'Annuler le téléchargement', child: button);
   }
 
   static String _formatMo(int bytes) {

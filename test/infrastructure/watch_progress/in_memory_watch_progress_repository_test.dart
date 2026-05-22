@@ -106,63 +106,71 @@ void main() {
         ),
       );
 
-      final found =
-          await repo.findForEpisode(profileId: 'p1', episodeId: 'ep-1');
+      final found = await repo.findForEpisode(
+        profileId: 'p1',
+        episodeId: 'ep-1',
+      );
       expect(found, isNotNull);
       expect(found!.episodeId, 'ep-1');
       expect(found.positionSeconds, 240);
     });
 
-    test('movie and episode with same string id are stored independently',
-        () async {
-      final repo = InMemoryWatchProgressRepository();
-      await repo.save(
-        MovieProgress(
-          profileId: 'p1',
-          movieId: 'x',
-          positionSeconds: 100,
-          completed: false,
-          updatedAt: DateTime.utc(2026, 5, 1),
-        ),
-      );
-      await repo.save(
-        EpisodeProgress(
+    test(
+      'movie and episode with same string id are stored independently',
+      () async {
+        final repo = InMemoryWatchProgressRepository();
+        await repo.save(
+          MovieProgress(
+            profileId: 'p1',
+            movieId: 'x',
+            positionSeconds: 100,
+            completed: false,
+            updatedAt: DateTime.utc(2026, 5, 1),
+          ),
+        );
+        await repo.save(
+          EpisodeProgress(
+            profileId: 'p1',
+            episodeId: 'x',
+            positionSeconds: 50,
+            completed: true,
+            updatedAt: DateTime.utc(2026, 5, 4),
+          ),
+        );
+
+        final movie = await repo.findForMovie(profileId: 'p1', movieId: 'x');
+        final episode = await repo.findForEpisode(
           profileId: 'p1',
           episodeId: 'x',
-          positionSeconds: 50,
-          completed: true,
-          updatedAt: DateTime.utc(2026, 5, 4),
-        ),
-      );
+        );
+        expect(movie!.positionSeconds, 100);
+        expect(movie.completed, isFalse);
+        expect(episode!.positionSeconds, 50);
+        expect(episode.completed, isTrue);
+      },
+    );
 
-      final movie = await repo.findForMovie(profileId: 'p1', movieId: 'x');
-      final episode =
-          await repo.findForEpisode(profileId: 'p1', episodeId: 'x');
-      expect(movie!.positionSeconds, 100);
-      expect(movie.completed, isFalse);
-      expect(episode!.positionSeconds, 50);
-      expect(episode.completed, isTrue);
-    });
+    test(
+      'dismissMovie flips dismissed flag, leaves position untouched',
+      () async {
+        final repo = InMemoryWatchProgressRepository();
+        await repo.save(
+          MovieProgress(
+            profileId: 'p1',
+            movieId: 'nemo',
+            positionSeconds: 1800,
+            completed: false,
+            updatedAt: DateTime.utc(2026, 5, 1),
+          ),
+        );
 
-    test('dismissMovie flips dismissed flag, leaves position untouched',
-        () async {
-      final repo = InMemoryWatchProgressRepository();
-      await repo.save(
-        MovieProgress(
-          profileId: 'p1',
-          movieId: 'nemo',
-          positionSeconds: 1800,
-          completed: false,
-          updatedAt: DateTime.utc(2026, 5, 1),
-        ),
-      );
+        await repo.dismissMovie(profileId: 'p1', movieId: 'nemo');
 
-      await repo.dismissMovie(profileId: 'p1', movieId: 'nemo');
-
-      final found = await repo.findForMovie(profileId: 'p1', movieId: 'nemo');
-      expect(found!.dismissed, isTrue);
-      expect(found.positionSeconds, 1800);
-    });
+        final found = await repo.findForMovie(profileId: 'p1', movieId: 'nemo');
+        expect(found!.dismissed, isTrue);
+        expect(found.positionSeconds, 1800);
+      },
+    );
 
     test('dismissMovie is idempotent and a no-op on unknown pair', () async {
       final repo = InMemoryWatchProgressRepository();
@@ -190,8 +198,7 @@ void main() {
       expect(found!.dismissed, isFalse);
     });
 
-    test('save() resets dismissed to false (server auto-reset rule)',
-        () async {
+    test('save() resets dismissed to false (server auto-reset rule)', () async {
       final repo = InMemoryWatchProgressRepository();
       await repo.save(
         MovieProgress(
@@ -220,36 +227,40 @@ void main() {
       expect(found.positionSeconds, 200);
     });
 
-    test('dismissEpisode is independent of dismissMovie on the same id',
-        () async {
-      final repo = InMemoryWatchProgressRepository();
-      await repo.save(
-        MovieProgress(
-          profileId: 'p1',
-          movieId: 'x',
-          positionSeconds: 10,
-          completed: false,
-          updatedAt: DateTime.utc(2026, 5, 1),
-        ),
-      );
-      await repo.save(
-        EpisodeProgress(
+    test(
+      'dismissEpisode is independent of dismissMovie on the same id',
+      () async {
+        final repo = InMemoryWatchProgressRepository();
+        await repo.save(
+          MovieProgress(
+            profileId: 'p1',
+            movieId: 'x',
+            positionSeconds: 10,
+            completed: false,
+            updatedAt: DateTime.utc(2026, 5, 1),
+          ),
+        );
+        await repo.save(
+          EpisodeProgress(
+            profileId: 'p1',
+            episodeId: 'x',
+            positionSeconds: 20,
+            completed: false,
+            updatedAt: DateTime.utc(2026, 5, 1),
+          ),
+        );
+
+        await repo.dismissEpisode(profileId: 'p1', episodeId: 'x');
+
+        final movie = await repo.findForMovie(profileId: 'p1', movieId: 'x');
+        final episode = await repo.findForEpisode(
           profileId: 'p1',
           episodeId: 'x',
-          positionSeconds: 20,
-          completed: false,
-          updatedAt: DateTime.utc(2026, 5, 1),
-        ),
-      );
-
-      await repo.dismissEpisode(profileId: 'p1', episodeId: 'x');
-
-      final movie = await repo.findForMovie(profileId: 'p1', movieId: 'x');
-      final episode =
-          await repo.findForEpisode(profileId: 'p1', episodeId: 'x');
-      expect(movie!.dismissed, isFalse);
-      expect(episode!.dismissed, isTrue);
-    });
+        );
+        expect(movie!.dismissed, isFalse);
+        expect(episode!.dismissed, isTrue);
+      },
+    );
 
     test('listForProfile returns mixed kinds', () async {
       final repo = InMemoryWatchProgressRepository();

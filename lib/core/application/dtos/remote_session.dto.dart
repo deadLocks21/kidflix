@@ -27,7 +27,9 @@ class RemoteSessionDto {
   factory RemoteSessionDto.fromJson(Map<String, dynamic> json) =>
       RemoteSessionDto(
         jwt: json['jwt'] as String,
-        device: RemoteDeviceDto.fromJson(json['device'] as Map<String, dynamic>),
+        device: RemoteDeviceDto.fromJson(
+          json['device'] as Map<String, dynamic>,
+        ),
         profiles: (json['profiles'] as List<dynamic>)
             .map((e) => RemoteProfileDto.fromJson(e as Map<String, dynamic>))
             .toList(growable: false),
