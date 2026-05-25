@@ -109,6 +109,14 @@ abstract interface class DownloadManifestStore {
 
   /// Removes the series snapshot for [seriesId]. Idempotent.
   Future<void> removeSeries(String seriesId);
+
+  /// Removes every entry across all three namespaces (movies, episodes,
+  /// series) and deletes the backing `manifest.json`. Resets the
+  /// in-memory cache to empty so subsequent reads start from a clean
+  /// slate (a deleted file alone would not suffice — the loaded cache
+  /// would be re-persisted on the next write). Idempotent; best-effort
+  /// on the file deletion.
+  Future<void> clear();
 }
 
 /// JSON-file backed implementation. Lazy-loads the manifest into memory
@@ -221,6 +229,23 @@ class JsonFileDownloadManifestStore implements DownloadManifestStore {
       );
       if (removed != null) {
         await _persistUnlocked(cache);
+      }
+    });
+  }
+
+  @override
+  Future<void> clear() async {
+    await _lock.synchronized(() async {
+      _cache = {};
+      final dir = await _resolveDir();
+      final file = File('${dir.path}/manifest.json');
+      if (await file.exists()) {
+        try {
+          await file.delete();
+        } catch (_) {
+          // Best-effort: the empty in-memory cache already reflects the
+          // cleared state, and the next write rewrites the file from it.
+        }
       }
     });
   }

@@ -4,8 +4,10 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kidflix/core/domain/model/download_kind.dart';
 import 'package:kidflix/core/domain/model/movie_download.dart';
 import 'package:kidflix/infrastructure/downloads/dio.download.repository.dart';
+import 'package:kidflix/infrastructure/downloads/download_manifest_entry.dart';
 import 'package:kidflix/infrastructure/downloads/manifest_store.dart';
 
 DownloadManifestStore _newManifest(Directory dir) =>
@@ -365,6 +367,43 @@ void main() {
       expect(found, isNotNull);
       expect(found!.episodeId, 'ep1');
       expect(found.status, DownloadStatus.complete);
+    });
+  });
+
+  group('DioDownloadRepository.deleteAll', () {
+    test('wipes movies, episodes, partials and the manifest', () async {
+      File(
+        '${tempDir.path}/movies/m1.mp4',
+      ).writeAsBytesSync(List.filled(100, 0));
+      File(
+        '${tempDir.path}/episodes/e1.mp4',
+      ).writeAsBytesSync(List.filled(50, 0));
+      File(
+        '${tempDir.path}/episodes/e1.mp4.partial',
+      ).writeAsBytesSync(List.filled(20, 0));
+      final manifest = _newManifest(tempDir);
+      await manifest.upsertSeries(
+        's1',
+        DownloadManifestEntry(kind: DownloadKind.cache),
+      );
+      final repo = DioDownloadRepository(
+        dio: _newDio(_FakeAdapter(totalBytes: 0), baseUrl: 'http://localhost'),
+        manifest: manifest,
+        downloadsDirectory: tempDir,
+      );
+
+      await repo.deleteAll();
+
+      expect(await repo.listAll(), isEmpty);
+      expect(await repo.totalBytesOnDisk(), equals(0));
+      expect(File('${tempDir.path}/movies/m1.mp4').existsSync(), isFalse);
+      expect(File('${tempDir.path}/episodes/e1.mp4').existsSync(), isFalse);
+      expect(
+        File('${tempDir.path}/episodes/e1.mp4.partial').existsSync(),
+        isFalse,
+      );
+      expect(File('${tempDir.path}/manifest.json').existsSync(), isFalse);
+      expect(await manifest.findForSeries('s1'), isNull);
     });
   });
 }

@@ -47,6 +47,9 @@ class _FakeRepo implements DownloadRepository {
   Future<void> deleteEpisode(String episodeId) async {}
 
   @override
+  Future<void> deleteAll() async {}
+
+  @override
   Future<List<DownloadInventoryRecord>> listAll() async => const [];
   @override
   Future<int> totalBytesOnDisk() async => 0;

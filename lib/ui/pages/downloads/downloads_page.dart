@@ -42,6 +42,8 @@ class DownloadsPage extends ConsumerWidget {
               const SizedBox(height: 24),
               CacheSection(asyncInventory: inventoryAsync, ref: ref),
               const SizedBox(height: 32),
+              _ClearAllSection(asyncInventory: inventoryAsync),
+              const SizedBox(height: 16),
               _CleanupRetentionFooter(),
             ],
           ),
@@ -145,5 +147,95 @@ class _CleanupRetentionFooter extends StatelessWidget {
         textAlign: TextAlign.center,
       ),
     );
+  }
+}
+
+/// Bottom danger zone: wipes every download **and** the whole cache (both
+/// kinds) plus the manifest, via [ClearAllDownloadsUseCase]. Distinct from
+/// the cache section's "Vider le cache", which spares pinned downloads.
+/// Renders nothing when storage is already empty.
+class _ClearAllSection extends ConsumerStatefulWidget {
+  final AsyncValue<DownloadInventory> asyncInventory;
+
+  const _ClearAllSection({required this.asyncInventory});
+
+  @override
+  ConsumerState<_ClearAllSection> createState() => _ClearAllSectionState();
+}
+
+class _ClearAllSectionState extends ConsumerState<_ClearAllSection> {
+  bool _busy = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final inv = widget.asyncInventory.maybeWhen(
+      data: (i) => i,
+      orElse: () => null,
+    );
+    if (inv == null) return const SizedBox.shrink();
+
+    final items = [...inv.downloads, ...inv.cache];
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    var totalBytes = 0;
+    for (final e in items) {
+      totalBytes += e.bytesOnDisk;
+    }
+
+    return Center(
+      child: TextButton.icon(
+        onPressed: _busy
+            ? null
+            : () => _confirmAndClearAll(context, items.length, totalBytes),
+        icon: _busy
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.delete_forever_outlined),
+        label: const Text('Tout effacer (cache + téléchargements)'),
+        style: TextButton.styleFrom(foregroundColor: theme.colorScheme.error),
+      ),
+    );
+  }
+
+  Future<void> _confirmAndClearAll(
+    BuildContext context,
+    int count,
+    int bytes,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dCtx) => AlertDialog(
+        title: const Text('Tout effacer ?'),
+        content: Text(
+          '$count vidéo${count > 1 ? "s" : ""} (${formatBytes(bytes)}) seront '
+          'définitivement supprimées : tous les téléchargements ET le cache. '
+          'Cette action est irréversible.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dCtx).pop(false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dCtx).pop(true),
+            child: const Text('Tout effacer'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _busy = true);
+    try {
+      await ref.read(clearAllDownloadsUseCaseProvider).execute();
+      ref.invalidate(downloadInventoryProvider);
+      ref.invalidate(storageSummaryProvider);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 }

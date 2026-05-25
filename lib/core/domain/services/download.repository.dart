@@ -95,6 +95,14 @@ abstract interface class DownloadRepository {
   /// Never throws.
   Future<int> totalBytesOnDisk();
 
+  /// Wipes **everything**: every media file and `.partial` (movies AND
+  /// episodes, regardless of `kind`) plus the entire manifest (movies,
+  /// episodes and series metadata snapshots). Cancels any in-flight
+  /// download first. Unlike the per-item `delete*`, this spares nothing —
+  /// pinned downloads are removed too. Idempotent; best-effort on
+  /// per-file errors.
+  Future<void> deleteAll();
+
   /// Sets the [DownloadKind] of the movie identified by [movieId].
   ///
   /// Idempotent: re-setting to the current value is a no-op (no

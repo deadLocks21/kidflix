@@ -300,6 +300,54 @@ final class RunStartupCacheCleanupUseCaseProvider
 String _$runStartupCacheCleanupUseCaseHash() =>
     r'69c9cf6639e160c109e43ee2eda6cf7782231b5d';
 
+@ProviderFor(clearAllDownloadsUseCase)
+final clearAllDownloadsUseCaseProvider = ClearAllDownloadsUseCaseProvider._();
+
+final class ClearAllDownloadsUseCaseProvider
+    extends
+        $FunctionalProvider<
+          ClearAllDownloadsUseCase,
+          ClearAllDownloadsUseCase,
+          ClearAllDownloadsUseCase
+        >
+    with $Provider<ClearAllDownloadsUseCase> {
+  ClearAllDownloadsUseCaseProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'clearAllDownloadsUseCaseProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$clearAllDownloadsUseCaseHash();
+
+  @$internal
+  @override
+  $ProviderElement<ClearAllDownloadsUseCase> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ClearAllDownloadsUseCase create(Ref ref) {
+    return clearAllDownloadsUseCase(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ClearAllDownloadsUseCase value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ClearAllDownloadsUseCase>(value),
+    );
+  }
+}
+
+String _$clearAllDownloadsUseCaseHash() =>
+    r'77ec90bae92029ef3c7edb1d723de27d21b7347d';
+
 /// Reactive inventory provider — use cases that mutate the manifest
 /// invalidate this provider so the manager UI re-renders.
 ///

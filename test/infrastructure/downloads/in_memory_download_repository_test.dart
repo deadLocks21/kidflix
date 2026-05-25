@@ -449,6 +449,59 @@ void main() {
       expect(entry.kind, equals(DownloadKind.cache));
     });
   });
+
+  group('InMemoryDownloadRepository — deleteAll', () {
+    test('wipes movies, episodes, partials and the manifest', () async {
+      // Seed a movie (promoted to download), an episode, a stray
+      // .partial, and a series-only manifest snapshot.
+      File(
+        '${tempDir.path}/movies/m1.mp4',
+      ).writeAsBytesSync(List.filled(100, 0));
+      File(
+        '${tempDir.path}/episodes/e1.mp4',
+      ).writeAsBytesSync(List.filled(50, 0));
+      File(
+        '${tempDir.path}/episodes/e1.mp4.partial',
+      ).writeAsBytesSync(List.filled(20, 0));
+      final manifest = JsonFileDownloadManifestStore(
+        resolveDownloadsDir: () async => tempDir,
+      );
+      await manifest.upsertSeries(
+        's1',
+        DownloadManifestEntry(kind: DownloadKind.cache),
+      );
+      final dio = Dio()..httpClientAdapter = _FakeAdapter(totalBytes: 0);
+      final repo = InMemoryDownloadRepository(
+        dio: dio,
+        manifest: manifest,
+        downloadsDirectory: tempDir,
+      );
+      await repo.setMovieKind('m1', DownloadKind.download);
+
+      await repo.deleteAll();
+
+      expect(await repo.listAll(), isEmpty);
+      expect(await repo.totalBytesOnDisk(), equals(0));
+      expect(File('${tempDir.path}/movies/m1.mp4').existsSync(), isFalse);
+      expect(File('${tempDir.path}/episodes/e1.mp4').existsSync(), isFalse);
+      expect(
+        File('${tempDir.path}/episodes/e1.mp4.partial').existsSync(),
+        isFalse,
+      );
+      expect(File('${tempDir.path}/manifest.json').existsSync(), isFalse);
+      expect(await manifest.findForSeries('s1'), isNull);
+    });
+
+    test('is idempotent on empty storage', () async {
+      final repo = _buildRepo(
+        adapter: _FakeAdapter(totalBytes: 0),
+        dir: tempDir,
+      );
+      await repo.deleteAll();
+      await repo.deleteAll();
+      expect(await repo.listAll(), isEmpty);
+    });
+  });
 }
 
 InMemoryDownloadRepository _buildRepo({

@@ -167,6 +167,34 @@ class DioDownloadRepository implements DownloadRepository {
   }
 
   @override
+  Future<void> deleteAll() async {
+    // Stop any in-flight stream loops before wiping the directories they
+    // write into.
+    for (final movieId in _activeMovies.keys.toList()) {
+      await cancelMovie(movieId);
+    }
+    for (final episodeId in _activeEpisodes.keys.toList()) {
+      await cancelEpisode(episodeId);
+    }
+    // Remove every artifact (completed + .partial) under both kinds; the
+    // subdirectories are recreated lazily on the next download.
+    final root = await _resolveRootDir();
+    for (final sub in const ['movies', 'episodes']) {
+      final dir = Directory('${root.path}/$sub');
+      if (await dir.exists()) {
+        try {
+          await dir.delete(recursive: true);
+        } catch (_) {
+          // Best-effort, mirrors deleteMediaArtifacts.
+        }
+      }
+    }
+    // Wipe the manifest (movies + episodes + series) and reset its
+    // in-memory cache so no stale entry survives.
+    await _manifest.clear();
+  }
+
+  @override
   Future<void> setMovieKind(String movieId, DownloadKind kind) async {
     final dir = await _resolveMoviesDir();
     await inv.setKind(

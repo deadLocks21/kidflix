@@ -72,6 +72,9 @@ class _FakeRepo implements DownloadRepository {
   Future<void> deleteEpisode(String episodeId) async {}
 
   @override
+  Future<void> deleteAll() async {}
+
+  @override
   Stream<MovieDownload> downloadMovie(String movieId) => const Stream.empty();
   @override
   Future<MovieDownload?> findForMovie(String movieId) async => null;

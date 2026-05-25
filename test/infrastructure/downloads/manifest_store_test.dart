@@ -176,5 +176,36 @@ void main() {
         expect(entry!.kind, equals(DownloadKind.download));
       },
     );
+
+    test('clear removes all namespaces and deletes manifest.json', () async {
+      await store.upsert(
+        mediaId: 'abc',
+        isEpisode: false,
+        entry: DownloadManifestEntry(kind: DownloadKind.download),
+      );
+      await store.upsert(
+        mediaId: 'ep-1',
+        isEpisode: true,
+        entry: DownloadManifestEntry(kind: DownloadKind.cache),
+      );
+      await store.upsertSeries(
+        's1',
+        DownloadManifestEntry(kind: DownloadKind.cache),
+      );
+      expect(File('${tempDir.path}/manifest.json').existsSync(), isTrue);
+
+      await store.clear();
+
+      expect(await store.listAll(), isEmpty);
+      expect(await store.findFor(mediaId: 'abc', isEpisode: false), isNull);
+      expect(await store.findForSeries('s1'), isNull);
+      expect(File('${tempDir.path}/manifest.json').existsSync(), isFalse);
+    });
+
+    test('clear is idempotent when manifest absent', () async {
+      await store.clear();
+      await store.clear();
+      expect(await store.listAll(), isEmpty);
+    });
   });
 }

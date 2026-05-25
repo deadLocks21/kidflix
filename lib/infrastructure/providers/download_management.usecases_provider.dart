@@ -1,4 +1,5 @@
 import 'package:kidflix/core/application/session_state.dart';
+import 'package:kidflix/core/application/usecases/clear_all_downloads.usecase.dart';
 import 'package:kidflix/core/application/usecases/download_season.usecase.dart';
 import 'package:kidflix/core/application/usecases/get_storage_summary.usecase.dart';
 import 'package:kidflix/core/application/usecases/list_downloads.usecase.dart';
@@ -62,6 +63,11 @@ RunStartupCacheCleanupUseCase runStartupCacheCleanupUseCase(Ref ref) {
     preferences: ref.watch(cacheCleanupPreferencesProvider),
     logger: ref.watch(loggerProvider),
   );
+}
+
+@Riverpod(keepAlive: true)
+ClearAllDownloadsUseCase clearAllDownloadsUseCase(Ref ref) {
+  return ClearAllDownloadsUseCase(ref.watch(downloadRepositoryProvider));
 }
 
 /// Reactive inventory provider — use cases that mutate the manifest
