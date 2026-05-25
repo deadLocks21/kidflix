@@ -193,28 +193,6 @@ class CatalogApplicationService {
     );
   }
 
-  List<CatalogRow> _buildSagaRows(List<Movie> movies, Random rng) {
-    final bySaga = <String, List<Movie>>{};
-    final labelById = <String, String>{};
-    for (final m in movies) {
-      if (!m.hasSaga) continue;
-      final id = m.sagaId!;
-      bySaga.putIfAbsent(id, () => []).add(m);
-      labelById[id] = m.sagaLabel ?? id;
-    }
-    final rows = <CatalogRow>[];
-    for (final entry in bySaga.entries) {
-      rows.add(
-        CatalogRow(
-          label: labelById[entry.key]!,
-          type: CatalogRowType.saga,
-          items: <CatalogItem>[..._shuffled(entry.value, rng)],
-        ),
-      );
-    }
-    return rows;
-  }
-
   List<CatalogRow> _buildGenreRows(List<Movie> movies, Random rng) {
     final byGenre = <String, List<Movie>>{};
     for (final m in movies) {
