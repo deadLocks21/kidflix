@@ -1,11 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:kidflix/ui/pages/home/widgets/movie_card.widget.dart';
+import 'package:kidflix/ui/theme/kidflix_palette.dart';
+
+/// Resting tone and pulse peak for the shimmer. Both are clearly lighter
+/// than the pure-black scaffold background, so the skeleton stays visible
+/// (see [CatalogSkeleton] for why we don't read `colorScheme.surfaceContainer*`).
+const Color _base = KidflixPalette.grey750;
+const Color _highlight = KidflixPalette.grey500;
 
 /// Placeholder UI shown while the homepage catalog is loading.
 ///
-/// Renders two fake rows of four grey cards with an opacity animation
-/// looped via a [Tween]. No third-party dependency (no `shimmer`), staying
-/// consistent with the project's minimal deps policy.
+/// Renders two fake rows of four grey cards whose fill colour pulses
+/// between two greys via a [Tween]. No third-party dependency (no
+/// `shimmer`), staying consistent with the project's minimal deps policy.
+///
+/// The pulse animates the **colour** rather than an [Opacity] over a
+/// surface tone, on purpose: the scaffold background is pure black
+/// (`ColorScheme.surface == KidflixPalette.black`) and the theme never
+/// defines the `surfaceContainer*` roles, so `colorScheme.surfaceContainerHigh`
+/// falls back to `surface` (pure black). Painting those tones and fading
+/// their opacity produced black-on-black boxes — the home looked blank, as
+/// if the catalog had failed to load. [_base] / [_highlight] are fixed
+/// design-system greys that stay visible at every point of the animation.
 class CatalogSkeleton extends StatefulWidget {
   const CatalogSkeleton({super.key});
 
@@ -16,7 +32,7 @@ class CatalogSkeleton extends StatefulWidget {
 class _CatalogSkeletonState extends State<CatalogSkeleton>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  late final Animation<double> _opacity;
+  late final Animation<double> _pulse;
 
   @override
   void initState() {
@@ -25,10 +41,7 @@ class _CatalogSkeletonState extends State<CatalogSkeleton>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
-    _opacity = Tween<double>(
-      begin: 0.3,
-      end: 0.6,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    _pulse = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
   }
 
   @override
@@ -39,7 +52,6 @@ class _CatalogSkeletonState extends State<CatalogSkeleton>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return ListView.builder(
       padding: const EdgeInsets.only(top: 16),
       itemCount: 2,
@@ -51,14 +63,7 @@ class _CatalogSkeletonState extends State<CatalogSkeleton>
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: _Shimmer(
-                  opacity: _opacity,
-                  child: Container(
-                    width: 180,
-                    height: 24,
-                    color: theme.colorScheme.surfaceContainerHigh,
-                  ),
-                ),
+                child: _Shimmer(animation: _pulse, width: 180, height: 24),
               ),
               SizedBox(
                 height: 300,
@@ -68,7 +73,7 @@ class _CatalogSkeletonState extends State<CatalogSkeleton>
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: 4,
                   separatorBuilder: (_, _) => const SizedBox(width: 12),
-                  itemBuilder: (_, _) => _CardSkeleton(opacity: _opacity),
+                  itemBuilder: (_, _) => _CardSkeleton(animation: _pulse),
                 ),
               ),
             ],
@@ -80,47 +85,27 @@ class _CatalogSkeletonState extends State<CatalogSkeleton>
 }
 
 class _CardSkeleton extends StatelessWidget {
-  final Animation<double> opacity;
+  final Animation<double> animation;
 
-  const _CardSkeleton({required this.opacity});
+  const _CardSkeleton({required this.animation});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return SizedBox(
       width: MovieCard.width,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _Shimmer(
-            opacity: opacity,
-            child: Container(
-              width: MovieCard.width,
-              height: MovieCard.posterHeight,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
+            animation: animation,
+            width: MovieCard.width,
+            height: MovieCard.posterHeight,
+            borderRadius: BorderRadius.circular(8),
           ),
           const SizedBox(height: 8),
-          _Shimmer(
-            opacity: opacity,
-            child: Container(
-              width: 130,
-              height: 16,
-              color: theme.colorScheme.surfaceContainerHigh,
-            ),
-          ),
+          _Shimmer(animation: animation, width: 130, height: 16),
           const SizedBox(height: 6),
-          _Shimmer(
-            opacity: opacity,
-            child: Container(
-              width: 80,
-              height: 12,
-              color: theme.colorScheme.surfaceContainerHigh,
-            ),
-          ),
+          _Shimmer(animation: animation, width: 80, height: 12),
         ],
       ),
     );
@@ -128,16 +113,30 @@ class _CardSkeleton extends StatelessWidget {
 }
 
 class _Shimmer extends StatelessWidget {
-  final Animation<double> opacity;
-  final Widget child;
+  final Animation<double> animation;
+  final double width;
+  final double height;
+  final BorderRadius? borderRadius;
 
-  const _Shimmer({required this.opacity, required this.child});
+  const _Shimmer({
+    required this.animation,
+    required this.width,
+    required this.height,
+    this.borderRadius,
+  });
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: opacity,
-      builder: (_, _) => Opacity(opacity: opacity.value, child: child),
+      animation: animation,
+      builder: (_, _) => Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: Color.lerp(_base, _highlight, animation.value),
+          borderRadius: borderRadius,
+        ),
+      ),
     );
   }
 }
