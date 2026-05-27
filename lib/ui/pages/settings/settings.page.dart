@@ -3,9 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kidflix/core/application/session_state.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
-import 'package:kidflix/infrastructure/providers/api_base_url.provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
-import 'package:kidflix/ui/pages/phone_entry/widgets/backend_url_dialog.widget.dart';
 import 'package:kidflix/ui/router/app_router.dart';
 
 /// Page Paramètres accessible depuis le menu profil de la home.
@@ -14,8 +12,6 @@ import 'package:kidflix/ui/router/app_router.dart';
 /// - **Mon profil** (tous les profils) : édition nom + avatar + code.
 /// - **Tranches d'âge à afficher** (profils non-`bebe`) : opt-in sur les
 ///   catégories strictement inférieures à afficher sur la home.
-/// - **URL du backend** (profil principal uniquement) : commute le mode
-///   hors-ligne / backend distant.
 /// - **Téléchargements & stockage** (profil principal uniquement) :
 ///   gestion des vidéos téléchargées et du cache.
 class SettingsPage extends ConsumerWidget {
@@ -28,10 +24,6 @@ class SettingsPage extends ConsumerWidget {
     final hasLowerAges =
         session is ProfileSelected &&
         session.profile.ageCategory != AgeCategory.bebe;
-    final apiBaseUrl = ref.watch(apiBaseUrlProvider);
-    final backendSubtitle = apiBaseUrl.isEmpty
-        ? 'Mode hors-ligne intégré'
-        : apiBaseUrl;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Paramètres')),
@@ -68,16 +60,6 @@ class SettingsPage extends ConsumerWidget {
                   ),
                 ],
                 if (isMain) ...[
-                  const SizedBox(height: 8),
-                  Card(
-                    child: ListTile(
-                      leading: const Icon(Icons.dns_outlined),
-                      title: const Text('URL du backend'),
-                      subtitle: Text(backendSubtitle),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => BackendUrlDialog.show(context),
-                    ),
-                  ),
                   const SizedBox(height: 8),
                   Card(
                     child: ListTile(
