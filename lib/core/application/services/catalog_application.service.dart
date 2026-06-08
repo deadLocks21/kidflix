@@ -35,11 +35,13 @@ class CatalogApplicationService {
   final ResolveContinueWatchingUseCase? _continueWatching;
   final WatchProgressRepository? _watchProgress;
 
-  /// Per-row item-count gate applied to "dynamic" rows (genres,
-  /// "Jamais vus"). Online: `4` — avoids cluttering the home with
-  /// barely-populated rows from a large catalog. Offline: `0` —
-  /// downloads tend to be sparse and every row that *can* be shown
-  /// should be (cf. offline mode design).
+  /// Per-row item-count gate applied to **genre** rows. Online: `4` —
+  /// avoids cluttering the home with barely-populated genre rows from a
+  /// large catalog. Offline: `0` — downloads tend to be sparse and every
+  /// row that *can* be shown should be (cf. offline mode design).
+  ///
+  /// "Jamais vus" is exempt from this gate: it shows as soon as a single
+  /// unseen film remains (cf. [buildHomeRowsFor]).
   final int _dynamicMinItems;
 
   const CatalogApplicationService(
@@ -100,18 +102,26 @@ class CatalogApplicationService {
     final downloadedDto = _buildDownloadedRowDto(downloads, items, profile.id);
     if (downloadedDto.items.isNotEmpty) fixed.add(downloadedDto);
 
-    final dynamicRows = <CatalogRow>[..._buildGenreRows(movies, rng)];
+    // Genre rows respect the dynamic min-items gate so the home isn't
+    // cluttered with barely-populated genre rows from a large catalog.
+    final genreRows = _buildGenreRows(
+      movies,
+      rng,
+    ).where((r) => r.items.length >= _dynamicMinItems);
     // A movie is "already seen" if it was completed in-app (watch
     // progress) OR explicitly marked déjà vu by the user. Both exclude
     // it from "Jamais vus".
     final seenOrWatched = <String>{...watchedMovieIds, ...seenMovieIds};
+    // "Jamais vus" is intentionally EXEMPT from the gate above: the user
+    // wants this row as soon as a single unseen film remains. It still
+    // hides when the list is empty.
     final neverWatched = _buildNeverWatchedRow(movies, seenOrWatched, rng);
-    if (neverWatched.items.isNotEmpty) dynamicRows.add(neverWatched);
-    final filteredDynamic =
-        dynamicRows.where((r) => r.items.length >= _dynamicMinItems).toList()
-          ..shuffle(rng);
+    final dynamicRows = <CatalogRow>[
+      ...genreRows,
+      if (neverWatched.items.isNotEmpty) neverWatched,
+    ]..shuffle(rng);
 
-    return [...fixed, ...filteredDynamic.map(_toDto)];
+    return [...fixed, ...dynamicRows.map(_toDto)];
   }
 
   List<T> _shuffled<T>(Iterable<T> items, Random rng) {
