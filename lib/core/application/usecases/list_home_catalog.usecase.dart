@@ -19,6 +19,7 @@ class ListHomeCatalogUseCase {
     ProfileDto profile, {
     List<DownloadEntry> downloads = const [],
     List<Favorite> favorites = const [],
+    Set<String> seenMovieIds = const {},
     int? shuffleSeed,
   }) async {
     try {
@@ -26,6 +27,7 @@ class ListHomeCatalogUseCase {
         profile,
         downloads: downloads,
         favorites: favorites,
+        seenMovieIds: seenMovieIds,
         shuffleSeed: shuffleSeed,
       );
     } catch (e, st) {

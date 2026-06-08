@@ -45,6 +45,18 @@ class SettingsPage extends ConsumerWidget {
                     onTap: () => context.push(AppRoutes.settingsProfile),
                   ),
                 ),
+                const SizedBox(height: 8),
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.visibility_outlined),
+                    title: const Text('Films déjà vus'),
+                    subtitle: const Text(
+                      'Marquer en masse les films déjà regardés',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => context.push(AppRoutes.settingsSeen),
+                  ),
+                ),
                 if (hasLowerAges) ...[
                   const SizedBox(height: 8),
                   Card(

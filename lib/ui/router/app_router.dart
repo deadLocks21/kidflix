@@ -17,6 +17,7 @@ import 'package:kidflix/ui/pages/profile_management/profile_form.page.dart';
 import 'package:kidflix/ui/pages/player/player.page.dart';
 import 'package:kidflix/ui/pages/profile_pin/profile_pin.page.dart';
 import 'package:kidflix/ui/pages/profile_selection/profile_selection.page.dart';
+import 'package:kidflix/ui/pages/seen_setup/seen_setup.page.dart';
 import 'package:kidflix/ui/pages/settings/included_lower_ages_edit.page.dart';
 import 'package:kidflix/ui/pages/settings/self_profile_edit.page.dart';
 import 'package:kidflix/ui/pages/settings/settings.page.dart';
@@ -36,6 +37,7 @@ abstract final class AppRoutes {
   static const settingsProfile = '/home/settings/profile';
   static const settingsAges = '/home/settings/ages';
   static const settingsDownloads = '/home/settings/downloads';
+  static const settingsSeen = '/home/settings/seen';
   static const settingsWishlist = '/home/settings/wishlist';
   static const settingsWishlistAdd = '/home/settings/wishlist/add';
   static const managementPin = '/profiles/manage/pin';
@@ -70,6 +72,7 @@ bool _isSettingsRoute(String path) =>
     path == AppRoutes.settingsProfile ||
     path == AppRoutes.settingsAges ||
     path == AppRoutes.settingsDownloads ||
+    path == AppRoutes.settingsSeen ||
     path == AppRoutes.settingsWishlist ||
     path == AppRoutes.settingsWishlistAdd;
 
@@ -143,6 +146,10 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: AppRoutes.settingsDownloads,
         builder: (_, _) => const DownloadsPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.settingsSeen,
+        builder: (_, _) => const SeenSetupPage(),
       ),
       GoRoute(
         path: AppRoutes.settingsWishlist,

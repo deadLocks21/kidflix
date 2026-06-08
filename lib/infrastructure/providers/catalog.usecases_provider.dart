@@ -16,6 +16,7 @@ import 'package:kidflix/infrastructure/providers/download_manifest_store.provide
 import 'package:kidflix/infrastructure/providers/favorites.controller_provider.dart';
 import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/offline_catalog.service_provider.dart';
+import 'package:kidflix/infrastructure/providers/seen.controller_provider.dart';
 import 'package:kidflix/infrastructure/providers/series.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -90,6 +91,15 @@ Future<List<CatalogRowDto>> homeCatalogRows(Ref ref) async {
   final favorites = ref
       .watch(favoritesControllerProvider)
       .maybeWhen(data: (v) => v, orElse: () => const <Favorite>[]);
+  // Déjà-vu marks of the active profile. Union'd with watch-progress
+  // inside the service to filter the "Jamais vus" row. Treat unresolved
+  // states as empty so a transient load never blocks the home.
+  final seenMovieIds = ref
+      .watch(seenControllerProvider)
+      .maybeWhen(
+        data: (v) => {for (final m in v) m.movieId},
+        orElse: () => const <String>{},
+      );
   final online = ref
       .watch(connectivityProvider)
       .maybeWhen(data: (v) => v, orElse: () => true);
@@ -99,6 +109,7 @@ Future<List<CatalogRowDto>> homeCatalogRows(Ref ref) async {
       profile,
       downloads: inventory.downloads,
       favorites: favorites,
+      seenMovieIds: seenMovieIds,
       shuffleSeed: seed,
     );
   }
@@ -107,6 +118,7 @@ Future<List<CatalogRowDto>> homeCatalogRows(Ref ref) async {
     profile,
     downloads: inventory.downloads,
     favorites: favorites,
+    seenMovieIds: seenMovieIds,
     shuffleSeed: seed,
   );
   // Connectivity says online and the call succeeded — fire-and-forget

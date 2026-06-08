@@ -63,6 +63,7 @@ class CatalogApplicationService {
     ProfileDto profile, {
     List<DownloadEntry> downloads = const [],
     List<Favorite> favorites = const [],
+    Set<String> seenMovieIds = const {},
     int? shuffleSeed,
   }) async {
     final rng = shuffleSeed != null ? Random(shuffleSeed) : Random();
@@ -100,7 +101,11 @@ class CatalogApplicationService {
     if (downloadedDto.items.isNotEmpty) fixed.add(downloadedDto);
 
     final dynamicRows = <CatalogRow>[..._buildGenreRows(movies, rng)];
-    final neverWatched = _buildNeverWatchedRow(movies, watchedMovieIds, rng);
+    // A movie is "already seen" if it was completed in-app (watch
+    // progress) OR explicitly marked déjà vu by the user. Both exclude
+    // it from "Jamais vus".
+    final seenOrWatched = <String>{...watchedMovieIds, ...seenMovieIds};
+    final neverWatched = _buildNeverWatchedRow(movies, seenOrWatched, rng);
     if (neverWatched.items.isNotEmpty) dynamicRows.add(neverWatched);
     final filteredDynamic =
         dynamicRows.where((r) => r.items.length >= _dynamicMinItems).toList()

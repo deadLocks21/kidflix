@@ -9,6 +9,7 @@ import 'package:kidflix/infrastructure/providers/download.repository_provider.da
 import 'package:kidflix/shared/duration_format.dart';
 import 'package:kidflix/ui/pages/home/widgets/download_intent_button.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/favorite_button.widget.dart';
+import 'package:kidflix/ui/pages/home/widgets/seen_button.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/trailer_header.widget.dart';
 
 /// Width threshold to choose between dialog and bottom-sheet presentation.
@@ -145,6 +146,7 @@ class MovieDetailContent extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     FavoriteButton(target: MovieFavoriteTarget(movie.id)),
+                    SeenButton(movieId: movie.id),
                   ],
                 ),
                 const SizedBox(height: 24),
