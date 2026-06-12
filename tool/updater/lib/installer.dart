@@ -1,0 +1,182 @@
+import 'dart:io';
+
+import 'package:path/path.dart' as p;
+
+import 'config.dart';
+import 'download.dart';
+import 'github.dart';
+import 'layout.dart';
+import 'links.dart';
+import 'log.dart';
+import 'shortcuts.dart';
+
+/// Orchestration des trois flux : installation, mise à jour, lancement.
+class Installer {
+  Installer(this.layout, this.log);
+
+  final Layout layout;
+  final Log log;
+
+  String get _tmpDir => p.join(layout.root, '.tmp');
+
+  // ── Installation neuve ─────────────────────────────────────────────────────
+
+  /// Installe Kidflix dans la racine de [layout]. [launch] démarre l'app à la
+  /// fin (cas du double-clic sur l'installateur).
+  Future<void> install({bool launch = true}) async {
+    log('Installation dans ${layout.root}');
+    Directory(layout.versionsDir).createSync(recursive: true);
+    Directory(layout.updaterDir).createSync(recursive: true);
+    log.file ??= layout.logFile;
+
+    final release = await fetchLatestRelease();
+    final asset = release.appAsset;
+    if (asset == null) {
+      throw StateError('Aucun asset pour cette plateforme dans ${release.tag}');
+    }
+
+    await _installVersion(release.version, asset);
+    swapCurrent(layout.currentLink, layout.versionDir(release.version), log);
+
+    _relocateUpdater();
+    Config(root: layout.root, installedVersion: release.version)
+      ..lastCheck = DateTime.now().toIso8601String()
+      ..save(layout);
+    layout.writePointer();
+    createShortcuts(layout, log);
+    _cleanupTmp();
+
+    log('Installation terminée : Kidflix ${release.version}');
+    if (launch) launchApp();
+  }
+
+  // ── Mise à jour silencieuse ────────────────────────────────────────────────
+
+  /// Vérifie GitHub et applique une éventuelle MAJ, en silence. Best-effort :
+  /// toute erreur (réseau, etc.) est loggée mais non propagée, pour ne jamais
+  /// empêcher le lancement de l'app.
+  Future<void> updateIfAvailable() async {
+    final config = Config.load(layout);
+    if (config == null) {
+      log.error('updateIfAvailable appelé sans installation');
+      return;
+    }
+    try {
+      final release = await fetchLatestRelease();
+      config.lastCheck = DateTime.now().toIso8601String();
+
+      if (compareVersions(release.version, config.installedVersion) <= 0) {
+        log('À jour (${config.installedVersion}).');
+        config.save(layout);
+        return;
+      }
+
+      log('MAJ ${config.installedVersion} -> ${release.version}');
+      final asset = release.appAsset;
+      if (asset == null) {
+        log.error('Pas d\'asset pour cette plateforme dans ${release.tag}');
+        return;
+      }
+
+      await _installVersion(release.version, asset);
+      swapCurrent(layout.currentLink, layout.versionDir(release.version), log);
+
+      config.installedVersion = release.version;
+      config.save(layout);
+
+      await _selfUpdateUpdater(release);
+      _pruneOldVersions(keep: release.version);
+      _cleanupTmp();
+      log('Mise à jour appliquée : ${release.version}');
+    } catch (e, st) {
+      log.error('Mise à jour ignorée', e, st);
+    }
+  }
+
+  // ── Lancement de l'app ─────────────────────────────────────────────────────
+
+  void launchApp() {
+    final exe = layout.appExecutable;
+    if (!File(exe).existsSync()) {
+      log.error('Exécutable introuvable : $exe');
+      return;
+    }
+    log('Lancement : $exe');
+    Process.start(
+      exe,
+      const [],
+      mode: ProcessStartMode.detached,
+      workingDirectory: layout.currentLink,
+    );
+  }
+
+  // ── Détails ────────────────────────────────────────────────────────────────
+
+  Future<void> _installVersion(String version, ReleaseAsset asset) async {
+    final file = await downloadAsset(asset, _tmpDir, log);
+    installAppArtifact(file, layout.versionDir(version), log);
+  }
+
+  /// Copie le binaire updater courant vers `<root>/updater/` (emplacement
+  /// stable visé par les raccourcis). No-op s'il s'exécute déjà depuis là.
+  void _relocateUpdater() {
+    final src = Platform.resolvedExecutable;
+    final dst = layout.updaterExe;
+    if (p.equals(src, dst)) return;
+    File(src).copySync(dst);
+    if (!Platform.isWindows) Process.runSync('chmod', ['+x', dst]);
+    log('Updater relocalisé : $dst');
+  }
+
+  /// Met à jour le binaire updater lui-même à partir de l'asset de la release.
+  /// Sous Windows on ne peut pas écraser un exe en cours d'exécution : on
+  /// renomme l'ancien en `.old` (autorisé) puis on écrit le nouveau au nom
+  /// définitif ; le `.old` est purgé au lancement suivant.
+  Future<void> _selfUpdateUpdater(Release release) async {
+    final asset = release.updaterAsset;
+    if (asset == null) return;
+    try {
+      final dl = await downloadAsset(asset, _tmpDir, log);
+      final dst = layout.updaterExe;
+      final old = File('$dst.old');
+      if (old.existsSync()) old.deleteSync();
+      if (File(dst).existsSync()) File(dst).renameSync(old.path);
+      dl.copySync(dst);
+      if (!Platform.isWindows) Process.runSync('chmod', ['+x', dst]);
+      log('Updater auto-mis à jour (${release.version})');
+    } catch (e) {
+      log.error('Auto-MAJ de l\'updater ignorée', e);
+    }
+  }
+
+  /// Supprime les anciens dossiers de versions, en gardant [keep].
+  void _pruneOldVersions({required String keep}) {
+    final dir = Directory(layout.versionsDir);
+    if (!dir.existsSync()) return;
+    for (final entry in dir.listSync()) {
+      if (entry is Directory && p.basename(entry.path) != keep) {
+        try {
+          entry.deleteSync(recursive: true);
+        } catch (e) {
+          log.error('Purge de ${entry.path}', e);
+        }
+      }
+    }
+  }
+
+  void _cleanupTmp() {
+    final tmp = Directory(_tmpDir);
+    if (tmp.existsSync()) {
+      try {
+        tmp.deleteSync(recursive: true);
+      } catch (_) {}
+    }
+    // Purge un éventuel updater .old laissé par une auto-MAJ précédente.
+    final old = File('${layout.updaterExe}.old');
+    if (old.existsSync()) {
+      try {
+        old.deleteSync();
+      } catch (_) {}
+    }
+  }
+}
