@@ -1,9 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:http/http.dart' as http;
-
 import 'layout.dart';
+import 'net.dart';
 
 class ReleaseAsset {
   ReleaseAsset({required this.name, required this.url, required this.size});
@@ -42,32 +41,21 @@ class Release {
 }
 
 /// Récupère la dernière release publiée du dépôt public Kidflix.
-/// [timeout] court : on ne veut pas bloquer le lancement de l'app si le
+/// [maxTimeSec] court : on ne veut pas bloquer le lancement de l'app si le
 /// réseau est lent ou absent.
-Future<Release> fetchLatestRelease({
-  Duration timeout = const Duration(seconds: 8),
-}) async {
-  final uri = Uri.parse(
-    'https://api.github.com/repos/${Layout.repoOwner}/${Layout.repoName}/releases/latest',
+Future<Release> fetchLatestRelease({int maxTimeSec = 8}) async {
+  final url =
+      'https://api.github.com/repos/${Layout.repoOwner}/${Layout.repoName}/releases/latest';
+  final body = httpGetString(
+    url,
+    headers: {
+      'Accept': 'application/vnd.github+json',
+      'User-Agent': 'kidflix-updater',
+    },
+    maxTimeSec: maxTimeSec,
   );
-  final resp = await http
-      .get(
-        uri,
-        headers: {
-          'Accept': 'application/vnd.github+json',
-          'User-Agent': 'kidflix-updater',
-        },
-      )
-      .timeout(timeout);
 
-  if (resp.statusCode != 200) {
-    throw HttpException(
-      'GitHub a répondu ${resp.statusCode} pour la dernière release',
-      uri: uri,
-    );
-  }
-
-  final json = jsonDecode(resp.body) as Map<String, dynamic>;
+  final json = jsonDecode(body) as Map<String, dynamic>;
   final tag = json['tag_name'] as String;
   final assets = (json['assets'] as List)
       .cast<Map<String, dynamic>>()

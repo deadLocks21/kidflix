@@ -1,49 +1,26 @@
 import 'dart:io';
 
 import 'package:archive/archive_io.dart';
-import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
 
 import 'github.dart';
 import 'log.dart';
+import 'net.dart';
 
-/// Télécharge [asset] dans un fichier temporaire, en loggant la progression.
+/// Télécharge [asset] dans un fichier temporaire via l'outil HTTP système
+/// (cf. [httpDownload] : respecte le magasin de certificats Windows / proxys).
 Future<File> downloadAsset(ReleaseAsset asset, String tmpDir, Log log) async {
   Directory(tmpDir).createSync(recursive: true);
   final dest = File(p.join(tmpDir, asset.name));
 
-  final client = http.Client();
-  try {
-    final req = http.Request('GET', Uri.parse(asset.url))
-      ..headers['User-Agent'] = 'kidflix-updater';
-    final resp = await client.send(req);
-    if (resp.statusCode != 200) {
-      throw HttpException(
-        'Téléchargement ${asset.name} : HTTP ${resp.statusCode}',
-      );
-    }
-
-    final total = resp.contentLength ?? asset.size;
-    final sink = dest.openWrite();
-    var received = 0;
-    var lastLoggedPct = -10;
-    await resp.stream.forEach((chunk) {
-      sink.add(chunk);
-      received += chunk.length;
-      if (total > 0) {
-        final pct = (received * 100 ~/ total);
-        if (pct >= lastLoggedPct + 10) {
-          lastLoggedPct = pct;
-          log('  téléchargement ${asset.name} : $pct%');
-        }
-      }
-    });
-    await sink.close();
-    log('Téléchargé ${asset.name} (${received ~/ 1024} Ko)');
-    return dest;
-  } finally {
-    client.close();
-  }
+  log('Téléchargement de ${asset.name} (${asset.size ~/ 1024} Ko)…');
+  httpDownload(
+    asset.url,
+    dest.path,
+    headers: {'User-Agent': 'kidflix-updater'},
+  );
+  log('Téléchargé ${asset.name}');
+  return dest;
 }
 
 /// Installe l'app contenue dans [archiveFile] dans [versionDir].
