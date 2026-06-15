@@ -102,8 +102,13 @@ Future<int> runCli(List<String> args) async {
     return 0;
   }
 
-  // Défaut & --launch : MAJ best-effort (avec IHM si --ui) puis lancement.
-  await installer.updateIfAvailable(showUi: showUi);
+  // Défaut & --launch : la fenêtre de progression est activée par défaut.
+  // Elle n'apparaît de toute façon que si une MAJ est réellement appliquée
+  // (et seulement sous Windows) -> démarrage silencieux conservé sinon. On ne
+  // dépend donc PAS du flag --ui dans le raccourci : les installs existantes
+  // en bénéficient dès que l'updater s'est auto-mis à jour, sans réécrire le
+  // launch.vbs (qui n'est régénéré qu'à l'installation).
+  await installer.updateIfAvailable(showUi: true);
   installer.launchApp();
   return 0;
 }
