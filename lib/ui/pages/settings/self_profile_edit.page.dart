@@ -9,6 +9,8 @@ import 'package:kidflix/core/application/usecases/update_profile_metadata.usecas
 import 'package:kidflix/core/domain/exceptions/invalid_profile_name.exception.dart';
 import 'package:kidflix/core/domain/model/avatar_update.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
+import 'package:kidflix/infrastructure/providers/biometric_auth.service_provider.dart';
+import 'package:kidflix/infrastructure/providers/biometric_preferences.provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/ui/avatars/widgets/avatar_image.widget.dart';
 import 'package:kidflix/ui/avatars/widgets/avatar_picker.widget.dart';
@@ -44,11 +46,58 @@ class _SelfProfileEditPageState extends ConsumerState<SelfProfileEditPage> {
   String? _pinError;
   bool _prefilled = false;
   bool _submitting = false;
+  bool _biometricSupported = false;
+  bool _biometricEnabled = false;
+  bool _biometricResolved = false;
 
   @override
   void initState() {
     super.initState();
     _nameController.addListener(_handleNameChanged);
+    _resolveBiometric();
+  }
+
+  /// Loads device support + the current per-profile opt-in so the toggle
+  /// renders with the right initial state. Only shown once resolved.
+  Future<void> _resolveBiometric() async {
+    final supported = await ref
+        .read(biometricAuthServiceProvider)
+        .isAvailable();
+    final profile = _currentProfile();
+    final enabled = profile != null
+        ? await ref
+              .read(biometricPreferencesProvider)
+              .isEnabledForProfile(profile.id)
+        : false;
+    if (!mounted) return;
+    setState(() {
+      _biometricSupported = supported;
+      _biometricEnabled = enabled;
+      _biometricResolved = true;
+    });
+  }
+
+  Future<void> _toggleBiometric(bool value) async {
+    final profile = _currentProfile();
+    if (profile == null) return;
+    if (value) {
+      // Confirm the user can actually authenticate before persisting the
+      // opt-in, so we never enable something that fails at the gate.
+      final ok = await ref
+          .read(biometricAuthServiceProvider)
+          .authenticate(
+            reason: 'Confirme ton empreinte pour activer le déverrouillage',
+          );
+      if (!ok) {
+        if (mounted) _showSnack('Authentification biométrique annulée');
+        return;
+      }
+    }
+    await ref
+        .read(biometricPreferencesProvider)
+        .setEnabledForProfile(profile.id, value);
+    if (!mounted) return;
+    setState(() => _biometricEnabled = value);
   }
 
   void _handleNameChanged() {
@@ -241,6 +290,19 @@ class _SelfProfileEditPageState extends ConsumerState<SelfProfileEditPage> {
                       onPressed: _submitting ? null : _clearPin,
                       icon: const Icon(Icons.lock_open),
                       label: const Text('Retirer le code'),
+                    ),
+                  ],
+                  if (_biometricResolved && _biometricSupported && hasPin) ...[
+                    const SizedBox(height: 8),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      secondary: const Icon(Icons.fingerprint),
+                      title: const Text('Déverrouillage biométrique'),
+                      subtitle: const Text(
+                        'Utiliser l\'empreinte ou le visage au lieu du code',
+                      ),
+                      value: _biometricEnabled,
+                      onChanged: _submitting ? null : _toggleBiometric,
                     ),
                   ],
                   const SizedBox(height: 24),

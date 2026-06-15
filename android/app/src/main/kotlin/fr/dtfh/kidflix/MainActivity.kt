@@ -3,11 +3,14 @@ package fr.dtfh.kidflix
 import android.app.ActivityManager
 import android.content.Context
 import android.os.Build
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : FlutterActivity() {
+// FlutterFragmentActivity (not FlutterActivity) is required by local_auth:
+// its BiometricPrompt needs a FragmentActivity host. The kids-lock channel
+// below is unaffected — startLockTask / stopLockTask live on Activity.
+class MainActivity : FlutterFragmentActivity() {
     private val lockChannel = "fr.dtfh.kidflix/app_lock"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

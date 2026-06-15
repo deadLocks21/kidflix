@@ -21,6 +21,7 @@ import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/model/session.dart';
 import 'package:kidflix/infrastructure/providers/api_base_url.provider.dart';
 import 'package:kidflix/infrastructure/providers/auth.service_provider.dart';
+import 'package:kidflix/infrastructure/providers/authenticate_with_biometrics.usecase_provider.dart';
 import 'package:kidflix/infrastructure/providers/in_memory_accounts_store.provider.dart';
 import 'package:kidflix/infrastructure/providers/profile_management.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/refresh_profiles.usecase_provider.dart';
@@ -164,6 +165,41 @@ class SessionController extends _$SessionController {
     }
   }
 
+  /// Whether biometric unlock should be offered for the profile awaiting
+  /// PIN entry (user opted-in AND device supports it). `false` outside
+  /// `PinRequired`. Used by the UI to auto-prompt and to show the manual
+  /// biometric button.
+  Future<bool> isBiometricOfferedForCurrentUnlock() async {
+    final current = state;
+    if (current is! PinRequired) return false;
+    return ref
+        .read(authenticateWithBiometricsUseCaseProvider)
+        .isOfferedFor(current.profile.id);
+  }
+
+  /// Attempts biometric unlock for the profile awaiting PIN entry,
+  /// short-circuiting the same `PinRequired -> ProfileSelected`
+  /// transition as `verifyPin`. Returns `false` (and leaves the state
+  /// untouched, so the PIN pad stays) outside `PinRequired` or when
+  /// biometrics are disabled / unavailable / declined.
+  Future<bool> unlockCurrentProfileWithBiometrics() async {
+    final current = state;
+    if (current is! PinRequired) return false;
+    final ok = await ref
+        .read(authenticateWithBiometricsUseCaseProvider)
+        .execute(
+          profileId: current.profile.id,
+          reason: 'Déverrouille le profil ${current.profile.name}',
+        );
+    if (ok) {
+      state = ProfileSelected(
+        profile: current.profile,
+        session: current.session,
+      );
+    }
+    return ok;
+  }
+
   /// Returns to the profile selection screen without clearing the session.
   /// Used by the "Changer de profil" action on the home page.
   void deselectProfile() {
@@ -231,6 +267,42 @@ class SessionController extends _$SessionController {
     if (current is ManagementPinRequired) {
       state = _afterManagementExit(current.session);
     }
+  }
+
+  /// Whether biometric unlock should be offered for the management gate.
+  /// Governed by the **main profile's** opt-in (the management PIN *is*
+  /// the main profile's PIN). `false` outside `ManagementPinRequired` or
+  /// when no main profile exists.
+  Future<bool> isBiometricOfferedForManagement() async {
+    final current = state;
+    if (current is! ManagementPinRequired) return false;
+    final main = _mainProfile(current.session);
+    if (main == null) return false;
+    return ref
+        .read(authenticateWithBiometricsUseCaseProvider)
+        .isOfferedFor(main.id);
+  }
+
+  /// Attempts biometric unlock for the management gate, short-circuiting
+  /// the same `ManagementPinRequired -> ManagingProfiles` transition as
+  /// `verifyManagementPin`. Governed by the main profile's opt-in.
+  /// Returns `false` (state untouched) outside `ManagementPinRequired`,
+  /// when no main profile exists, or when biometrics are declined.
+  Future<bool> unlockManagementWithBiometrics() async {
+    final current = state;
+    if (current is! ManagementPinRequired) return false;
+    final main = _mainProfile(current.session);
+    if (main == null) return false;
+    final ok = await ref
+        .read(authenticateWithBiometricsUseCaseProvider)
+        .execute(
+          profileId: main.id,
+          reason: 'Déverrouille la gestion des profils',
+        );
+    if (ok) {
+      state = ManagingProfiles(current.session);
+    }
+    return ok;
   }
 
   void exitManagementMode() {

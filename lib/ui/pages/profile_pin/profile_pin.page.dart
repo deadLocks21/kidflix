@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/core/application/session_state.dart';
 import 'package:kidflix/core/application/usecases/verify_profile_pin.usecase.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
+import 'package:kidflix/ui/widgets/pin_pad.widget.dart';
 
 class ProfilePinPage extends ConsumerStatefulWidget {
   const ProfilePinPage({super.key});
@@ -12,63 +12,53 @@ class ProfilePinPage extends ConsumerStatefulWidget {
   ConsumerState<ProfilePinPage> createState() => _ProfilePinPageState();
 }
 
-class _ProfilePinPageState extends ConsumerState<ProfilePinPage>
-    with SingleTickerProviderStateMixin {
+class _ProfilePinPageState extends ConsumerState<ProfilePinPage> {
   static const int _pinLength = 4;
-  final _controller = TextEditingController();
-  final _focusNode = FocusNode();
-  bool _isVerifying = false;
-  late final AnimationController _shake;
+  bool _biometricOffered = false;
+  bool _biometricAttempted = false;
 
   @override
   void initState() {
     super.initState();
-    _shake = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 400),
-    );
-    _controller.addListener(_onChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _initBiometric());
   }
 
-  @override
-  void dispose() {
-    _controller.removeListener(_onChanged);
-    _controller.dispose();
-    _focusNode.dispose();
-    _shake.dispose();
-    super.dispose();
-  }
-
-  void _onChanged() {
-    setState(() {});
-    if (_controller.text.length == _pinLength && !_isVerifying) {
-      _submit();
+  /// Resolves whether biometrics are offered for this profile and, if so,
+  /// auto-prompts the OS sheet once. Silent no-op when not offered.
+  Future<void> _initBiometric() async {
+    final offered = await ref
+        .read(sessionControllerProvider.notifier)
+        .isBiometricOfferedForCurrentUnlock();
+    if (!mounted) return;
+    setState(() => _biometricOffered = offered);
+    if (offered && !_biometricAttempted) {
+      _biometricAttempted = true;
+      await _promptBiometric();
     }
   }
 
-  Future<void> _submit() async {
-    setState(() => _isVerifying = true);
+  Future<void> _promptBiometric() async {
+    // On success the router redirects away; on failure/cancel the keypad
+    // stays visible — nothing to restore.
+    await ref
+        .read(sessionControllerProvider.notifier)
+        .unlockCurrentProfileWithBiometrics();
+  }
+
+  Future<bool> _verify(String pin) async {
     final result = await ref
         .read(sessionControllerProvider.notifier)
-        .verifyPin(_controller.text);
-    if (!mounted) return;
-    setState(() => _isVerifying = false);
-    switch (result) {
-      case VerifyProfilePinSuccess():
-        break;
-      case VerifyProfilePinInvalid():
-        await _shake.forward(from: 0);
-        if (!mounted) return;
-        _controller.clear();
-        _focusNode.requestFocus();
-    }
+        .verifyPin(pin);
+    return result is VerifyProfilePinSuccess;
   }
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(sessionControllerProvider);
-    final name = state is PinRequired ? state.profile.name : '';
-    final pinLength = _controller.text.length;
+    final name = ref.watch(
+      sessionControllerProvider.select(
+        (s) => s is PinRequired ? s.profile.name : '',
+      ),
+    );
     return Scaffold(
       appBar: AppBar(
         title: Text('PIN de $name'),
@@ -79,85 +69,18 @@ class _ProfilePinPageState extends ConsumerState<ProfilePinPage>
         ),
       ),
       body: SafeArea(
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: _focusNode.requestFocus,
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Entre le code à $_pinLength chiffres',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 48),
-                AnimatedBuilder(
-                  animation: _shake,
-                  builder: (context, child) {
-                    final t = _shake.value;
-                    final dx = t == 0 ? 0.0 : 8 * (1 - t) * (t < 0.5 ? 1 : -1);
-                    return Transform.translate(
-                      offset: Offset(dx, 0),
-                      child: child,
-                    );
-                  },
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(_pinLength, (i) {
-                      final filled = i < pinLength;
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 120),
-                          width: 20,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: filled
-                                ? Theme.of(context).colorScheme.primary
-                                : Colors.transparent,
-                            border: Border.all(
-                              color: Theme.of(context).colorScheme.primary,
-                              width: 2,
-                            ),
-                          ),
-                        ),
-                      );
-                    }),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: 1,
-                  height: 1,
-                  child: TextField(
-                    controller: _controller,
-                    focusNode: _focusNode,
-                    autofocus: true,
-                    keyboardType: TextInputType.number,
-                    obscureText: true,
-                    maxLength: _pinLength,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      counterText: '',
-                    ),
-                    style: const TextStyle(
-                      color: Colors.transparent,
-                      height: 0.01,
-                    ),
-                    cursorColor: Colors.transparent,
-                    enableInteractiveSelection: false,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                if (_isVerifying) const CircularProgressIndicator(),
-              ],
-            ),
-          ),
+        child: PinPad(
+          title: 'Entre le code à $_pinLength chiffres',
+          pinLength: _pinLength,
+          onSubmit: _verify,
+          footer: _biometricOffered
+              ? IconButton.filledTonal(
+                  onPressed: _promptBiometric,
+                  icon: const Icon(Icons.fingerprint),
+                  iconSize: 40,
+                  tooltip: 'Utiliser la biométrie',
+                )
+              : null,
         ),
       ),
     );
