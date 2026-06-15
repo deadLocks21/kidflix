@@ -8,6 +8,7 @@ import 'github.dart';
 import 'layout.dart';
 import 'links.dart';
 import 'log.dart';
+import 'progress.dart';
 import 'shortcuts.dart';
 
 /// Orchestration des trois flux : installation, mise à jour, lancement.
@@ -55,12 +56,17 @@ class Installer {
   /// Vérifie GitHub et applique une éventuelle MAJ, en silence. Best-effort :
   /// toute erreur (réseau, etc.) est loggée mais non propagée, pour ne jamais
   /// empêcher le lancement de l'app.
-  Future<void> updateIfAvailable() async {
+  ///
+  /// Si [showUi] et qu'une MAJ est trouvée, affiche une fenêtre de progression
+  /// native PENDANT le téléchargement/installation (Windows uniquement). Aucune
+  /// fenêtre n'apparaît s'il n'y a rien à mettre à jour.
+  Future<void> updateIfAvailable({bool showUi = false}) async {
     final config = Config.load(layout);
     if (config == null) {
       log.error('updateIfAvailable appelé sans installation');
       return;
     }
+    ProgressWindow? ui;
     try {
       final release = await fetchLatestRelease();
       config.lastCheck = DateTime.now().toIso8601String();
@@ -78,18 +84,26 @@ class Installer {
         return;
       }
 
+      if (showUi) ui = await ProgressWindow.start(layout, log);
+
+      ui?.status('Téléchargement de la version ${release.version}…');
       await _installVersion(release.version, asset);
+
+      ui?.status('Installation…');
       swapCurrent(layout.currentLink, layout.versionDir(release.version), log);
 
       config.installedVersion = release.version;
       config.save(layout);
 
+      ui?.status('Finalisation…');
       await _selfUpdateUpdater(release);
       _pruneOldVersions(keep: release.version);
       _cleanupTmp();
       log('Mise à jour appliquée : ${release.version}');
     } catch (e, st) {
       log.error('Mise à jour ignorée', e, st);
+    } finally {
+      await ui?.close();
     }
   }
 

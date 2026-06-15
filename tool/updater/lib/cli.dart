@@ -46,6 +46,11 @@ Future<int> runCli(List<String> args) async {
       'dir',
       help: 'Dossier d\'installation (sinon demandé / défaut).',
     )
+    ..addFlag(
+      'ui',
+      negatable: false,
+      help: 'Affiche une fenêtre de progression si une MAJ est appliquée.',
+    )
     ..addFlag('help', abbr: 'h', negatable: false);
 
   final ArgResults opts;
@@ -67,6 +72,7 @@ Future<int> runCli(List<String> args) async {
 
   final dirOpt = opts['dir'] as String?;
   final yes = opts['yes'] as bool;
+  final showUi = opts['ui'] as bool;
   final existing = Layout.resolveExisting();
 
   // --check : diagnostic, ne modifie rien.
@@ -92,12 +98,12 @@ Future<int> runCli(List<String> args) async {
   final installer = Installer(existing, Log(existing.logFile));
 
   if (opts['update'] as bool) {
-    await installer.updateIfAvailable();
+    await installer.updateIfAvailable(showUi: showUi);
     return 0;
   }
 
-  // Défaut & --launch : MAJ silencieuse best-effort puis lancement.
-  await installer.updateIfAvailable();
+  // Défaut & --launch : MAJ best-effort (avec IHM si --ui) puis lancement.
+  await installer.updateIfAvailable(showUi: showUi);
   installer.launchApp();
   return 0;
 }

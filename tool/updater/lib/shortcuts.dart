@@ -23,11 +23,12 @@ void createShortcuts(Layout layout, Log log) {
 
 void _createWindowsShortcuts(Layout layout, Log log) {
   // Wrapper VBS : lance l'updater fenêtre cachée (window style 0) -> aucun
-  // terminal visible au démarrage quotidien.
+  // terminal au démarrage. `--ui` : si (et seulement si) une MAJ est trouvée,
+  // l'updater affiche lui-même une fenêtre de progression native.
   final vbs =
       '''
 Set shell = CreateObject("WScript.Shell")
-shell.Run """${layout.updaterExe}"" --launch", 0, False
+shell.Run """${layout.updaterExe}"" --launch --ui", 0, False
 ''';
   File(layout.launchVbs).writeAsStringSync(vbs);
 

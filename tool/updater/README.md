@@ -13,9 +13,11 @@ release GitHub (`kidflix-updater-windows.exe`, `kidflix-updater-linux`).
   téléchargé, il demande le **dossier d'installation** (avec un défaut
   pré-rempli), récupère la dernière release GitHub, l'installe et crée un
   raccourci.
-- **Chaque lancement suivant** (via le raccourci) : **aucune fenêtre**. Il
-  vérifie GitHub, applique une éventuelle mise à jour **en silence**, puis lance
-  l'app. Si le réseau est lent/absent, il lance directement la version locale.
+- **Chaque lancement suivant** (via le raccourci) : il vérifie GitHub puis lance
+  l'app. **S'il n'y a rien à mettre à jour : aucune fenêtre.** Si une MAJ est
+  trouvée, une **fenêtre de progression native** (Windows) s'affiche le temps du
+  téléchargement/installation, puis l'app démarre. Réseau lent/absent : l'app
+  est lancée directement sur la version locale.
 - **Auto-mise à jour de l'updater** lui-même.
 
 ## Layout sur disque
@@ -57,7 +59,7 @@ on bascule le lien), donc rien n'est verrouillé.
 |---|---|
 | (défaut) | Installe si absent, sinon MAJ silencieuse + lance l'app. |
 | `--install [--dir <path>] [--yes]` | Installation neuve. `--yes` = non-interactif (dossier par défaut). |
-| `--launch` | MAJ silencieuse puis lancement (mode utilisé par le raccourci). |
+| `--launch [--ui]` | MAJ puis lancement (mode du raccourci). `--ui` : fenêtre de progression si une MAJ est appliquée. |
 | `--update` | MAJ silencieuse, sans lancer. |
 | `--check` | Affiche version locale vs dernière dispo. |
 
