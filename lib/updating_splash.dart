@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:kidflix/ui/theme/kidflix_palette.dart';
 
 /// Mode « fenêtre de mise à jour » de l'app : lancée par l'updater via
 /// `kidflix --updating --status <chemin>`, elle affiche une petite fenêtre
@@ -40,7 +41,7 @@ class UpdatingSplashApp extends StatelessWidget {
       theme: ThemeData(
         brightness: Brightness.dark,
         useMaterial3: true,
-        colorSchemeSeed: const Color(0xFFE53935),
+        colorSchemeSeed: KidflixPalette.red,
       ),
       home: _UpdatingScreen(statusPath: statusPath),
     );
@@ -121,7 +122,11 @@ class _UpdatingScreenState extends State<_UpdatingScreen> {
             const SizedBox(height: 22),
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
-              child: const LinearProgressIndicator(minHeight: 6),
+              child: const LinearProgressIndicator(
+                minHeight: 6,
+                color: KidflixPalette.red,
+                backgroundColor: Color(0xFF2A2A2A),
+              ),
             ),
           ],
         ),
