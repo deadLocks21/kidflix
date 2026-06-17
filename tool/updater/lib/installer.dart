@@ -18,6 +18,12 @@ class Installer {
   final Layout layout;
   final Log log;
 
+  /// Première version de l'app embarquant le mode `--updating` (fenêtre de
+  /// progression Flutter). On n'affiche le splash que si l'app DÉJÀ installée
+  /// est >= à cette version : sinon elle ne connaît pas `--updating` et
+  /// lancerait l'app complète au lieu de la fenêtre.
+  static const _minAppVersionForSplash = '1.9.3';
+
   String get _tmpDir => p.join(layout.root, '.tmp');
 
   // ── Installation neuve ─────────────────────────────────────────────────────
@@ -58,7 +64,7 @@ class Installer {
   /// empêcher le lancement de l'app.
   ///
   /// Si [showUi] et qu'une MAJ est trouvée, affiche une fenêtre de progression
-  /// native PENDANT le téléchargement/installation (Windows uniquement). Aucune
+  /// (rendue par l'app via `--updating`) PENDANT le téléchargement. Aucune
   /// fenêtre n'apparaît s'il n'y a rien à mettre à jour.
   Future<void> updateIfAvailable({bool showUi = false}) async {
     final config = Config.load(layout);
@@ -84,7 +90,13 @@ class Installer {
         return;
       }
 
-      if (showUi) ui = await ProgressWindow.start(layout, log);
+      // Splash rendu par l'app DÉJÀ installée -> seulement si elle connaît
+      // `--updating` (cf. _minAppVersionForSplash), sinon elle lancerait l'app
+      // complète à la place.
+      final splashCapable =
+          compareVersions(config.installedVersion, _minAppVersionForSplash) >=
+          0;
+      if (showUi && splashCapable) ui = await ProgressWindow.start(layout, log);
 
       ui?.status('Téléchargement de la version ${release.version}…');
       await _installVersion(release.version, asset);
@@ -97,6 +109,12 @@ class Installer {
 
       ui?.status('Finalisation…');
       await _selfUpdateUpdater(release);
+
+      // Ferme le splash AVANT de purger : la fenêtre tourne depuis l'ancienne
+      // version, dont _pruneOldVersions supprime le dossier.
+      await ui?.close();
+      ui = null;
+
       _pruneOldVersions(keep: release.version);
       _cleanupTmp();
       log('Mise à jour appliquée : ${release.version}');

@@ -6,9 +6,19 @@ import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/ui/router/app_router.dart';
 import 'package:kidflix/ui/theme/app_theme_data.dart';
+import 'package:kidflix/updating_splash.dart';
 import 'package:media_kit/media_kit.dart';
 
-void main() {
+void main(List<String> args) {
+  // Mode « fenêtre de mise à jour » : l'updater lance `kidflix --updating
+  // --status <chemin>` pour afficher une petite fenêtre de progression native
+  // pendant qu'il télécharge/installe la nouvelle version. On NE démarre PAS
+  // l'app complète dans ce cas.
+  if (args.contains('--updating')) {
+    runUpdatingSplash(args);
+    return;
+  }
+
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
 

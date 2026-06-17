@@ -15,10 +15,16 @@ release GitHub (`kidflix-updater-windows.exe`, `kidflix-updater-linux`).
   raccourci.
 - **Chaque lancement suivant** (via le raccourci) : il vérifie GitHub puis lance
   l'app. **S'il n'y a rien à mettre à jour : aucune fenêtre.** Si une MAJ est
-  trouvée, une **fenêtre de progression native** (Windows) s'affiche le temps du
+  trouvée, une **fenêtre de progression** s'affiche le temps du
   téléchargement/installation, puis l'app démarre. Réseau lent/absent : l'app
   est lancée directement sur la version locale.
 - **Auto-mise à jour de l'updater** lui-même.
+
+La fenêtre de progression est **rendue par l'app Kidflix elle-même** : l'updater
+lance `current/kidflix --updating --status <fichier>`, et l'app affiche une
+petite fenêtre Flutter (fiable, contrairement à PowerShell/WinForms) qui suit le
+fichier d'état. N'est utilisée que si l'app installée connaît déjà `--updating`
+(garde-fou de version dans `installer.dart`).
 
 ## Layout sur disque
 
