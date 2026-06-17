@@ -8,20 +8,23 @@ import 'log.dart';
 /// Fenêtre de progression native (Windows uniquement), affichée pendant qu'une
 /// mise à jour se télécharge/installe — et seulement dans ce cas.
 ///
-/// Implémentée via une petite IHM PowerShell/WinForms lancée en processus
-/// séparé. La communication se fait par un fichier d'état que le formulaire
-/// relit en boucle : l'updater y écrit le libellé de l'étape courante, puis un
-/// sentinel `__DONE__` pour demander la fermeture.
+/// Implémentation : un petit formulaire WinForms piloté par PowerShell, lancé
+/// **totalement caché via un wrapper VBS** (window style 0 dès la création, donc
+/// aucun flash de console). Comme le formulaire hérite alors du flag « caché »,
+/// le script le **force visible** lui-même (`ShowWindow`/`SetForegroundWindow`).
 ///
-/// Best-effort : si PowerShell échoue ou qu'on n'est pas sous Windows, la MAJ
-/// se poursuit sans IHM (jamais bloquée par l'affichage).
+/// Communication par fichier d'état : l'updater y écrit le libellé de l'étape,
+/// puis le sentinel `__DONE__` que le formulaire détecte pour se fermer.
+///
+/// Best-effort : si quoi que ce soit échoue (ou hors Windows), la MAJ se
+/// poursuit sans IHM. Les erreurs runtime du script vont dans
+/// `progress-error.log` à côté du fichier d'état.
 class ProgressWindow {
-  ProgressWindow._(this._process, this._statusFile, this._scriptFile)
+  ProgressWindow._(this._statusFile, this._tempFiles)
     : _shown = Stopwatch()..start();
 
-  final Process _process;
   final File _statusFile;
-  final File _scriptFile;
+  final List<File> _tempFiles;
   final Stopwatch _shown;
 
   static const _doneSentinel = '__DONE__';
@@ -40,20 +43,21 @@ class ProgressWindow {
       final scriptFile = File(p.join(layout.root, '.progress.ps1'))
         ..writeAsStringSync('$bom$_psBody');
 
-      // PAS de `-WindowStyle Hidden` : ce flag pose SW_HIDE dans le STARTUPINFO,
-      // dont WinForms hérite pour la 1re fenêtre -> le formulaire ne s'affiche
-      // jamais. On lance donc en style normal et le script cache lui-même sa
-      // console (P/Invoke ShowWindow), ce qui n'affecte pas le formulaire.
-      final process = await Process.start('powershell', [
-        '-NoProfile',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-File',
-        scriptFile.path,
-        '-StatusFile',
-        statusFile.path,
+      // VBS qui lance PowerShell totalement caché (window 0) : aucun terminal.
+      final vbsFile = File(p.join(layout.root, '.progress.vbs'))
+        ..writeAsStringSync(
+          'CreateObject("WScript.Shell").Run '
+          '"powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden '
+          '-File ""${scriptFile.path}"" -StatusFile ""${statusFile.path}""", '
+          '0, False',
+        );
+
+      // wscript lance le VBS puis rend la main aussitôt ; le formulaire se
+      // ferme via le sentinel `__DONE__` (pas besoin de tuer le process).
+      await Process.start('wscript', [
+        vbsFile.path,
       ], mode: ProcessStartMode.detached);
-      return ProgressWindow._(process, statusFile, scriptFile);
+      return ProgressWindow._(statusFile, [scriptFile, vbsFile, statusFile]);
     } catch (e) {
       log.error('Fenêtre de progression non affichée', e);
       return null;
@@ -76,12 +80,10 @@ class ProgressWindow {
     try {
       _statusFile.writeAsStringSync(_doneSentinel);
     } catch (_) {}
-    // Laisse le formulaire lire le sentinel et se fermer en douceur.
-    await Future<void>.delayed(const Duration(milliseconds: 400));
-    try {
-      _process.kill();
-    } catch (_) {}
-    for (final f in [_scriptFile, _statusFile]) {
+    // Laisse le formulaire lire le sentinel (poll 200 ms) et se fermer avant de
+    // supprimer les fichiers qu'il lit.
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    for (final f in _tempFiles) {
       try {
         if (f.existsSync()) f.deleteSync();
       } catch (_) {}
@@ -90,18 +92,14 @@ class ProgressWindow {
 
   /// Corps du script WinForms. Le titre est codé en dur (accents fiables grâce
   /// au BOM) ; les libellés d'étape arrivent via le fichier d'état, relu en
-  /// UTF-8. Toute erreur runtime est écrite dans `progress-error.log` à côté du
-  /// fichier d'état, pour diagnostic.
+  /// UTF-8.
   static const _psBody = r'''
 param([string]$StatusFile)
 $errLog = Join-Path (Split-Path -Parent $StatusFile) 'progress-error.log'
 try {
   Add-Type -AssemblyName System.Windows.Forms
   Add-Type -AssemblyName System.Drawing
-
-  # Cache la console de CE process (lancé en style normal, cf. commentaire Dart).
-  Add-Type -Name Win -Namespace Native -MemberDefinition '[DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow(); [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);'
-  [Native.Win]::ShowWindow([Native.Win]::GetConsoleWindow(), 0) | Out-Null
+  Add-Type -Name Win -Namespace Native -MemberDefinition '[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow); [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);'
 
   $form = New-Object System.Windows.Forms.Form
   $form.Text = 'Kidflix'
@@ -112,7 +110,6 @@ try {
   $form.MinimizeBox = $false
   $form.MaximizeBox = $false
   $form.TopMost = $true
-  $form.Add_Shown({ $form.Activate(); $form.BringToFront() })
 
   $title = New-Object System.Windows.Forms.Label
   $title.Text = 'Mise à jour de Kidflix'
@@ -134,6 +131,17 @@ try {
   $bar.Location = New-Object System.Drawing.Point(20, 82)
   $bar.Size = New-Object System.Drawing.Size(380, 22)
   $form.Controls.Add($bar)
+
+  # PowerShell est lancé caché -> le formulaire hérite de SW_HIDE. On le force
+  # visible dès que son handle existe (timer one-shot après démarrage du loop).
+  $showTimer = New-Object System.Windows.Forms.Timer
+  $showTimer.Interval = 50
+  $showTimer.Add_Tick({
+    $showTimer.Stop()
+    [Native.Win]::ShowWindow($form.Handle, 5) | Out-Null   # SW_SHOW
+    [Native.Win]::SetForegroundWindow($form.Handle) | Out-Null
+  })
+  $showTimer.Start()
 
   $timer = New-Object System.Windows.Forms.Timer
   $timer.Interval = 200
