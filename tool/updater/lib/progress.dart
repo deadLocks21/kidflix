@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -5,36 +6,50 @@ import 'package:path/path.dart' as p;
 import 'layout.dart';
 import 'log.dart';
 
-/// Fenêtre de progression affichée pendant qu'une mise à jour se
-/// télécharge/installe — et seulement dans ce cas.
+/// Choix possibles renvoyés par la fenêtre de prompt de mise à jour.
+enum UpdateChoice { update, later, skip }
+
+/// Fenêtre de mise à jour, rendue par l'app Kidflix elle-même
+/// (`current/kidflix --updating …`) — fiable, contrairement à PowerShell.
 ///
-/// L'affichage est délégué à **l'app Kidflix elle-même** : l'updater lance
-/// `current/kidflix(.exe) --updating --status <fichier>`, qui ouvre une petite
-/// fenêtre native rendue par Flutter (fiable, contrairement à une fenêtre
-/// PowerShell/WinForms). La communication passe par le fichier d'état :
-/// l'updater y écrit le libellé d'étape, puis le sentinel `__DONE__` que la
-/// fenêtre détecte pour se fermer.
+/// Deux modes :
+///  - **prompt** : propose « Mettre à jour / Plus tard / Ignorer » ; l'app écrit
+///    le choix dans le fichier de choix, que [waitForChoice] relit. Sur
+///    « Mettre à jour », la fenêtre bascule sur la vue progression et reste
+///    ouverte ; sinon l'app se ferme.
+///  - **progress** : barre de progression directe (replis pour les apps qui
+///    connaissent `--updating` mais pas encore `--prompt`).
 ///
-/// Best-effort : si quoi que ce soit échoue, la MAJ se poursuit sans IHM.
-///
-/// NB d'amorçage : c'est l'app **déjà installée** qui rend la fenêtre. Si elle
-/// est antérieure au support de `--updating`, elle lancerait l'app complète au
-/// lieu du splash — d'où le garde-fou de version côté [Installer].
+/// Communication par fichiers : `.update-status` (libellé d'étape + sentinel
+/// `__DONE__`) et `.update-choice` (choix utilisateur).
 class ProgressWindow {
-  ProgressWindow._(this._process, this._statusFile)
+  ProgressWindow._(this._process, this._statusFile, this._choiceFile)
     : _shown = Stopwatch()..start();
 
   final Process _process;
   final File _statusFile;
+  final File? _choiceFile;
   final Stopwatch _shown;
 
   static const _doneSentinel = '__DONE__';
-
-  /// Durée d'affichage minimale, pour qu'une MAJ rapide ne fasse pas juste
-  /// « flasher » la fenêtre.
   static const _minDisplay = Duration(milliseconds: 1200);
 
-  static Future<ProgressWindow?> start(Layout layout, Log log) async {
+  /// Lance la fenêtre en mode **prompt** (3 boutons) pour [newVersion].
+  static Future<ProgressWindow?> startPrompt(
+    Layout layout,
+    Log log,
+    String newVersion,
+  ) => _start(layout, log, promptVersion: newVersion);
+
+  /// Lance la fenêtre en mode **progression** directe (sans prompt).
+  static Future<ProgressWindow?> startProgress(Layout layout, Log log) =>
+      _start(layout, log);
+
+  static Future<ProgressWindow?> _start(
+    Layout layout,
+    Log log, {
+    String? promptVersion,
+  }) async {
     try {
       final exe = layout.appExecutable;
       if (!File(exe).existsSync()) {
@@ -44,29 +59,82 @@ class ProgressWindow {
       final statusFile = File(p.join(layout.root, '.update-status'))
         ..writeAsStringSync('Préparation…');
 
+      final args = ['--updating', '--status', statusFile.path];
+      File? choiceFile;
+      if (promptVersion != null) {
+        choiceFile = File(p.join(layout.root, '.update-choice'));
+        if (choiceFile.existsSync()) choiceFile.deleteSync();
+        args.addAll([
+          '--prompt',
+          '--new-version',
+          promptVersion,
+          '--choice',
+          choiceFile.path,
+        ]);
+      }
+
+      // Mode normal (pas detached) pour pouvoir détecter la fermeture de la
+      // fenêtre via exitCode ; on draine les flux pour ne pas bloquer l'app.
       final process = await Process.start(
         exe,
-        ['--updating', '--status', statusFile.path],
-        mode: ProcessStartMode.detached,
+        args,
+        mode: ProcessStartMode.normal,
         workingDirectory: layout.currentLink,
       );
-      return ProgressWindow._(process, statusFile);
+      process.stdout.drain<void>();
+      process.stderr.drain<void>();
+
+      return ProgressWindow._(process, statusFile, choiceFile);
     } catch (e) {
       log.error('Fenêtre de progression non affichée', e);
       return null;
     }
   }
 
-  /// Met à jour le libellé d'étape affiché.
+  /// Attend le choix de l'utilisateur. Si la fenêtre est fermée sans choix
+  /// (croix, crash), on renvoie [UpdateChoice.later] pour ne jamais bloquer.
+  Future<UpdateChoice> waitForChoice() async {
+    final choiceFile = _choiceFile;
+    if (choiceFile == null) return UpdateChoice.update;
+
+    final completer = Completer<UpdateChoice>();
+    final poll = Timer.periodic(const Duration(milliseconds: 200), (t) {
+      try {
+        if (!choiceFile.existsSync()) return;
+        final txt = choiceFile.readAsStringSync().trim();
+        final choice = switch (txt) {
+          'update' => UpdateChoice.update,
+          'skip' => UpdateChoice.skip,
+          'later' => UpdateChoice.later,
+          _ => null,
+        };
+        if (choice != null && !completer.isCompleted) {
+          t.cancel();
+          completer.complete(choice);
+        }
+      } catch (_) {}
+    });
+    // Fenêtre fermée sans choix -> « plus tard ».
+    unawaited(
+      _process.exitCode.then((_) {
+        if (!completer.isCompleted) {
+          poll.cancel();
+          completer.complete(UpdateChoice.later);
+        }
+      }),
+    );
+    return completer.future;
+  }
+
+  /// Met à jour le libellé d'étape affiché (vue progression).
   void status(String message) {
     try {
       _statusFile.writeAsStringSync(message);
     } catch (_) {}
   }
 
-  /// Demande la fermeture de la fenêtre et nettoie le fichier d'état. Attend
-  /// que la fenêtre (et donc le process app) se ferme, car l'appelant purge
-  /// ensuite l'ancienne version dont ce process pouvait dépendre.
+  /// Demande la fermeture de la fenêtre et nettoie les fichiers. Attend que la
+  /// fenêtre se ferme (l'appelant purge ensuite l'ancienne version).
   Future<void> close() async {
     final remaining = _minDisplay - _shown.elapsed;
     if (remaining > Duration.zero) await Future<void>.delayed(remaining);
@@ -74,13 +142,14 @@ class ProgressWindow {
     try {
       _statusFile.writeAsStringSync(_doneSentinel);
     } catch (_) {}
-    // Laisse la fenêtre lire le sentinel (poll 200 ms) et se fermer.
     await Future<void>.delayed(const Duration(milliseconds: 800));
     try {
-      _process.kill(); // backstop si elle ne s'est pas fermée seule.
+      _process.kill();
     } catch (_) {}
-    try {
-      if (_statusFile.existsSync()) _statusFile.deleteSync();
-    } catch (_) {}
+    for (final f in [_statusFile, _choiceFile].whereType<File>()) {
+      try {
+        if (f.existsSync()) f.deleteSync();
+      } catch (_) {}
+    }
   }
 }

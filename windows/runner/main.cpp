@@ -37,8 +37,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   Win32Window::Size size(1280, 720);
   if (updating) {
     // Tailles logiques (Win32Window::Create les met à l'échelle selon le DPI).
-    const int width = 460;
-    const int height = 200;
+    // Assez haut pour le prompt (titre + 3 boutons) comme pour la progression.
+    const int width = 480;
+    const int height = 250;
     const double scale = ::GetDpiForSystem() / 96.0;
     const int logical_screen_w =
         static_cast<int>(::GetSystemMetrics(SM_CXSCREEN) / scale);

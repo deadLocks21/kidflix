@@ -5,7 +5,12 @@ import 'layout.dart';
 
 /// État persistant d'une installation, sérialisé dans `<root>/config.json`.
 class Config {
-  Config({required this.root, required this.installedVersion, this.lastCheck});
+  Config({
+    required this.root,
+    required this.installedVersion,
+    this.lastCheck,
+    this.ignoredVersion,
+  });
 
   /// Racine d'installation (redondant avec l'emplacement, mais pratique).
   String root;
@@ -16,16 +21,23 @@ class Config {
   /// Horodatage ISO-8601 du dernier check, purement informatif.
   String? lastCheck;
 
+  /// Version dont l'utilisateur a explicitement refusé la MAJ (« Ignorer cette
+  /// version »). On ne le repropose plus pour celle-ci, seulement pour une
+  /// version strictement plus récente.
+  String? ignoredVersion;
+
   factory Config.fromJson(Map<String, dynamic> json) => Config(
     root: json['root'] as String,
     installedVersion: json['installedVersion'] as String,
     lastCheck: json['lastCheck'] as String?,
+    ignoredVersion: json['ignoredVersion'] as String?,
   );
 
   Map<String, dynamic> toJson() => {
     'root': root,
     'installedVersion': installedVersion,
     if (lastCheck != null) 'lastCheck': lastCheck,
+    if (ignoredVersion != null) 'ignoredVersion': ignoredVersion,
   };
 
   static Config? load(Layout layout) {

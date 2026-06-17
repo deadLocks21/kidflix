@@ -24,6 +24,11 @@ class Installer {
   /// lancerait l'app complète au lieu de la fenêtre.
   static const _minAppVersionForSplash = '1.10.0';
 
+  /// Première version de l'app embarquant le **prompt** Oui/Non/Ignorer
+  /// (`--prompt`). En dessous, on retombe sur le splash de progression
+  /// silencieux (>= [_minAppVersionForSplash]).
+  static const _minAppVersionForPrompt = '1.10.2';
+
   String get _tmpDir => p.join(layout.root, '.tmp');
 
   // ── Installation neuve ─────────────────────────────────────────────────────
@@ -83,6 +88,15 @@ class Installer {
         return;
       }
 
+      // Version explicitement ignorée par l'utilisateur : on ne repropose que
+      // pour une version strictement plus récente.
+      final ignored = config.ignoredVersion;
+      if (ignored != null && compareVersions(release.version, ignored) <= 0) {
+        log('MAJ ${release.version} ignorée (choix utilisateur).');
+        config.save(layout);
+        return;
+      }
+
       log('MAJ ${config.installedVersion} -> ${release.version}');
       final asset = release.appAsset;
       if (asset == null) {
@@ -90,15 +104,38 @@ class Installer {
         return;
       }
 
-      // Splash rendu par l'app DÉJÀ installée -> seulement si elle connaît
-      // `--updating` (cf. _minAppVersionForSplash), sinon elle lancerait l'app
-      // complète à la place. On se base sur la version RÉELLE pointée par
-      // `current` (dossier versions/<v>), pas sur config.json : ainsi un
-      // config.json bidouillé (test) ne désactive pas le splash par erreur.
+      // Capacités de l'app DÉJÀ installée. On se base sur la version RÉELLE
+      // pointée par `current` (dossier versions/<v>), pas sur config.json :
+      // ainsi un config.json bidouillé (test) ne fausse pas la décision.
       final appVersion = _installedVersionOnDisk(config);
-      final splashCapable =
-          compareVersions(appVersion, _minAppVersionForSplash) >= 0;
-      if (showUi && splashCapable) ui = await ProgressWindow.start(layout, log);
+      final canSplash =
+          showUi && compareVersions(appVersion, _minAppVersionForSplash) >= 0;
+      final canPrompt =
+          showUi && compareVersions(appVersion, _minAppVersionForPrompt) >= 0;
+
+      if (canPrompt) {
+        ui = await ProgressWindow.startPrompt(layout, log, release.version);
+        final choice = await ui?.waitForChoice();
+        if (choice == UpdateChoice.later) {
+          log('MAJ ${release.version} reportée (« plus tard »).');
+          await ui?.close();
+          ui = null;
+          config.save(layout);
+          return;
+        }
+        if (choice == UpdateChoice.skip) {
+          log('MAJ ${release.version} ignorée (« ignorer cette version »).');
+          config.ignoredVersion = release.version;
+          await ui?.close();
+          ui = null;
+          config.save(layout);
+          return;
+        }
+        // UpdateChoice.update (ou null si lancement KO) : on poursuit ; la
+        // fenêtre est déjà passée en vue progression.
+      } else if (canSplash) {
+        ui = await ProgressWindow.startProgress(layout, log);
+      }
 
       ui?.status('Téléchargement de la version ${release.version}…');
       await _installVersion(release.version, asset);
@@ -107,6 +144,7 @@ class Installer {
       swapCurrent(layout.currentLink, layout.versionDir(release.version), log);
 
       config.installedVersion = release.version;
+      config.ignoredVersion = null; // une MAJ effective lève tout « ignorer ».
       config.save(layout);
 
       ui?.status('Finalisation…');

@@ -20,11 +20,19 @@ release GitHub (`kidflix-updater-windows.exe`, `kidflix-updater-linux`).
   est lancée directement sur la version locale.
 - **Auto-mise à jour de l'updater** lui-même.
 
-La fenêtre de progression est **rendue par l'app Kidflix elle-même** : l'updater
-lance `current/kidflix --updating --status <fichier>`, et l'app affiche une
-petite fenêtre Flutter (fiable, contrairement à PowerShell/WinForms) qui suit le
-fichier d'état. N'est utilisée que si l'app installée connaît déjà `--updating`
-(garde-fou de version dans `installer.dart`).
+La fenêtre est **rendue par l'app Kidflix elle-même** (`current/kidflix
+--updating …`) : une petite fenêtre Flutter (fiable, contrairement à
+PowerShell/WinForms), pilotée par fichiers (`.update-status`, `.update-choice`).
+
+Depuis l'app >= 1.10.2, une MAJ trouvée **propose** d'abord
+« Mettre à jour / Plus tard / Ignorer cette version » (`--prompt`) :
+- **Mettre à jour** : la fenêtre passe en progression, la MAJ s'applique.
+- **Plus tard** : on lance la version actuelle ; reproposé au prochain lancement.
+- **Ignorer cette version** : mémorisé dans `config.json` (`ignoredVersion`) ;
+  reproposé seulement pour une version plus récente.
+
+Garde-fous de version (basés sur la version RÉELLE pointée par `current`, pas sur
+`config.json`) : `--updating` >= 1.10.0, `--prompt` >= 1.10.2.
 
 ## Layout sur disque
 
