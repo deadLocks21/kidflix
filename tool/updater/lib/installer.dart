@@ -22,7 +22,7 @@ class Installer {
   /// progression Flutter). On n'affiche le splash que si l'app DÉJÀ installée
   /// est >= à cette version : sinon elle ne connaît pas `--updating` et
   /// lancerait l'app complète au lieu de la fenêtre.
-  static const _minAppVersionForSplash = '1.9.3';
+  static const _minAppVersionForSplash = '1.10.0';
 
   String get _tmpDir => p.join(layout.root, '.tmp');
 
@@ -92,10 +92,12 @@ class Installer {
 
       // Splash rendu par l'app DÉJÀ installée -> seulement si elle connaît
       // `--updating` (cf. _minAppVersionForSplash), sinon elle lancerait l'app
-      // complète à la place.
+      // complète à la place. On se base sur la version RÉELLE pointée par
+      // `current` (dossier versions/<v>), pas sur config.json : ainsi un
+      // config.json bidouillé (test) ne désactive pas le splash par erreur.
+      final appVersion = _installedVersionOnDisk(config);
       final splashCapable =
-          compareVersions(config.installedVersion, _minAppVersionForSplash) >=
-          0;
+          compareVersions(appVersion, _minAppVersionForSplash) >= 0;
       if (showUi && splashCapable) ui = await ProgressWindow.start(layout, log);
 
       ui?.status('Téléchargement de la version ${release.version}…');
@@ -147,6 +149,21 @@ class Installer {
   Future<void> _installVersion(String version, ReleaseAsset asset) async {
     final file = await downloadAsset(asset, _tmpDir, log);
     installAppArtifact(file, layout.versionDir(version), log);
+  }
+
+  /// Version réellement installée = nom du dossier vers lequel pointe
+  /// `current` (`versions/<v>`). Reflète le binaire d'app effectif, contrairement
+  /// à `config.json` (qui peut être édité à la main). Repli sur config si la
+  /// résolution du lien échoue.
+  String _installedVersionOnDisk(Config config) {
+    try {
+      final real = Directory(layout.currentLink).resolveSymbolicLinksSync();
+      final name = p.basename(real);
+      if (name.isNotEmpty) return name;
+    } catch (_) {
+      // Lien cassé / illisible : on retombe sur config.
+    }
+    return config.installedVersion;
   }
 
   /// Copie le binaire updater courant vers `<root>/updater/` (emplacement
