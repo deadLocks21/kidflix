@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -176,7 +177,141 @@ void main() {
       expect(adapter.requests[2].headers, isNot(contains('Authorization')));
     });
   });
+
+  group('AuthInterceptor — expired token detection', () {
+    test('notifies onUnauthorized on 401 invalid_token', () async {
+      var calls = 0;
+      final dio = _dio(_unauthorizedAdapter());
+      dio.interceptors.add(
+        AuthInterceptor(
+          session: () => _session,
+          profileId: () => 'ar',
+          onUnauthorized: () => calls++,
+        ),
+      );
+
+      await expectLater(
+        dio.get<dynamic>('/movies'),
+        throwsA(isA<DioException>()),
+      );
+      expect(calls, 1);
+    });
+
+    test('forwards the original DioException to the caller', () async {
+      final dio = _dio(_unauthorizedAdapter());
+      dio.interceptors.add(
+        AuthInterceptor(
+          session: () => _session,
+          profileId: () => 'ar',
+          onUnauthorized: () {},
+        ),
+      );
+
+      await expectLater(
+        dio.get<dynamic>('/movies'),
+        throwsA(
+          isA<DioException>().having(
+            (e) => e.response?.statusCode,
+            'statusCode',
+            401,
+          ),
+        ),
+      );
+    });
+
+    test('ignores 401 invalid_otp on /auth/verify-otp', () async {
+      var calls = 0;
+      final adapter = _FakeAdapter(
+        status: 401,
+        body: {
+          'error': {'code': 'invalid_otp'},
+        },
+      );
+      final dio = _dio(adapter);
+      dio.interceptors.add(
+        AuthInterceptor(
+          session: () => null,
+          profileId: () => null,
+          onUnauthorized: () => calls++,
+        ),
+      );
+
+      await expectLater(
+        dio.post<dynamic>('/auth/verify-otp'),
+        throwsA(isA<DioException>()),
+      );
+      expect(calls, 0);
+    });
+
+    test('ignores a 401 carrying a different error code', () async {
+      var calls = 0;
+      final adapter = _FakeAdapter(
+        status: 401,
+        body: {
+          'error': {'code': 'something_else'},
+        },
+      );
+      final dio = _dio(adapter);
+      dio.interceptors.add(
+        AuthInterceptor(
+          session: () => _session,
+          profileId: () => 'ar',
+          onUnauthorized: () => calls++,
+        ),
+      );
+
+      await expectLater(
+        dio.get<dynamic>('/movies'),
+        throwsA(isA<DioException>()),
+      );
+      expect(calls, 0);
+    });
+
+    test('ignores non-401 failures', () async {
+      var calls = 0;
+      final adapter = _FakeAdapter(
+        status: 403,
+        body: {
+          'error': {'code': 'forbidden_profile'},
+        },
+      );
+      final dio = _dio(adapter);
+      dio.interceptors.add(
+        AuthInterceptor(
+          session: () => _session,
+          profileId: () => 'ar',
+          onUnauthorized: () => calls++,
+        ),
+      );
+
+      await expectLater(
+        dio.get<dynamic>('/movies'),
+        throwsA(isA<DioException>()),
+      );
+      expect(calls, 0);
+    });
+
+    test('stays inert when no onUnauthorized callback is wired', () async {
+      final dio = _dio(_unauthorizedAdapter());
+      dio.interceptors.add(
+        AuthInterceptor(session: () => _session, profileId: () => 'ar'),
+      );
+
+      await expectLater(
+        dio.get<dynamic>('/movies'),
+        throwsA(isA<DioException>()),
+      );
+    });
+  });
 }
+
+/// Adapter answering the documented `401 invalid_token` envelope.
+_FakeAdapter _unauthorizedAdapter() => _FakeAdapter(
+  status: 401,
+  body: {
+    'error': {'code': 'invalid_token'},
+  },
+);
 
 Dio _dio(_FakeAdapter adapter) {
   final dio = Dio(
@@ -204,6 +339,13 @@ class _CapturedRequest {
 }
 
 class _FakeAdapter implements HttpClientAdapter {
+  /// Defaults to `200` with an empty body. Pass [status] / [body] to make
+  /// the adapter answer an error envelope instead (used by the
+  /// `401 invalid_token` tests).
+  _FakeAdapter({this.status = 200, this.body});
+
+  final int status;
+  final Object? body;
   final List<_CapturedRequest> requests = [];
 
   _CapturedRequest get last => requests.last;
@@ -220,7 +362,16 @@ class _FakeAdapter implements HttpClientAdapter {
         headers: Map<String, dynamic>.from(options.headers),
       ),
     );
-    return ResponseBody.fromBytes(<int>[], 200, headers: const {});
+    if (body == null) {
+      return ResponseBody.fromBytes(<int>[], status, headers: const {});
+    }
+    return ResponseBody.fromBytes(
+      utf8.encode(json.encode(body)),
+      status,
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
+    );
   }
 
   @override

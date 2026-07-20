@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:kidflix/core/domain/model/session.dart';
+import 'package:kidflix/infrastructure/http/error_code.dart';
 
 /// Dio interceptor that injects `Authorization: Bearer <jwt>`,
 /// `X-Device-Id: <uuid>` and `X-Profile-Id: <profile_id>` headers on every
@@ -29,15 +30,24 @@ import 'package:kidflix/core/domain/model/session.dart';
 /// Riverpod or any framework — its callsite (`dioProvider`) is in charge
 /// of bridging to the session source (typically `currentSessionProvider`)
 /// and the profile-id source (typically `currentProfileIdProvider`).
+///
+/// On the response side, the interceptor also detects an expired JWT
+/// (`401 invalid_token` on a protected route) and notifies [onUnauthorized]
+/// so the app can kick off a silent re-authentication. The error is always
+/// forwarded to the caller unchanged — the interceptor never swallows it and
+/// never retries the request.
 class AuthInterceptor extends Interceptor {
   AuthInterceptor({
     required Session? Function() session,
     required String? Function() profileId,
+    void Function()? onUnauthorized,
   }) : _currentSession = session,
-       _currentProfileId = profileId;
+       _currentProfileId = profileId,
+       _onUnauthorized = onUnauthorized;
 
   final Session? Function() _currentSession;
   final String? Function() _currentProfileId;
+  final void Function()? _onUnauthorized;
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
@@ -67,5 +77,32 @@ class AuthInterceptor extends Interceptor {
       }
     }
     handler.next(options);
+  }
+
+  /// Detects an expired / invalid JWT and signals it via [onUnauthorized].
+  ///
+  /// Scope is deliberately narrow — only `401` **with** `error.code ==
+  /// 'invalid_token'`, and only outside `/auth/*`:
+  ///
+  /// - `/auth/*` is excluded because `POST /auth/verify-otp` answers `401
+  ///   invalid_otp` on a wrong code. Recovering there would be nonsense
+  ///   (we are already re-authenticating) and would loop.
+  /// - The `invalid_token` code check keeps other 401s (present or future)
+  ///   from triggering a spurious logout + SMS.
+  ///
+  /// The callback is expected to be idempotent under concurrency: a cold
+  /// start fires many parallel requests, so a single expired token yields
+  /// as many `onError` hits as there are in-flight calls. De-duplication
+  /// lives in the callback (see `SessionController.handleExpiredToken`),
+  /// not here, so the interceptor stays free of timing state.
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    final isPublicAuthRoute = err.requestOptions.path.startsWith('/auth/');
+    if (!isPublicAuthRoute &&
+        err.response?.statusCode == 401 &&
+        readErrorCode(err.response) == 'invalid_token') {
+      _onUnauthorized?.call();
+    }
+    handler.next(err);
   }
 }

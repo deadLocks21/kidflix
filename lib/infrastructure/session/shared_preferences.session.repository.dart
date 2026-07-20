@@ -1,6 +1,8 @@
 import 'dart:convert';
 
+import 'package:kidflix/core/domain/exceptions/invalid_phone_number.exception.dart';
 import 'package:kidflix/core/domain/model/device.dart';
+import 'package:kidflix/core/domain/model/phone_number.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/model/session.dart';
 import 'package:kidflix/core/domain/services/session.repository.dart';
@@ -19,6 +21,7 @@ class SharedPreferencesSessionRepository implements SessionRepository {
   static const _kProfiles = 'kidflix.profiles';
   static const _kDeviceId = 'kidflix.device_id';
   static const _kDeviceName = 'kidflix.device_name';
+  static const _kPhone = 'kidflix.phone_number';
 
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
 
@@ -61,10 +64,31 @@ class SharedPreferencesSessionRepository implements SessionRepository {
   }
 
   @override
+  Future<PhoneNumber?> readPhoneNumber() async {
+    final prefs = await _prefs;
+    final raw = prefs.getString(_kPhone);
+    if (raw == null) return null;
+    try {
+      return PhoneNumber.fromE164(raw);
+    } on InvalidPhoneNumberException {
+      // Corrupt / hand-edited value: treat as absent rather than crashing
+      // the caller (the silent re-auth flow falls back to phone entry).
+      return null;
+    }
+  }
+
+  @override
+  Future<void> writePhoneNumber(PhoneNumber phone) async {
+    final prefs = await _prefs;
+    await prefs.setString(_kPhone, phone.e164);
+  }
+
+  @override
   Future<void> clearSessionPreserveDevice() async {
     final prefs = await _prefs;
     await prefs.remove(_kJwt);
     await prefs.remove(_kProfiles);
+    await prefs.remove(_kPhone);
   }
 
   @override
@@ -72,6 +96,7 @@ class SharedPreferencesSessionRepository implements SessionRepository {
     final prefs = await _prefs;
     await prefs.remove(_kJwt);
     await prefs.remove(_kProfiles);
+    await prefs.remove(_kPhone);
     await prefs.remove(_kDeviceId);
     await prefs.remove(_kDeviceName);
   }

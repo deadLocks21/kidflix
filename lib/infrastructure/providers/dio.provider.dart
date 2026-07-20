@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:kidflix/infrastructure/http/auth.interceptor.dart';
 import 'package:kidflix/infrastructure/providers/api_base_url.provider.dart';
 import 'package:kidflix/infrastructure/providers/current_profile_id.provider.dart';
 import 'package:kidflix/infrastructure/providers/current_session.provider.dart';
+import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'dio.provider.g.dart';
@@ -36,9 +39,18 @@ part 'dio.provider.g.dart';
 /// `/auth/*` endpoints (no header at all) and exempts `GET /profiles` from
 /// `X-Profile-Id` injection (bootstrap route).
 ///
-/// Both callbacks are read via `ref.read` (not `ref.watch`) so login/logout
-/// transitions AND profile-selection transitions do NOT rebuild this `Dio`.
-/// The interceptor reads the latest values lazily at every request.
+/// The same interceptor watches responses for `401 invalid_token` and hands
+/// off to [SessionController.handleExpiredToken], which re-issues an OTP and
+/// drops the user on the verification screen. `unawaited` keeps the error
+/// path non-blocking: the original `DioException` still surfaces to the
+/// calling repository, the recovery runs beside it.
+///
+/// All three callbacks are read via `ref.read` (not `ref.watch`) so
+/// login/logout transitions AND profile-selection transitions do NOT rebuild
+/// this `Dio`. The interceptor reads the latest values lazily at every
+/// request. Reading `sessionControllerProvider` lazily also breaks what would
+/// otherwise be a build-time cycle (`dio → sessionController → authService →
+/// authRepository → dio`).
 @Riverpod(keepAlive: true)
 Dio dio(Ref ref) {
   final baseUrl = ref.watch(apiBaseUrlProvider);
@@ -55,6 +67,9 @@ Dio dio(Ref ref) {
     AuthInterceptor(
       session: () => ref.read(currentSessionProvider),
       profileId: () => ref.read(currentProfileIdProvider),
+      onUnauthorized: () => unawaited(
+        ref.read(sessionControllerProvider.notifier).handleExpiredToken(),
+      ),
     ),
   );
   return dio;

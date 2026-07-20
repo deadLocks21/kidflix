@@ -1,4 +1,5 @@
 import 'package:kidflix/core/domain/model/device.dart';
+import 'package:kidflix/core/domain/model/phone_number.dart';
 import 'package:kidflix/core/domain/model/session.dart';
 import 'package:kidflix/core/domain/services/session.repository.dart';
 import 'package:uuid/uuid.dart';
@@ -10,6 +11,7 @@ import 'package:uuid/uuid.dart';
 class InMemorySessionRepository implements SessionRepository {
   Session? _session;
   Device? _device;
+  PhoneNumber? _phone;
 
   @override
   Future<Session?> read() async => _session;
@@ -21,13 +23,23 @@ class InMemorySessionRepository implements SessionRepository {
   }
 
   @override
+  Future<PhoneNumber?> readPhoneNumber() async => _phone;
+
+  @override
+  Future<void> writePhoneNumber(PhoneNumber phone) async {
+    _phone = phone;
+  }
+
+  @override
   Future<void> clearSessionPreserveDevice() async {
     _session = null;
+    _phone = null;
   }
 
   @override
   Future<void> clear() async {
     _session = null;
+    _phone = null;
     _device = null;
   }
 

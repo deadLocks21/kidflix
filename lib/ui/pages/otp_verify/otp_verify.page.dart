@@ -95,14 +95,22 @@ class _OtpVerifyPageState extends ConsumerState<OtpVerifyPage> {
   Widget build(BuildContext context) {
     final state = ref.watch(sessionControllerProvider);
     final phoneText = state is OtpRequested ? state.phone.e164 : '';
+    // Session expirée : l'utilisateur n'a jamais tapé son numéro dans ce
+    // flow, il n'y a donc pas d'écran de saisie derrière — on masque le
+    // retour arrière plutôt que de le renvoyer sur une étape qu'il n'a
+    // pas franchie.
+    final expired = state is OtpRequested && state.sessionExpired;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Vérification'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () =>
-              ref.read(sessionControllerProvider.notifier).backToPhoneEntry(),
-        ),
+        leading: expired
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => ref
+                    .read(sessionControllerProvider.notifier)
+                    .backToPhoneEntry(),
+              ),
       ),
       body: Center(
         child: ConstrainedBox(
@@ -113,10 +121,22 @@ class _OtpVerifyPageState extends ConsumerState<OtpVerifyPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 24),
-                Text(
-                  'Entre le code à 6 chiffres',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
+                if (expired) ...[
+                  Text(
+                    'Session expirée',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Pour des raisons de sécurité, il faut te reconnecter. '
+                    'On vient de t\'envoyer un nouveau code.',
+                  ),
+                  const SizedBox(height: 24),
+                ] else
+                  Text(
+                    'Entre le code à 6 chiffres',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
                 const SizedBox(height: 8),
                 Text('Envoyé au $phoneText'),
                 const SizedBox(height: 32),

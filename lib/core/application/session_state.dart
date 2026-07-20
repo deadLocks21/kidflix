@@ -8,6 +8,8 @@ import 'package:kidflix/core/domain/model/session.dart';
 /// - Anonymous             → OtpRequested           (requestOtp)
 /// - OtpRequested          → Authenticated          (verifyOtp success)
 /// - OtpRequested          → OtpRequested           (resendOtp)
+/// - any (avec session)    → OtpRequested           (handleExpiredToken, 401 invalid_token)
+/// - any (avec session)    → Anonymous              (handleExpiredToken sans numéro connu / SMS KO)
 /// - Authenticated         → PinRequired            (selectProfile avec PIN)
 /// - Authenticated         → ProfileSelected        (selectProfile sans PIN)
 /// - Authenticated         → ManagementPinRequired  (enterManagementMode)
@@ -35,7 +37,17 @@ class OtpRequested extends SessionState {
   final PhoneNumber phone;
   final DateTime expiresAt;
 
-  const OtpRequested({required this.phone, required this.expiresAt});
+  /// `true` quand l'OTP a été déclenché automatiquement par l'expiration du
+  /// JWT (`401 invalid_token`) et non par une saisie volontaire du numéro.
+  /// L'écran OTP s'en sert pour expliquer la déconnexion et masquer le
+  /// retour arrière (il n'y a pas d'écran de saisie à retrouver derrière).
+  final bool sessionExpired;
+
+  const OtpRequested({
+    required this.phone,
+    required this.expiresAt,
+    this.sessionExpired = false,
+  });
 }
 
 /// Session authentifiée, aucun profil actif.

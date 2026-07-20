@@ -41,6 +41,10 @@ class SessionController extends _$SessionController {
   /// de sélection comme avant.
   String? _returnToProfileId;
 
+  /// Verrou single-flight de [handleExpiredToken] : empêche N requêtes
+  /// tombées en 401 simultanément de déclencher N SMS.
+  bool _isRecoveringSession = false;
+
   @override
   SessionState build() => const Anonymous();
 
@@ -94,9 +98,69 @@ class SessionController extends _$SessionController {
     );
     if (result is VerifyOtpSuccess) {
       await sessions.write(result.session);
+      // Le backend ne renvoie pas le numéro dans `verify-otp` : on le
+      // persiste nous-mêmes, c'est lui qui permettra de relancer un SMS
+      // sans ressaisie quand le JWT expirera (`handleExpiredToken`).
+      await sessions.writePhoneNumber(current.phone);
       state = Authenticated(result.session);
     }
     return result;
+  }
+
+  /// Réaction centralisée au `401 invalid_token` : la session est morte,
+  /// on renvoie l'utilisateur sur l'écran OTP avec un SMS déjà parti.
+  ///
+  /// Appelé depuis l'`AuthInterceptor` (via `dioProvider`) à chaque requête
+  /// protégée refusée. Trois protections :
+  ///
+  /// 1. **Single-flight.** Un démarrage à froid déclenche une dizaine
+  ///    d'appels en parallèle ; tous prendront 401. Le drapeau
+  ///    `_isRecoveringSession` garantit un seul `request-otp`, donc un seul
+  ///    SMS — sans quoi le backend répondrait `429 rate_limited` et on
+  ///    facturerait des SMS pour rien.
+  /// 2. **Garde d'état.** Depuis `Anonymous` / `OtpRequested` il n'y a rien
+  ///    à récupérer : une réponse 401 tardive d'une requête partie avant la
+  ///    déconnexion ne doit pas réarmer le flow.
+  /// 3. **Repli sûr.** Sans numéro persisté (session écrite par un build
+  ///    antérieur à cette feature) ou si l'envoi du SMS échoue (réseau,
+  ///    429, numéro retiré de la whitelist), on retombe sur `Anonymous` :
+  ///    l'utilisateur ressaisit son numéro plutôt que de rester bloqué sur
+  ///    un écran OTP qui n'attend aucun code.
+  Future<void> handleExpiredToken() async {
+    if (_isRecoveringSession) return;
+    final current = state;
+    if (current is Anonymous || current is OtpRequested) return;
+    _isRecoveringSession = true;
+    try {
+      final sessions = ref.read(sessionRepositoryProvider);
+      // Lecture AVANT purge : `clearSessionPreserveDevice` efface aussi le
+      // numéro.
+      final phone = await sessions.readPhoneNumber();
+      await sessions.clearSessionPreserveDevice();
+      // On bascule tout de suite hors des états porteurs de session : le
+      // JWT est mort, autant que les requêtes en vol cessent de l'envoyer.
+      state = const Anonymous();
+      if (phone == null) return;
+      final service = ref.read(authServiceProvider);
+      final result = await service.resendOtp.execute(phone);
+      switch (result) {
+        case ResendOtpSuccess(:final expiresAt):
+          await sessions.writePhoneNumber(phone);
+          state = OtpRequested(
+            phone: phone,
+            expiresAt: expiresAt,
+            sessionExpired: true,
+          );
+        case ResendOtpUnknownPhone():
+          break; // reste `Anonymous`
+      }
+    } catch (_) {
+      // `resendOtp` ne mappe que `unknown_phone_number` ; tout le reste
+      // (réseau, 429, 5xx) remonte en exception. On reste `Anonymous`.
+      state = const Anonymous();
+    } finally {
+      _isRecoveringSession = false;
+    }
   }
 
   /// Replays an OTP request for the same phone (used when the previous
