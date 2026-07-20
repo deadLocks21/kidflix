@@ -1,27 +1,42 @@
 # GitLab CI pour Kidflix
 #
-# Une seule étape : versioning automatique sur push `main`.
-# Le build & publish iOS/Android est géré par Codemagic, déclenché par le
-# tag `v*` que cette étape pousse.
+# Deux étapes :
+#   - `semantic-release` : versioning automatique sur push `main`.
+#   - `mirror-to-github` : push forcé des branches + tags vers le miroir
+#     GitHub, d'où GitHub Actions prend le relais pour le build & publish
+#     multi-plateformes (cf. .github/workflows/release.yml).
 #
 # Flow complet :
 #   1. Dev pousse des commits conventionnels sur main (feat:, fix:, ...)
 #   2. semantic-release lit les commits depuis le dernier tag
 #   3. Bump `version:` dans pubspec.yaml + commit `chore(release): X.Y.Z`
-#   4. Crée et pousse le tag `vX.Y.Z`
-#   5. Codemagic détecte le tag → lance les workflows iOS + Android
+#   4. Crée et pousse le tag `vX.Y.Z` sur GitLab
+#   5. `mirror-to-github` (stage `.post`, donc après) repousse main + tags
+#      vers GitHub
+#   6. GitHub Actions détecte le tag `v*` → build, publish stores, Release
+#
+# Pourquoi un job CI plutôt que le seul miroir natif GitLab : le push
+# mirroring intégré est asynchrone et best-effort — il peut retarder ou rater
+# le tag, et donc ne jamais déclencher les Actions. Ce job le force dans le
+# pipeline et échoue visiblement s'il ne passe pas.
 #
 # Note : on n'utilise PAS `[skip ci]` dans le message de release. GitHub Actions
-# interprète ce marqueur sur le tag mirroré et skip notre smoke test côté
+# interprète ce marqueur sur le tag mirroré et skip notre workflow côté
 # GitHub. À la place, on casse la boucle GitLab via une `rules:` qui ignore
 # les commits dont le titre commence par `chore(release)`.
 #
 # Pré-requis GitLab :
 #   - Variable CI/CD `GITLAB_TOKEN` : Project Access Token avec scope
 #     `write_repository` et rôle `Maintainer` (Settings → Access Tokens).
+#   - Variable CI/CD `GITHUB_TOKEN` (masquée) : PAT GitHub avec droit
+#     d'écriture sur le dépôt miroir — classic avec scope `repo`, ou
+#     fine-grained avec `Contents: read & write` sur deadLocks21/kidflix.
 #   - Si la branche `main` est protégée : ajouter le bot/token aux
 #     utilisateurs autorisés à push + autoriser le push de tags `v*`
 #     (Settings → Repository → Protected branches / Protected tags).
+
+variables:
+  GITHUB_MIRROR_URL: "https://github.com/deadLocks21/kidflix.git"
 
 stages:
   - release
@@ -52,3 +67,30 @@ semantic-release:
       when: never
     # Uniquement sur push direct main (pas sur MR, pas sur tag).
     - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
+
+mirror-to-github:
+  # Stage `.post` : s'exécute après TOUS les autres stages. Le clone ci-dessous
+  # a donc lieu APRÈS que semantic-release ait poussé son commit et son tag sur
+  # GitLab — c'est ce qui permet de mirrorer le tag `vX.Y.Z` fraîchement créé
+  # dans le pipeline courant, sans attendre un pipeline suivant.
+  stage: .post
+  variables:
+    # Clone complet : on repousse toutes les branches et tous les tags, pas
+    # seulement le ref du pipeline.
+    GIT_STRATEGY: clone
+    GIT_DEPTH: 0
+  before_script:
+    # `${VAR#https://}` retire le préfixe pour réinjecter le token dans l'URL.
+    - git remote add github "https://oauth2:${GITHUB_TOKEN}@${GITHUB_MIRROR_URL#https://}"
+  script:
+    # Pas de `git push --mirror` : il pousserait aussi les refs internes GitLab
+    # (refs/pipelines/*, refs/merge-requests/*) et supprimerait côté GitHub tout
+    # ref absent d'ici. On énumère explicitement les branches, puis les tags.
+    - git push --force github "refs/remotes/origin/*:refs/heads/*"
+    - git push --force --tags github
+  rules:
+    # Pas de garde `chore(release)` ici, contrairement au job ci-dessus : le
+    # pipeline déclenché par le commit de release ne fait tourner QUE ce job,
+    # et sert de filet si le mirroring du pipeline précédent a échoué.
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_COMMIT_TAG'
