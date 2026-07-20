@@ -56,6 +56,10 @@ const Duration _doubleTapForwardDuration = Duration(seconds: 30);
 const int _resumeMinSeconds = 10;
 const double _completionThreshold = 0.9;
 
+/// Throttle between two `playback.clamped` records inside one streak.
+/// Diagnostic only — remove with the seek-guard instrumentation.
+const Duration _clampLogInterval = Duration(seconds: 5);
+
 /// Internal projection of either [MovieDownloadDto] or
 /// [EpisodeDownloadDto], used by the player widget without caring about
 /// the underlying media kind.
@@ -181,6 +185,19 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   bool _disposed = false;
   bool _switching = false;
   bool _autoAdvanceFired = false;
+
+  /// Diagnostics for the reactive seek guard below. The guard is
+  /// suspected of pinning playback: because it `return`s before
+  /// `_lastObservedPosition = p`, a clamp derived from that same field
+  /// can never advance, so every subsequent tick is yanked back to the
+  /// same point. These three fields exist to prove or kill that theory
+  /// from production logs — a streak that keeps climbing while
+  /// `clamp.max_safe_ms` stays put is the signature.
+  ///
+  /// Remove once the guard is fixed.
+  int _clampStreak = 0;
+  DateTime? _clampStreakLoggedAt;
+  Duration? _clampStreakAnchor;
 
   /// Cached at bootstrap so dispose() can invoke it without touching
   /// [ref] (Riverpod disallows ref access after the widget is marked
@@ -411,6 +428,30 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     if (_disposed) return;
     setState(() => _lastDownload = dto);
     _downloadedFractionNotifier.value = _downloadedFraction();
+    // Diagnostic: a download that ends on a terminal status while the
+    // engine is live is the suspected trigger for the playback freeze —
+    // `_maxSafePosition` keeps clamping against a download that is no
+    // longer running, and the in-band `failed` / `cancelled` events
+    // carry no `bytesTotal`, which selects its self-referential branch.
+    // Pair this record with the `playback.clamped` streak that follows.
+    // Remove with the seek-guard instrumentation.
+    if (dto.status == DownloadStatusDto.failed ||
+        dto.status == DownloadStatusDto.cancelled) {
+      unawaited(
+        ref.read(loggerProvider).warn(
+          'download.terminal',
+          attrs: {
+            'content.id': _currentMediaId(),
+            'download.status': dto.status.name,
+            'download.bytes_received': dto.bytesReceived,
+            'download.bytes_total': dto.bytesTotal,
+            'download.error': dto.errorMessage,
+            'playback.engine_live': _engine != null,
+            'clamp.last_observed_ms': _lastObservedPosition?.inMilliseconds,
+          },
+        ),
+      );
+    }
     if (!_readyEmitted &&
         (dto.status == DownloadStatusDto.readyToPlay ||
             dto.status == DownloadStatusDto.complete)) {
@@ -447,9 +488,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       // demux a not-yet-written region.
       final maxSafe = _maxSafePosition();
       if (maxSafe != null && p > maxSafe) {
+        _onClampFired(p, maxSafe);
         unawaited(_engine?.seek(maxSafe));
         return;
       }
+      _onClampCleared();
       final previous = _lastObservedPosition;
       setState(() => _position = p);
       _lastObservedPosition = p;
@@ -750,6 +793,76 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     if (ratio <= 0) return Duration.zero;
     if (ratio >= 1) return d;
     return d * ratio;
+  }
+
+  /// Records a firing of the reactive seek guard.
+  ///
+  /// Emits on the first hit of a streak, then at most every
+  /// [_clampLogInterval] for as long as it keeps firing — the position
+  /// stream ticks ~4×/s, so logging every hit would flood the Signoz
+  /// buffer (500 records, oldest dropped) and bury the evidence.
+  ///
+  /// What to read in the output:
+  ///
+  /// - `clamp.streak` climbing past a handful → the guard is not
+  ///   correcting a one-off scrub, it is fighting normal playback.
+  /// - `clamp.ceiling_moved=false` across a long streak → the ceiling is
+  ///   pinned, which only happens if the clamp source cannot advance.
+  /// - `download.bytes_total=null` → the unknown-total branch of
+  ///   [_maxSafePosition] is active, i.e. the clamp is `_lastObservedPosition`
+  ///   feeding back on itself. This is the smoking gun.
+  /// - `download.status` on a terminal value (`failed` / `cancelled`) →
+  ///   the clamp outlived the download it was protecting.
+  void _onClampFired(Duration position, Duration maxSafe) {
+    _clampStreak++;
+    final anchor = _clampStreakAnchor ??= maxSafe;
+    final now = DateTime.now();
+    final lastLoggedAt = _clampStreakLoggedAt;
+    final isFirst = _clampStreak == 1;
+    if (!isFirst &&
+        lastLoggedAt != null &&
+        now.difference(lastLoggedAt) < _clampLogInterval) {
+      return;
+    }
+    _clampStreakLoggedAt = now;
+    final dl = _lastDownload;
+    unawaited(
+      ref.read(loggerProvider).warn(
+        'playback.clamped',
+        attrs: {
+          'content.id': _currentMediaId(),
+          'clamp.streak': _clampStreak,
+          'clamp.position_ms': position.inMilliseconds,
+          'clamp.max_safe_ms': maxSafe.inMilliseconds,
+          'clamp.ceiling_moved': maxSafe != anchor,
+          'clamp.last_observed_ms': _lastObservedPosition?.inMilliseconds,
+          'download.status': dl?.status.name,
+          'download.bytes_received': dl?.bytesReceived,
+          'download.bytes_total': dl?.bytesTotal,
+          'duration_ms': _duration?.inMilliseconds,
+        },
+      ),
+    );
+  }
+
+  /// Closes out a clamp streak once playback gets through the guard.
+  ///
+  /// A streak that ends on its own was a legitimate correction. A streak
+  /// that never ends is the freeze — in that case this never fires, and
+  /// the absence of `playback.clamp_released` after a large
+  /// `clamp.streak` is itself the finding.
+  void _onClampCleared() {
+    if (_clampStreak == 0) return;
+    final streak = _clampStreak;
+    _clampStreak = 0;
+    _clampStreakLoggedAt = null;
+    _clampStreakAnchor = null;
+    unawaited(
+      ref.read(loggerProvider).info(
+        'playback.clamp_released',
+        attrs: {'content.id': _currentMediaId(), 'clamp.streak': streak},
+      ),
+    );
   }
 
   /// Fraction of the file currently on disk (0..1). Returns `null` when
