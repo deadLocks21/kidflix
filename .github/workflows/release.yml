@@ -22,6 +22,9 @@
 #      Windows et Linux n'ont pas de store dans ce pipeline (artifacts only).
 #
 #   5) release        Crée la GitHub Release avec les 6 assets attachés.
+#                     Notes = changelog semantic-release relu depuis le corps
+#                     du commit `chore(release)` taggé (PAS le message
+#                     générique de `release_notes.json`, réservé aux stores).
 #                     Skippée si workflow_dispatch (pas de tag) — pour tester
 #                     l'ensemble du pipeline sans polluer les Releases GitHub.
 #
@@ -838,15 +841,58 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # `fetch-depth: 0` : le fallback `git describe` (cf. étape "Compose
+          # les notes de release") a besoin des tags et de l'historique.
+          fetch-depth: 0
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts/
 
+      - name: Compose les notes de release
+        # semantic-release (côté GitLab CI) génère déjà le changelog
+        # conventionnel et l'écrit dans le CORPS du commit
+        # `chore(release): X.Y.Z` — celui-là même sur lequel pointe le tag
+        # `vX.Y.Z` qui déclenche ce workflow. On le relit ici plutôt que de
+        # publier le message générique de `release_notes.json` (qui reste
+        # réservé aux stores, cf. jobs publish-*).
+        run: |
+          set -euo pipefail
+
+          NOTES=""
+
+          # On teste le SUJET, pas le corps : tout commit conventionnel un peu
+          # soigné a un corps, donc "corps non vide" ne prouve rien. Seul
+          # `chore(release):` garantit que le corps est bien le changelog.
+          case "$(git log -1 --format=%s HEAD)" in
+            "chore(release):"*) NOTES=$(git log -1 --format=%b HEAD) ;;
+          esac
+
+          # Fallback `workflow_dispatch` : HEAD n'est pas un commit de release
+          # → on liste les commits depuis le dernier tag.
+          if [ -z "$(printf '%s' "$NOTES" | tr -d '[:space:]')" ]; then
+            PREV=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
+            # NB : pas d'apostrophe dans le mot par défaut de `${PREV:-...}`,
+            # bash y ré-interprète les quotes même entre guillemets doubles.
+            echo "HEAD n'est pas un commit de release — fallback depuis ${PREV:-le premier commit}"
+            NOTES=$(git log --no-merges --invert-grep --grep='^chore(release)' \
+              --pretty='* %s (%h)' ${PREV:+"$PREV.."}HEAD)
+          fi
+
+          # Les liens générés par semantic-release pointent vers `origin`,
+          # c'est-à-dire GitLab. Les chemins `/compare/` et `/commit/` sont
+          # identiques chez GitHub → un simple swap d'host suffit.
+          printf '%s\n' "$NOTES" \
+            | sed "s#https://gitlab.com/kidflix/app#$GITHUB_SERVER_URL/$GITHUB_REPOSITORY#g" \
+            > notes.md
+
+          echo "--- notes.md ---"
+          cat notes.md
+
       - name: Create GitHub Release
         run: |
-          BODY=$(jq -r '.[] | select(.language=="fr-FR") | .text' release_notes.json)
           IPA=$(find artifacts -type f -name '*.ipa' | head -1)
           AAB=$(find artifacts -type f -name '*.aab' | head -1)
           APK=$(find artifacts -type f -name '*.apk' | head -1)
@@ -881,6 +927,6 @@ jobs:
 
           gh release create "$RELEASE_TAG" \
             --title "Kidflix v$VERSION" \
-            --notes "$BODY" \
+            --notes-file notes.md \
             "$IPA" "$AAB" "$APK" "$MAPPING" "$PKG" "$WIN_ZIP" "$APPIMAGE" \
             "$UPD_WIN" "$UPD_LINUX"
