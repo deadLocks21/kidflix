@@ -284,10 +284,37 @@ void main() {
         await sub.asFuture<void>();
 
         expect(events.last.status, DownloadStatus.cancelled);
+        expect(events.last.bytesTotal, totalBytes);
         expect(File('${tempDir.path}/abc.mp4.partial').existsSync(), isTrue);
         expect(File('${tempDir.path}/abc.mp4').existsSync(), isFalse);
       },
     );
+
+    test('terminal event after a mid-stream drop carries bytesTotal', () async {
+      // Regression: these events used to omit bytesTotal, which left the
+      // player without a bytes-to-time ratio for its seek guard. The guard
+      // then fell back to the playhead itself and pinned playback to a
+      // one-second loop until the app was restarted.
+      const totalBytes = 20 * 1024 * 1024;
+      final adapter = _FakeAdapter(
+        totalBytes: totalBytes,
+        chunkSize: 1024 * 1024,
+        throwAfterBytes: 6 * 1024 * 1024,
+      );
+
+      final events = await streamHttpDownload(
+        dio: _newDio(adapter),
+        url: 'https://example.test/abc.mp4',
+        movieId: 'abc',
+        downloadsDir: tempDir,
+        cancelToken: CancelToken(),
+        isCancelled: () => false,
+      ).toList();
+
+      expect(events.last.status, DownloadStatus.failed);
+      expect(events.last.bytesTotal, totalBytes);
+      expect(events.last.bytesReceived, 6 * 1024 * 1024);
+    });
   });
 
   group('inspectDownloadOnDisk', () {
@@ -348,6 +375,9 @@ Dio _newDio(_FakeAdapter adapter) {
 /// - Setting [chunkDelay] inserts a small async gap between chunks so
 ///   tests can observe progress events and trigger cancellation
 ///   mid-stream.
+/// - Setting [throwAfterBytes] drops the body stream once that many bytes
+///   have been emitted, simulating a connection lost mid-download —
+///   after the response headers, so the total size is already known.
 class _FakeAdapter implements HttpClientAdapter {
   _FakeAdapter({
     required this.totalBytes,
@@ -358,6 +388,7 @@ class _FakeAdapter implements HttpClientAdapter {
     this.forceStatusCode,
     this.forceContentRangeStart,
     this.contentType,
+    this.throwAfterBytes,
   });
 
   final int totalBytes;
@@ -368,6 +399,7 @@ class _FakeAdapter implements HttpClientAdapter {
   final int? forceStatusCode;
   final int? forceContentRangeStart;
   final String? contentType;
+  final int? throwAfterBytes;
 
   int requestCount = 0;
   RequestOptions? lastRequest;
@@ -403,6 +435,13 @@ class _FakeAdapter implements HttpClientAdapter {
     Stream<Uint8List> buildStream() async* {
       var emitted = 0;
       while (emitted < remaining) {
+        final cutoff = throwAfterBytes;
+        if (cutoff != null && emitted >= cutoff) {
+          throw DioException.connectionError(
+            requestOptions: options,
+            reason: 'simulated mid-stream drop',
+          );
+        }
         final size = (remaining - emitted) < chunkSize
             ? (remaining - emitted)
             : chunkSize;

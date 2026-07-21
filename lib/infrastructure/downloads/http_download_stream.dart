@@ -95,6 +95,13 @@ Future<void> _runDownload({
   required CancelToken cancelToken,
   required bool Function() isCancelled,
 }) async {
+  // Hoisted out of the `try` so every terminal path — including the
+  // outermost catch — can report what was actually written and how big
+  // the file was meant to be. A terminal event carrying a null
+  // `bytesTotal` leaves the player with no bytes-to-time ratio for its
+  // seek guard, which is how a dropped connection used to pin playback.
+  var bytesReceived = 0;
+  int? bytesTotal;
   try {
     if (!await downloadsDir.exists()) {
       await downloadsDir.create(recursive: true);
@@ -187,7 +194,7 @@ Future<void> _runDownload({
       '${downloadsDir.path}/${partialFileName(movieId, ext)}',
     );
 
-    var bytesReceived = serverAcceptedRange ? initialBytes : 0;
+    bytesReceived = serverAcceptedRange ? initialBytes : 0;
     if (!serverAcceptedRange && existingPartial != null) {
       // Range rejected (or restart-from-0): drop the stale partial, which may
       // even carry a different extension than the one we just derived.
@@ -197,7 +204,7 @@ Future<void> _runDownload({
       await partialFile.create(recursive: true);
     }
 
-    final bytesTotal = _resolveTotalSize(response.headers, bytesReceived);
+    bytesTotal = _resolveTotalSize(response.headers, bytesReceived);
 
     final sink = partialFile.openWrite(mode: FileMode.writeOnlyAppend);
 
@@ -256,9 +263,21 @@ Future<void> _runDownload({
       await sink.flush();
       await sink.close();
       if (isCancelled() || (e is DioException && CancelToken.isCancel(e))) {
-        await _emitCancelled(controller, movieId, partialFile, bytesReceived);
+        await _emitCancelled(
+          controller,
+          movieId,
+          partialFile,
+          bytesReceived,
+          bytesTotal: bytesTotal,
+        );
       } else {
-        await _emitFailed(controller, movieId, e.toString(), partialFile);
+        await _emitFailed(
+          controller,
+          movieId,
+          e.toString(),
+          partialFile,
+          bytesTotal: bytesTotal,
+        );
       }
       return;
     }
@@ -267,7 +286,13 @@ Future<void> _runDownload({
     await sink.close();
 
     if (isCancelled()) {
-      await _emitCancelled(controller, movieId, partialFile, bytesReceived);
+      await _emitCancelled(
+        controller,
+        movieId,
+        partialFile,
+        bytesReceived,
+        bytesTotal: bytesTotal,
+      );
       return;
     }
 
@@ -289,7 +314,8 @@ Future<void> _runDownload({
       MovieDownload(
         movieId: movieId,
         status: DownloadStatus.failed,
-        bytesReceived: 0,
+        bytesReceived: bytesReceived,
+        bytesTotal: bytesTotal,
         errorMessage: e.toString(),
         updatedAt: DateTime.now(),
       ),
@@ -330,12 +356,17 @@ bool _meetsReadyThreshold(int received, int? total) {
   return received >= total * _readyThresholdFraction;
 }
 
+/// [bytesTotal] is `null` only when the download died before the
+/// response headers were read — past that point callers pass the
+/// resolved total so consumers keep a usable bytes-to-time ratio for the
+/// partial file left on disk.
 Future<void> _emitCancelled(
   StreamController<MovieDownload> controller,
   String movieId,
   File? partialFile,
-  int bytes,
-) async {
+  int bytes, {
+  int? bytesTotal,
+}) async {
   String? path;
   if (partialFile != null && await partialFile.exists()) {
     path = partialFile.path;
@@ -345,6 +376,7 @@ Future<void> _emitCancelled(
       movieId: movieId,
       status: DownloadStatus.cancelled,
       bytesReceived: bytes,
+      bytesTotal: bytesTotal,
       localPath: path,
       updatedAt: DateTime.now(),
     ),
@@ -352,12 +384,14 @@ Future<void> _emitCancelled(
   if (!controller.isClosed) await controller.close();
 }
 
+/// See [_emitCancelled] for the [bytesTotal] contract.
 Future<void> _emitFailed(
   StreamController<MovieDownload> controller,
   String movieId,
   String message,
-  File? partialFile,
-) async {
+  File? partialFile, {
+  int? bytesTotal,
+}) async {
   var bytes = 0;
   String? path;
   if (partialFile != null && await partialFile.exists()) {
@@ -369,6 +403,7 @@ Future<void> _emitFailed(
       movieId: movieId,
       status: DownloadStatus.failed,
       bytesReceived: bytes,
+      bytesTotal: bytesTotal,
       localPath: path,
       errorMessage: message,
       updatedAt: DateTime.now(),
