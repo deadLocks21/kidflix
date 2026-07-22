@@ -38,7 +38,8 @@ Garde-fous de version (basés sur la version RÉELLE pointée par `current`, pas
 
 ```
 <root>/                      racine choisie à l'install
-  versions/<v>/              contenu d'une version (kidflix.exe + dll + data/, ou AppImage)
+  versions/<v>/              contenu d'une version (kidflix.exe + dll + data/ sous
+                             Windows, squashfs-root/ extrait sous Linux)
   current      ->  versions/<v>   jonction (Windows) / symlink (Linux)
   updater/kidflix-updater[.exe]   le binaire relocalisé (cible stable des raccourcis)
   config.json                { root, installedVersion, lastCheck }
@@ -60,6 +61,20 @@ L'updater est un binaire **distinct** de `kidflix.exe`, et il met à jour
 **avant** de lancer l'app : l'app n'est jamais en cours d'exécution quand on
 touche aux fichiers. On n'écrase jamais une version (on en **ajoute** une puis
 on bascule le lien), donc rien n'est verrouillé.
+
+## Pourquoi l'AppImage est extraite (Linux)
+
+Une AppImage de type 2 se monte via **FUSE 2** à chaque lancement, or `libfuse2`
+n'est plus installée par défaut depuis Ubuntu 22.04 : l'exécuter directement
+échoue sur `error loading libfuse.so.2`. L'updater lançant l'app sans console,
+l'échec serait totalement silencieux côté utilisateur.
+
+L'installation fait donc un `--appimage-extract` (pris en charge par le runtime
+AppImage lui-même, **sans** FUSE) et lance `current/squashfs-root/AppRun`.
+Extraire **une fois à l'installation** plutôt qu'à chaque démarrage
+(`--appimage-extract-and-run`) évite de repayer la décompression du bundle à
+chaque lancement. Repli sur `Kidflix.AppImage` si l'extraction échoue, ou pour
+une install antérieure pas encore mise à jour.
 
 ## Comment ça démarre sans fenêtre
 

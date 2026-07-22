@@ -70,6 +70,12 @@ foreach ($dir in @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFo
 
 // ── Linux ───────────────────────────────────────────────────────────────────
 
+/// `APPLICATION_ID` de `linux/CMakeLists.txt`, posé en WM_CLASS par le runner
+/// via `g_set_prgname`. Sans le `StartupWMClass` correspondant, la fenêtre qui
+/// tourne n'est pas rattachée à cette entrée et le dock affiche une icône
+/// générique, même avec un `Icon=` valide.
+const _applicationId = 'fr.dtfh.kidflix';
+
 void _createLinuxDesktopEntry(Layout layout, Log log) {
   final home = Platform.environment['HOME'] ?? '.';
   final appsDir = Directory(p.join(home, '.local', 'share', 'applications'))
@@ -83,9 +89,10 @@ Type=Application
 Name=Kidflix
 Comment=Kidflix
 Exec="${layout.updaterExe}" --launch
-Icon=${layout.appExecutable}
+Icon=${layout.appIcon}
 Terminal=false
 Categories=AudioVideo;Video;
+StartupWMClass=$_applicationId
 ''';
   final file = File(p.join(appsDir.path, 'kidflix.desktop'));
   file.writeAsStringSync(desktop);

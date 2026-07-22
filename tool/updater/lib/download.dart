@@ -25,7 +25,7 @@ Future<File> downloadAsset(ReleaseAsset asset, String tmpDir, Log log) async {
 
 /// Installe l'app contenue dans [archiveFile] dans [versionDir].
 ///  - Windows : décompresse le `.zip` (kidflix.exe + dll + data/) à la racine.
-///  - Linux   : place l'AppImage en `Kidflix.AppImage` et la rend exécutable.
+///  - Linux   : extrait l'AppImage en `squashfs-root/`.
 void installAppArtifact(File archiveFile, String versionDir, Log log) {
   final dir = Directory(versionDir);
   if (dir.existsSync()) dir.deleteSync(recursive: true);
@@ -34,11 +34,49 @@ void installAppArtifact(File archiveFile, String versionDir, Log log) {
   if (Platform.isWindows) {
     _extractZip(archiveFile.path, versionDir, log);
   } else {
-    final target = File(p.join(versionDir, 'Kidflix.AppImage'));
-    archiveFile.copySync(target.path);
-    Process.runSync('chmod', ['+x', target.path]);
-    log('AppImage installée : ${target.path}');
+    _extractAppImage(archiveFile, versionDir, log);
   }
+}
+
+/// Déploie l'AppImage [archiveFile] dans [versionDir] en l'**extrayant**, au
+/// lieu de la laisser telle quelle.
+///
+/// Une AppImage de type 2 se monte via FUSE 2 à chaque lancement, or `libfuse2`
+/// n'est plus installée par défaut depuis Ubuntu 22.04 : l'exécuter directement
+/// échoue sur `error loading libfuse.so.2`. Comme l'updater lance l'app sans
+/// console, cet échec serait parfaitement silencieux côté utilisateur.
+///
+/// `--appimage-extract` est pris en charge par le runtime AppImage lui-même,
+/// sans FUSE. On l'applique une fois à l'installation plutôt qu'à chaque
+/// démarrage (`--appimage-extract-and-run`), pour ne pas repayer la
+/// décompression du bundle à chaque lancement.
+void _extractAppImage(File archiveFile, String versionDir, Log log) {
+  final image = File(p.join(versionDir, 'Kidflix.AppImage'));
+  archiveFile.copySync(image.path);
+  Process.runSync('chmod', ['+x', image.path]);
+
+  // `--appimage-extract` écrit toujours dans `squashfs-root/` du répertoire
+  // courant : d'où le workingDirectory plutôt qu'un chemin de sortie.
+  final result = Process.runSync(image.path, const [
+    '--appimage-extract',
+  ], workingDirectory: versionDir);
+
+  final appRun = File(p.join(versionDir, 'squashfs-root', 'AppRun'));
+  if (result.exitCode != 0 || !appRun.existsSync()) {
+    // On garde l'AppImage : `Layout.appExecutable` retombera dessus, ce qui
+    // reste jouable si l'hôte a libfuse2.
+    log.error(
+      'Extraction de l\'AppImage échouée (code ${result.exitCode}) — '
+      'lancement direct de l\'image',
+      result.stderr,
+    );
+    return;
+  }
+
+  // Le contenu extrait fait foi : inutile de garder l'image en double.
+  image.deleteSync();
+  Process.runSync('chmod', ['+x', appRun.path]);
+  log('AppImage extraite : ${appRun.path}');
 }
 
 void _extractZip(String zipPath, String destDir, Log log) {

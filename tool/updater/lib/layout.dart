@@ -6,7 +6,8 @@ import 'package:path/path.dart' as p;
 ///
 /// ```
 /// <root>/
-///   versions/<v>/        contenu d'une version (kidflix.exe + dll + data/, ou AppImage)
+///   versions/<v>/        contenu d'une version (kidflix.exe + dll + data/ sous
+///                        Windows, squashfs-root/ extrait sous Linux)
 ///   current              jonction (Windows) / symlink (Linux) -> versions/<v>
 ///   updater/             le binaire updater relocalisé (emplacement stable)
 ///   config.json          { root, installedVersion, ... }
@@ -53,9 +54,26 @@ class Layout {
   );
 
   /// Exécutable de l'app à lancer, via le lien `current` (jamais versionné).
-  String get appExecutable => Platform.isWindows
-      ? p.join(currentLink, 'kidflix.exe')
-      : p.join(currentLink, 'Kidflix.AppImage');
+  ///
+  /// Sous Linux on vise l'AppImage **extraite** (`squashfs-root/AppRun`), qui ne
+  /// dépend pas de FUSE 2 — absent d'Ubuntu 22.04+ (cf. `_extractAppImage`).
+  /// Le repli sur l'image elle-même couvre deux cas : les installations
+  /// antérieures à ce changement, pas encore mises à jour, et une extraction qui
+  /// aurait échoué.
+  String get appExecutable {
+    if (Platform.isWindows) return p.join(currentLink, 'kidflix.exe');
+    final appRun = p.join(currentLink, 'squashfs-root', 'AppRun');
+    if (File(appRun).existsSync()) return appRun;
+    return p.join(currentLink, 'Kidflix.AppImage');
+  }
+
+  /// Icône pour l'entrée de bureau Linux. L'AppImage extraite expose la vraie
+  /// icône à sa racine ; sinon on retombe sur l'exécutable, que les
+  /// environnements de bureau ignoreront silencieusement.
+  String get appIcon {
+    final png = p.join(currentLink, 'squashfs-root', 'kidflix.png');
+    return File(png).existsSync() ? png : appExecutable;
+  }
 
   bool get isInstalled => File(configFile).existsSync();
 
