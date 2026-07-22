@@ -665,35 +665,55 @@ jobs:
 
       - name: Verify the AppImage is self-contained
         # Garde-fou contre la régression qui a motivé linuxdeploy : on extrait
-        # l'AppImage dans une Ubuntu 24.04 vierge — donc SANS libmpv, et avec un
-        # libmpv.so.2 de toute façon incompatible — et on exige que plus aucune
-        # dépendance ne manque. Seuls GTK et ALSA sont installés, pour simuler un
-        # vrai bureau : ce sont des libs volontairement laissées à l'hôte.
+        # l'AppImage dans une Ubuntu 24.04 nue — donc sans libmpv — et on exige
+        # que tout se résolve. Le conteneur reçoit ce qu'un vrai bureau fournit
+        # (GTK, ALSA, pile graphique Mesa) : ces libs sont volontairement NON
+        # embarquées, l'excludelist AppImage les laisse à l'hôte car elles sont
+        # couplées à son driver. Sans elles, le test crierait au loup.
+        #
+        # Le script passe par stdin (`-s`) plutôt que par `-c '…'` : il peut
+        # ainsi contenir des apostrophes.
         run: |
-          docker run --rm -v "$PWD:/w" -w /w -e APPIMAGE="$APPIMAGE_NAME" \
-            ubuntu:24.04 bash -euo pipefail -c '
-              apt-get update -qq
-              apt-get install -y -qq libgtk-3-0t64 libasound2t64 >/dev/null
-              ./"$APPIMAGE" --appimage-extract >/dev/null
-              export LD_LIBRARY_PATH=squashfs-root/usr/bin/lib:squashfs-root/usr/lib
-              missing=$(
-                for f in squashfs-root/usr/bin/kidflix \
-                         squashfs-root/usr/bin/lib/*.so* \
-                         squashfs-root/usr/lib/*.so*; do
-                  [ -f "$f" ] || continue
-                  ldd "$f" 2>/dev/null | grep "not found" \
-                    | sed "s|^|$(basename "$f") -> |" || true
-                done
-              )
-              if [ -n "$missing" ]; then
-                echo "::error::AppImage non autonome, dépendances manquantes :"
-                echo "$missing"
-                exit 1
-              fi
-              echo "AppImage autonome : toutes les dépendances sont résolues."
-              ldd squashfs-root/usr/bin/lib/*media_kit*.so 2>/dev/null | grep -i mpv || true
-              rm -rf squashfs-root
-            '
+          docker run --rm -i -v "$PWD:/w" -w /w -e APPIMAGE="$APPIMAGE_NAME" \
+            ubuntu:24.04 bash -euo pipefail -s <<'IN_CONTAINER'
+          apt-get update -qq
+          apt-get install -y -qq \
+            libgtk-3-0t64 libasound2t64 \
+            libgl1 libegl1 libgbm1 libdrm2 libx11-xcb1 >/dev/null
+
+          ./"$APPIMAGE" --appimage-extract >/dev/null
+          export LD_LIBRARY_PATH=squashfs-root/usr/bin/lib:squashfs-root/usr/lib
+
+          # L'assertion qui compte : c'est très exactement le bug d'origine.
+          test -f squashfs-root/usr/lib/libmpv.so.1 || {
+            echo "::error::libmpv.so.1 n'est pas embarquée dans l'AppImage"
+            exit 1
+          }
+
+          # Backends optionnels, absents d'un bureau standard et sans rapport
+          # avec la lecture vidéo : JACK (sortie audio alternative de
+          # ffmpeg/mpv), libusb via libdc1394 (caméras IIDC de libavdevice),
+          # libjvm via libdartjni (package `jni`, transitif Android).
+          OPTIONAL='libjack\.so\.0|libusb-1\.0\.so\.0|libjvm\.so'
+
+          missing=$(
+            for f in squashfs-root/usr/bin/kidflix \
+                     squashfs-root/usr/bin/lib/*.so* \
+                     squashfs-root/usr/lib/*.so*; do
+              [ -f "$f" ] || continue
+              ldd "$f" 2>/dev/null | grep "not found" | grep -Ev "$OPTIONAL" \
+                | sed "s|^|$(basename "$f") -> |" || true
+            done | sort -u
+          )
+          if [ -n "$missing" ]; then
+            echo "::error::AppImage non autonome, dépendances manquantes :"
+            echo "$missing"
+            exit 1
+          fi
+
+          echo "libmpv.so.1 embarquée, et toutes les dépendances se résolvent."
+          rm -rf squashfs-root
+          IN_CONTAINER
 
       - name: Upload Linux AppImage artifact
         uses: actions/upload-artifact@v4
