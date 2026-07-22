@@ -542,7 +542,8 @@ jobs:
             pkg-config \
             liblzma-dev \
             libasound2-dev \
-            libmpv-dev
+            libmpv-dev \
+            imagemagick
 
       - uses: subosito/flutter-action@v2
         with:
@@ -574,15 +575,26 @@ jobs:
           mkdir -p "$APPDIR/usr/bin"
           cp -r "$BUNDLE_DIR"/* "$APPDIR/usr/bin/"
 
-          cat > "$APPDIR/AppRun" <<'EOF'
+          # AppRun maison, passé à linuxdeploy via `--custom-apprun`. Deux
+          # dossiers de libs cohabitent et doivent TOUS DEUX être exposés :
+          #   usr/bin/lib  libs Flutter (embedder, libapp.so, plugins) — layout
+          #                imposé par le bundle, rpath `$ORIGIN/lib`.
+          #   usr/lib      libs système déployées par linuxdeploy (libmpv & co).
+          # Passer par LD_LIBRARY_PATH plutôt que de dépendre du rpath rend le
+          # lancement insensible à une éventuelle réécriture par patchelf.
+          cat > AppRun <<'EOF'
           #!/bin/bash
           HERE="$(dirname "$(readlink -f "${0}")")"
-          export LD_LIBRARY_PATH="$HERE/usr/bin/lib:${LD_LIBRARY_PATH}"
+          export LD_LIBRARY_PATH="$HERE/usr/bin/lib:$HERE/usr/lib:${LD_LIBRARY_PATH}"
+          # Met le thème d'icônes embarqué à portée de GTK : sans ça, le
+          # `gtk_window_set_default_icon_name("kidflix")` du runner ne résout
+          # rien et la fenêtre reste sans icône.
+          export XDG_DATA_DIRS="$HERE/usr/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
           cd "$HERE/usr/bin" && exec ./kidflix "$@"
           EOF
-          chmod +x "$APPDIR/AppRun"
+          chmod +x AppRun
 
-          cat > "$APPDIR/kidflix.desktop" <<EOF
+          cat > kidflix.desktop <<EOF
           [Desktop Entry]
           Type=Application
           Name=Kidflix
@@ -594,21 +606,94 @@ jobs:
           StartupWMClass=fr.dtfh.kidflix
           EOF
 
-          cp assets/icon/app_icon.png "$APPDIR/kidflix.png"
+          # 256×256 : taille hicolor standard, listée dans les index.theme
+          # système. L'original fait 1024×1024, une taille qu'aucun index.theme
+          # ne déclare — GTK ignorerait purement et simplement le répertoire.
+          convert assets/icon/app_icon.png -resize 256x256 kidflix.png
 
-      - name: Download appimagetool
+      - name: Download linuxdeploy
+        # Noms canoniques conservés : linuxdeploy découvre ses plugins par le
+        # motif `linuxdeploy-plugin-<nom>*` dans son propre dossier ou le PATH.
         run: |
-          wget -q -O appimagetool \
-            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x appimagetool
+          wget -q -O linuxdeploy-x86_64.AppImage \
+            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget -q -O linuxdeploy-plugin-appimage-x86_64.AppImage \
+            https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-appimage-x86_64.AppImage
 
       - name: Build AppImage
-        # `--appimage-extract-and-run` : appimagetool est lui-même un AppImage
-        # qui requiert FUSE2 pour s'auto-monter. Sur GHA, FUSE n'est pas dispo.
+        env:
+          # linuxdeploy et son plugin sont eux-mêmes des AppImages, qui
+          # requièrent FUSE2 pour s'auto-monter. Sur GHA, FUSE n'est pas dispo.
+          APPIMAGE_EXTRACT_AND_RUN: "1"
         run: |
           APPIMAGE_NAME="Kidflix-${VERSION}-${{ github.run_number }}-x86_64.AppImage"
-          ARCH=x86_64 ./appimagetool --appimage-extract-and-run AppDir "$APPIMAGE_NAME"
+
+          # Résolu via ldconfig plutôt qu'en dur : si un jour le runner ne
+          # fournit plus libmpv.so.1, on veut échouer ICI avec un message clair
+          # plutôt que de publier une AppImage cassée.
+          LIBMPV=$(ldconfig -p | awk '/libmpv\.so\.1 / {print $NF; exit}')
+          if [ -z "$LIBMPV" ]; then
+            echo "::error::libmpv.so.1 introuvable sur le runner (libmpv-dev installé ?)"
+            exit 1
+          fi
+          echo "libmpv déployée depuis $LIBMPV"
+
+          # `--library libmpv` : media_kit ne bundle RIEN sur Linux (son
+          # `media_kit_libs_linux_bundled_libraries` est vide) — libmpv est une
+          # dépendance système, présente ici uniquement parce que la CI installe
+          # `libmpv-dev` pour compiler. Sans ce déploiement explicite, l'AppImage
+          # sort avec un `NEEDED libmpv.so.1` que l'hôte doit satisfaire… ce
+          # qu'Ubuntu 24.04 ne peut plus faire (il n'expose que libmpv.so.2,
+          # soname bumpé par mpv 0.36). linuxdeploy embarque libmpv et tout son
+          # arbre (ffmpeg, libass, …) en respectant l'excludelist AppImage, qui
+          # laisse à l'hôte ce qui doit lui rester (libGL, X11, glibc, GTK).
+          #
+          # `--executable` pointe le binaire du BUNDLE, pas sa copie déjà dans
+          # l'AppDir : linuxdeploy le (re)copie et patche son rpath, sans risque
+          # de copie source==destination.
+          ARCH=x86_64 OUTPUT="$APPIMAGE_NAME" ./linuxdeploy-x86_64.AppImage \
+            --appdir AppDir \
+            --executable build/linux/x64/release/bundle/kidflix \
+            --library "$LIBMPV" \
+            --desktop-file kidflix.desktop \
+            --icon-file kidflix.png \
+            --custom-apprun AppRun \
+            --output appimage
+
           echo "APPIMAGE_NAME=$APPIMAGE_NAME" >> "$GITHUB_ENV"
+
+      - name: Verify the AppImage is self-contained
+        # Garde-fou contre la régression qui a motivé linuxdeploy : on extrait
+        # l'AppImage dans une Ubuntu 24.04 vierge — donc SANS libmpv, et avec un
+        # libmpv.so.2 de toute façon incompatible — et on exige que plus aucune
+        # dépendance ne manque. Seuls GTK et ALSA sont installés, pour simuler un
+        # vrai bureau : ce sont des libs volontairement laissées à l'hôte.
+        run: |
+          docker run --rm -v "$PWD:/w" -w /w -e APPIMAGE="$APPIMAGE_NAME" \
+            ubuntu:24.04 bash -euo pipefail -c '
+              apt-get update -qq
+              apt-get install -y -qq libgtk-3-0t64 libasound2t64 >/dev/null
+              ./"$APPIMAGE" --appimage-extract >/dev/null
+              export LD_LIBRARY_PATH=squashfs-root/usr/bin/lib:squashfs-root/usr/lib
+              missing=$(
+                for f in squashfs-root/usr/bin/kidflix \
+                         squashfs-root/usr/bin/lib/*.so* \
+                         squashfs-root/usr/lib/*.so*; do
+                  [ -f "$f" ] || continue
+                  ldd "$f" 2>/dev/null | grep "not found" \
+                    | sed "s|^|$(basename "$f") -> |" || true
+                done
+              )
+              if [ -n "$missing" ]; then
+                echo "::error::AppImage non autonome, dépendances manquantes :"
+                echo "$missing"
+                exit 1
+              fi
+              echo "AppImage autonome : toutes les dépendances sont résolues."
+              ldd squashfs-root/usr/bin/lib/*media_kit*.so 2>/dev/null | grep -i mpv || true
+              rm -rf squashfs-root
+            '
 
       - name: Upload Linux AppImage artifact
         uses: actions/upload-artifact@v4
