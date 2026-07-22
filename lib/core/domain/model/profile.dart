@@ -36,6 +36,26 @@ class Profile {
   /// back to the strict `==` match (current default behavior).
   final List<AgeCategory> includedLowerAgeCategories;
 
+  /// `true` when the profile belongs to *another* account and is shared with
+  /// the current one — typically a child profile shared between two parents,
+  /// so that watch progress, favorites and seen marks follow the child from
+  /// one phone to the other.
+  ///
+  /// Derived server-side from the caller's point of view, not stored on the
+  /// profile: the same profile is `shared == false` for its owner and
+  /// `shared == true` for the account it is shared with. A main profile is
+  /// never shared.
+  final bool shared;
+
+  /// `true` when the current account may edit this profile (name, avatar,
+  /// age category, PIN). Always `true` for a profile the account owns.
+  ///
+  /// Never covers deletion: deleting cascades on the owner household's watch
+  /// progress, favorites and seen marks, so it stays owner-only. A shared
+  /// profile is therefore never deletable from this account, whatever
+  /// [canManage] says.
+  final bool canManage;
+
   const Profile({
     required this.id,
     required this.name,
@@ -44,7 +64,12 @@ class Profile {
     this.avatarId,
     this.isMain = false,
     this.includedLowerAgeCategories = const [],
+    this.shared = false,
+    this.canManage = true,
   });
+
+  /// `true` when this account may delete the profile — owned profiles only.
+  bool get canDelete => !shared && !isMain;
 
   /// `true` when the profile requires PIN verification.
   bool get hasPin => pinHash != null && pinHash!.isNotEmpty;

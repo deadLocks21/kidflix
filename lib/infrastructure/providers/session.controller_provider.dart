@@ -578,8 +578,9 @@ class SessionController extends _$SessionController {
   /// Re-fetches the profile list from the backend (or the in-memory seed)
   /// and replaces `session.profiles` with the result. Used to resync after
   /// external mutations (new profile on another device, PIN updated,
-  /// profile deleted). No automatic trigger is wired — UI callsites pick
-  /// the right moment.
+  /// profile deleted, profil partagé depuis un autre compte). Déclenché au
+  /// démarrage par `bootstrap()` et à l'entrée sur l'écran de sélection de
+  /// profils.
   ///
   /// Throws [StateError] when called from `Anonymous` or `OtpRequested`
   /// (no session to refresh) — the throw is delegated to

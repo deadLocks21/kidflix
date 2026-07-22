@@ -124,6 +124,8 @@ class SharedPreferencesSessionRepository implements SessionRepository {
     'includedLowerAgeCategories': profile.includedLowerAgeCategories
         .map((c) => c.name)
         .toList(growable: false),
+    'shared': profile.shared,
+    'canManage': profile.canManage,
   };
 
   Profile _profileFromJson(Map<String, dynamic> json) => Profile(
@@ -143,6 +145,11 @@ class SharedPreferencesSessionRepository implements SessionRepository {
     includedLowerAgeCategories: _parseIncludedLowerAges(
       json['includedLowerAgeCategories'],
     ),
+    // Backwards-compat: sessions persisted before profile sharing landed
+    // only ever held owned profiles, hence `false` / `true`. The refresh
+    // fired at bootstrap overwrites with the server's view.
+    shared: json['shared'] as bool? ?? false,
+    canManage: json['canManage'] as bool? ?? true,
   );
 
   List<AgeCategory> _parseIncludedLowerAges(Object? raw) {

@@ -16,6 +16,19 @@ class ProfileDto {
   final bool isMain;
   final List<String> includedLowerAgeCategories;
 
+  /// Profile owned by another account and shared with this one. Drives the
+  /// "Partagé" badge in the management list.
+  final bool shared;
+
+  /// Whether this account may edit the profile. `false` on a shared profile
+  /// whose owner granted read-only access — the edit affordances are hidden
+  /// rather than left to fail with a `403` on tap.
+  final bool canManage;
+
+  /// Whether this account may delete the profile. Never true for a shared
+  /// profile: deletion cascades on the owner household's data.
+  final bool canDelete;
+
   const ProfileDto({
     required this.id,
     required this.name,
@@ -24,6 +37,9 @@ class ProfileDto {
     this.avatarId,
     required this.isMain,
     this.includedLowerAgeCategories = const [],
+    this.shared = false,
+    this.canManage = true,
+    this.canDelete = true,
   });
 
   factory ProfileDto.fromDomain(Profile profile) => ProfileDto(
@@ -36,5 +52,8 @@ class ProfileDto {
     includedLowerAgeCategories: profile.includedLowerAgeCategories
         .map((c) => c.name)
         .toList(growable: false),
+    shared: profile.shared,
+    canManage: profile.canManage,
+    canDelete: profile.canDelete,
   );
 }

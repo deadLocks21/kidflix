@@ -38,6 +38,63 @@ void main() {
       expect(dto.ageCategory, AgeCategory.adulte);
     });
 
+    test('defaults to owned when sharing fields are absent', () {
+      // Compat descendante : un backend antérieur au partage ne renvoie que
+      // des profils possédés. Les omettre doit donner "à moi, modifiable",
+      // surtout pas l'inverse (qui griserait les actions à tort).
+      final dto = RemoteProfileDto.fromJson({
+        'id': 'ar',
+        'name': 'Ar',
+        'age_category': 'enfant',
+        'pin_hash': null,
+        'avatar_id': null,
+        'is_main': false,
+      });
+
+      expect(dto.shared, isFalse);
+      expect(dto.canManage, isTrue);
+      expect(dto.toDomain().canDelete, isTrue);
+    });
+
+    test('parses a shared read-only profile', () {
+      final dto = RemoteProfileDto.fromJson({
+        'id': 'ar',
+        'name': 'Ar',
+        'age_category': 'enfant',
+        'pin_hash': null,
+        'avatar_id': null,
+        'is_main': false,
+        'shared': true,
+        'can_manage': false,
+      });
+
+      expect(dto.shared, isTrue);
+      expect(dto.canManage, isFalse);
+
+      final profile = dto.toDomain();
+      expect(profile.shared, isTrue);
+      expect(profile.canManage, isFalse);
+      expect(profile.canDelete, isFalse);
+    });
+
+    test('a shared profile stays undeletable even when manageable', () {
+      // `can_manage` couvre l'édition, jamais la suppression : celle-ci
+      // cascade sur les données du foyer propriétaire.
+      final profile = RemoteProfileDto.fromJson({
+        'id': 'ar',
+        'name': 'Ar',
+        'age_category': 'enfant',
+        'pin_hash': null,
+        'avatar_id': null,
+        'is_main': false,
+        'shared': true,
+        'can_manage': true,
+      }).toDomain();
+
+      expect(profile.canManage, isTrue);
+      expect(profile.canDelete, isFalse);
+    });
+
     test('maps "jeune_adulte" wire string to AgeCategory.jeuneAdulte', () {
       final dto = RemoteProfileDto.fromJson({
         'id': 'x',
@@ -83,6 +140,8 @@ void main() {
           'avatar_id': null,
           'is_main': false,
           'included_lower_age_categories': const <String>[],
+          'shared': false,
+          'can_manage': true,
         };
 
         expect(

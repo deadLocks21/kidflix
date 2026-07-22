@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/core/application/dtos/profile.dto.dart';
@@ -6,11 +8,38 @@ import 'package:kidflix/core/application/usecases/enter_management_mode.usecase.
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/ui/pages/profile_selection/widgets/profile_avatar.widget.dart';
 
-class ProfileSelectionPage extends ConsumerWidget {
+class ProfileSelectionPage extends ConsumerStatefulWidget {
   const ProfileSelectionPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileSelectionPage> createState() =>
+      _ProfileSelectionPageState();
+}
+
+class _ProfileSelectionPageState extends ConsumerState<ProfileSelectionPage> {
+  @override
+  void initState() {
+    super.initState();
+    // Resync la liste de profils à chaque passage sur cet écran. `bootstrap`
+    // en déclenche déjà un au démarrage à froid, mais un profil qui vient
+    // d'être partagé côté serveur n'apparaîtrait sinon qu'au prochain
+    // redémarrage complet de l'app. Best-effort : un échec réseau laisse la
+    // liste persistée en place.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final state = ref.read(sessionControllerProvider);
+      if (state is Anonymous || state is OtpRequested) return;
+      unawaited(
+        ref
+            .read(sessionControllerProvider.notifier)
+            .refreshProfiles()
+            .catchError((Object _) {}),
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(sessionControllerProvider);
     final session = switch (state) {
       Authenticated(:final session) => session,

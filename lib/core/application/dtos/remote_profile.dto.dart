@@ -27,6 +27,17 @@ class RemoteProfileDto {
   /// `included_lower_age_categories` field yet.
   final List<AgeCategory> includedLowerAgeCategories;
 
+  /// Profile owned by another account and shared with this one. Defaults to
+  /// `false` when absent from the payload — same forward-compat strategy as
+  /// [includedLowerAgeCategories]: a backend that predates profile sharing
+  /// only ever returns owned profiles.
+  final bool shared;
+
+  /// Right to edit this shared profile. Defaults to `true` when absent, which
+  /// is the correct value for every profile an older backend returns (they
+  /// are all owned).
+  final bool canManage;
+
   const RemoteProfileDto({
     required this.id,
     required this.name,
@@ -35,6 +46,8 @@ class RemoteProfileDto {
     this.pinHash,
     this.avatarId,
     this.includedLowerAgeCategories = const [],
+    this.shared = false,
+    this.canManage = true,
   });
 
   factory RemoteProfileDto.fromJson(Map<String, dynamic> json) {
@@ -53,6 +66,8 @@ class RemoteProfileDto {
       avatarId: json['avatar_id'] as String?,
       isMain: json['is_main'] as bool,
       includedLowerAgeCategories: included,
+      shared: json['shared'] as bool? ?? false,
+      canManage: json['can_manage'] as bool? ?? true,
     );
   }
 
@@ -66,6 +81,11 @@ class RemoteProfileDto {
     'included_lower_age_categories': includedLowerAgeCategories
         .map(ageCategoryToWire)
         .toList(growable: false),
+    // Champs dérivés, en lecture seule côté serveur : les renvoyer dans un
+    // body produirait `400 invalid_request`. Ils ne sont sérialisés ici que
+    // pour la symétrie du DTO (tests, persistance locale).
+    'shared': shared,
+    'can_manage': canManage,
   };
 
   Profile toDomain() => Profile(
@@ -76,5 +96,7 @@ class RemoteProfileDto {
     avatarId: avatarId,
     isMain: isMain,
     includedLowerAgeCategories: includedLowerAgeCategories,
+    shared: shared,
+    canManage: canManage,
   );
 }

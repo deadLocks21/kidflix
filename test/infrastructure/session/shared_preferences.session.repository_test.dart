@@ -79,6 +79,65 @@ void main() {
       expect(await repo.readPhoneNumber(), isNull);
     });
   });
+
+  group('SharedPreferencesSessionRepository — profile sharing', () {
+    test('round-trips shared and canManage', () async {
+      final repo = SharedPreferencesSessionRepository();
+      await repo.write(
+        Session(
+          jwt: 'eyJabc',
+          device: const Device(id: 'uuid-1', name: null),
+          profiles: const [
+            Profile(
+              id: 'papa',
+              name: 'Papa',
+              ageCategory: AgeCategory.adulte,
+              isMain: true,
+            ),
+            Profile(
+              id: 'ar',
+              name: 'Ar',
+              ageCategory: AgeCategory.enfant,
+              shared: true,
+              canManage: false,
+            ),
+          ],
+        ),
+      );
+
+      final restored = await repo.read();
+      final papa = restored!.profiles.firstWhere((p) => p.id == 'papa');
+      final ar = restored.profiles.firstWhere((p) => p.id == 'ar');
+
+      expect(papa.shared, isFalse);
+      expect(papa.canManage, isTrue);
+      expect(ar.shared, isTrue);
+      expect(ar.canManage, isFalse);
+      expect(ar.canDelete, isFalse);
+    });
+
+    test('a session persisted before sharing reads back as owned', () async {
+      // Compat descendante : les sessions déjà sur les appareils n'ont pas
+      // ces clés. Elles ne contenaient que des profils possédés, donc le
+      // défaut doit être "à moi, modifiable" — l'inverse griserait les
+      // actions jusqu'au prochain resync.
+      SharedPreferences.setMockInitialValues({
+        'flutter.kidflix.jwt': 'eyJabc',
+        'flutter.kidflix.device_id': 'uuid-1',
+        'flutter.kidflix.profiles':
+            '[{"id":"papa","name":"Papa","ageCategory":"adulte",'
+            '"pinHash":null,"avatarId":null,"isMain":true,'
+            '"includedLowerAgeCategories":[]}]',
+      });
+
+      final restored = await SharedPreferencesSessionRepository().read();
+      final papa = restored!.profiles.single;
+
+      expect(papa.shared, isFalse);
+      expect(papa.canManage, isTrue);
+      expect(papa.canDelete, isFalse, reason: 'main profile stays undeletable');
+    });
+  });
 }
 
 final Session _session = Session(

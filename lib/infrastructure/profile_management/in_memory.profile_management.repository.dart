@@ -79,6 +79,8 @@ class InMemoryProfileManagementRepository
       pinHash: existing.pinHash,
       avatarId: newAvatarId,
       isMain: existing.isMain,
+      shared: existing.shared,
+      canManage: existing.canManage,
       includedLowerAgeCategories: newIncluded,
     );
     account.profiles[index] = updated;
@@ -99,6 +101,8 @@ class InMemoryProfileManagementRepository
       pinHash: existing.pinHash,
       avatarId: existing.avatarId,
       isMain: existing.isMain,
+      shared: existing.shared,
+      canManage: existing.canManage,
       includedLowerAgeCategories: List.unmodifiable(categories),
     );
     account.profiles[index] = updated;
@@ -117,6 +121,8 @@ class InMemoryProfileManagementRepository
       pinHash: hash,
       avatarId: existing.avatarId,
       isMain: existing.isMain,
+      shared: existing.shared,
+      canManage: existing.canManage,
       includedLowerAgeCategories: existing.includedLowerAgeCategories,
     );
     account.profiles[index] = updated;
@@ -137,6 +143,8 @@ class InMemoryProfileManagementRepository
       pinHash: null,
       avatarId: existing.avatarId,
       isMain: existing.isMain,
+      shared: existing.shared,
+      canManage: existing.canManage,
       includedLowerAgeCategories: existing.includedLowerAgeCategories,
     );
     account.profiles[index] = updated;

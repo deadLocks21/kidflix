@@ -13,9 +13,13 @@ import 'package:kidflix/core/domain/services/auth.repository.dart';
 /// `SessionState` variant with the new profile list (or throws
 /// `StateError` when called from a state that carries no session).
 ///
-/// No automatic trigger (foreground, pull-to-refresh, periodic timer) is
-/// wired in this change — the usecase ships ready to be consumed by a
-/// future change that picks the right UX trigger.
+/// Deux déclencheurs sont câblés, tous deux best-effort (un échec réseau
+/// laisse la session restaurée intacte) :
+///
+/// - `bootstrap()` après `restoreSession()`, au démarrage à froid ;
+/// - l'entrée sur l'écran de sélection de profils, qui couvre le cas d'un
+///   profil partagé depuis un autre compte pendant que l'app tourne — il
+///   n'apparaîtrait sinon qu'au prochain redémarrage complet.
 class RefreshProfilesUseCase {
   final AuthRepository _repo;
 
