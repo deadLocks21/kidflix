@@ -157,6 +157,12 @@ class Installer {
 
       _pruneOldVersions(keep: release.version);
       _cleanupTmp();
+
+      // Après la bascule de `current`, pour que l'icône soit résolue sur la
+      // nouvelle version. Sans ça, une entrée écrite par un updater antérieur
+      // ne serait jamais corrigée.
+      refreshShortcuts(layout, log);
+
       log('Mise à jour appliquée : ${release.version}');
     } catch (e, st) {
       log.error('Mise à jour ignorée', e, st);

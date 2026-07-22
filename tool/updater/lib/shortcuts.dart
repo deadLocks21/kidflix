@@ -19,6 +19,21 @@ void createShortcuts(Layout layout, Log log) {
   }
 }
 
+/// Rafraîchit les raccourcis après une mise à jour.
+///
+/// Sous **Windows**, c'est un no-op : les raccourcis visent déjà des chemins
+/// stables (`launch.vbs`, `current\kidflix.exe`), et les réécrire ressusciterait
+/// un raccourci que l'utilisateur aurait volontairement supprimé.
+///
+/// Sous **Linux**, l'entrée `.desktop` embarque l'icône résolue au moment de
+/// l'écriture. Sans cette réécriture, une entrée produite par un updater
+/// antérieur reste périmée à vie — c'est ce qui laissait une icône générique
+/// même une fois l'app à jour.
+void refreshShortcuts(Layout layout, Log log) {
+  if (Platform.isWindows) return;
+  _createLinuxDesktopEntry(layout, log);
+}
+
 // ── Windows ─────────────────────────────────────────────────────────────────
 
 void _createWindowsShortcuts(Layout layout, Log log) {
