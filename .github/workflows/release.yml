@@ -586,6 +586,20 @@ jobs:
           #!/bin/bash
           HERE="$(dirname "$(readlink -f "${0}")")"
           export LD_LIBRARY_PATH="$HERE/usr/bin/lib:$HERE/usr/lib:${LD_LIBRARY_PATH}"
+          # media_kit charge libmpv DEUX fois, par deux chemins distincts :
+          #   - côté natif, `libmedia_kit_video_plugin.so` porte un NEEDED en
+          #     dur sur `libmpv.so.1` (soname du runner 22.04 qui l'a compilé),
+          #     satisfait par la copie embarquée ci-dessus ;
+          #   - côté Dart, `MediaKit.ensureInitialized()` sonde les noms dans
+          #     l'ordre `libmpv.so`, `libmpv.so.2`, `libmpv.so.1`. Les deux
+          #     premiers sont absents de l'AppImage, donc la recherche sort du
+          #     LD_LIBRARY_PATH et trouve la libmpv.so.2 de l'HÔTE (mpv >= 0.36,
+          #     soit toute distro récente).
+          # Le handle mpv créé côté Dart était alors passé au render context de
+          # l'autre libmpv : layouts de structs incompatibles, segfault à la
+          # première frame. On force le côté Dart sur le fichier exact que le
+          # plugin natif a déjà chargé.
+          export LIBMPV_LIBRARY_PATH="$HERE/usr/lib/libmpv.so.1"
           # Met le thème d'icônes embarqué à portée de GTK : sans ça, le
           # `gtk_window_set_default_icon_name("kidflix")` du runner ne résout
           # rien et la fenêtre reste sans icône.
