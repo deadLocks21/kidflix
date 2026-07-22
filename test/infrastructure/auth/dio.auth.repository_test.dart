@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kidflix/core/domain/exceptions/device_already_registered.exception.dart';
 import 'package:kidflix/core/domain/exceptions/invalid_otp.exception.dart';
 import 'package:kidflix/core/domain/exceptions/otp_expired.exception.dart';
 import 'package:kidflix/core/domain/exceptions/unknown_phone_number.exception.dart';
@@ -341,6 +342,52 @@ void main() {
         );
       },
     );
+
+    test(
+      'maps 409 device_already_registered to '
+      'DeviceAlreadyRegisteredException',
+      () async {
+        final adapter = _FakeAdapter(
+          (_, _) => _jsonResponse(409, {
+            'error': {'code': 'device_already_registered'},
+          }),
+        );
+        final repo = DioAuthRepository(_makeDio(adapter));
+
+        await expectLater(
+          repo.verifyOtp(
+            PhoneNumber.parse('0612345678'),
+            OtpCode.parse('123456'),
+            const Device(id: 'abc'),
+          ),
+          throwsA(isA<DeviceAlreadyRegisteredException>()),
+        );
+      },
+    );
+
+    test('rethrows a 409 carrying an unrelated error code', () async {
+      final adapter = _FakeAdapter(
+        (_, _) => _jsonResponse(409, {
+          'error': {'code': 'wishlist_entry_exists'},
+        }),
+      );
+      final repo = DioAuthRepository(_makeDio(adapter));
+
+      await expectLater(
+        repo.verifyOtp(
+          PhoneNumber.parse('0612345678'),
+          OtpCode.parse('123456'),
+          const Device(id: 'abc'),
+        ),
+        throwsA(
+          isA<DioException>().having(
+            (e) => e.response?.statusCode,
+            'response.statusCode',
+            409,
+          ),
+        ),
+      );
+    });
 
     test('rethrows DioException on 500', () async {
       final adapter = _FakeAdapter((_, _) => _emptyResponse(500));

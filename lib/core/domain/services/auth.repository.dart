@@ -19,6 +19,8 @@ abstract interface class AuthRepository {
   ///
   /// Throws `InvalidOtpException` if [code] does not match the issued OTP.
   /// Throws `OtpExpiredException` if the OTP has expired.
+  /// Throws `DeviceAlreadyRegisteredException` if [device] is already
+  /// attached to another user account.
   Future<Session> verifyOtp(
     PhoneNumber phoneNumber,
     OtpCode code,

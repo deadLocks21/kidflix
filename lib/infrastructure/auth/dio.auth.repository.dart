@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:kidflix/core/application/dtos/remote_profile.dto.dart';
 import 'package:kidflix/core/application/dtos/remote_session.dto.dart';
+import 'package:kidflix/core/domain/exceptions/device_already_registered.exception.dart';
 import 'package:kidflix/core/domain/exceptions/invalid_otp.exception.dart';
 import 'package:kidflix/core/domain/exceptions/otp_expired.exception.dart';
 import 'package:kidflix/core/domain/exceptions/unknown_phone_number.exception.dart';
@@ -18,9 +19,10 @@ import 'package:kidflix/infrastructure/http/error_code.dart';
 /// contract documented in `API.md` § Auth, and translates the documented
 /// HTTP error codes into Domain exceptions:
 ///
-/// - `404 unknown_phone_number` → [UnknownPhoneNumberException]
-/// - `401 invalid_otp`          → [InvalidOtpException]
-/// - `410 otp_expired`          → [OtpExpiredException]
+/// - `404 unknown_phone_number`      → [UnknownPhoneNumberException]
+/// - `401 invalid_otp`               → [InvalidOtpException]
+/// - `410 otp_expired`               → [OtpExpiredException]
+/// - `409 device_already_registered` → [DeviceAlreadyRegisteredException]
 ///
 /// Any other failure (network error, 5xx, 429, malformed body) is rethrown
 /// as a [DioException] for the application layer to surface as a generic
@@ -76,6 +78,9 @@ class DioAuthRepository implements AuthRepository {
       }
       if (status == 404 && code == 'unknown_phone_number') {
         throw UnknownPhoneNumberException(phoneNumber);
+      }
+      if (status == 409 && code == 'device_already_registered') {
+        throw const DeviceAlreadyRegisteredException();
       }
       rethrow;
     }

@@ -63,11 +63,23 @@ class _OtpVerifyPageState extends ConsumerState<OtpVerifyPage> {
   Future<void> _submit() async {
     if (_isSubmitting) return;
     setState(() => _isSubmitting = true);
-    final result = await ref
-        .read(sessionControllerProvider.notifier)
-        .verifyOtp(_currentCode);
+    // `catch` + `finally` et pas une remise à zéro après l'`await` : le
+    // controller lit le device et écrit la session en stockage sécurisé
+    // hors du usecase, donc hors de son filet à exceptions. Sans ça, un
+    // échec de ces appels laisse l'écran figé sur son indicateur de
+    // chargement — et `_submit` est appelé sans `await` depuis
+    // `_handleFilled`, donc l'exception partirait dans le vide.
+    VerifyOtpResult result;
+    try {
+      result = await ref
+          .read(sessionControllerProvider.notifier)
+          .verifyOtp(_currentCode);
+    } catch (_) {
+      result = const VerifyOtpFailure();
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
     if (!mounted) return;
-    setState(() => _isSubmitting = false);
     switch (result) {
       case VerifyOtpSuccess():
         // Redirection pilotée par le router.
@@ -84,11 +96,42 @@ class _OtpVerifyPageState extends ConsumerState<OtpVerifyPage> {
             content: Text('Code expiré. Renvoie un nouveau code.'),
           ),
         );
+      case VerifyOtpDeviceAlreadyRegistered():
+        // Pas d'invitation à réessayer : l'appareil restera pris tant que
+        // l'autre compte le détient.
+        _clearAll();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cet appareil est déjà lié à un autre compte.'),
+          ),
+        );
+      case VerifyOtpFailure():
+        _clearAll();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Connexion impossible. Vérifie ta connexion et réessaie.',
+            ),
+          ),
+        );
     }
   }
 
   Future<void> _resend() async {
-    await ref.read(sessionControllerProvider.notifier).resendOtp();
+    // `ResendOtpUseCase` ne mappe que `unknown_phone_number` ; le reste
+    // (réseau, 429, 5xx) remonte en exception jusqu'à `ResendButton`, qui
+    // l'`await` sans protection. On la rattrape ici pour que l'échec se
+    // voie au lieu de partir dans le vide.
+    try {
+      await ref.read(sessionControllerProvider.notifier).resendOtp();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Envoi impossible. Vérifie ta connexion et réessaie.'),
+        ),
+      );
+    }
   }
 
   @override

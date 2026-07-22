@@ -1,4 +1,5 @@
 import 'package:kidflix/core/application/services/logger_application.service.dart';
+import 'package:kidflix/core/domain/exceptions/device_already_registered.exception.dart';
 import 'package:kidflix/core/domain/exceptions/invalid_otp.exception.dart';
 import 'package:kidflix/core/domain/exceptions/otp_expired.exception.dart';
 import 'package:kidflix/core/domain/model/device.dart';
@@ -24,6 +25,21 @@ class VerifyOtpInvalidCode extends VerifyOtpResult {
 
 class VerifyOtpExpired extends VerifyOtpResult {
   const VerifyOtpExpired();
+}
+
+/// L'appareil est déjà rattaché à un autre compte (`409
+/// device_already_registered`). Situation stable, et non une panne :
+/// réessayer ne débloquera rien, l'UI le dit plutôt que d'inviter à
+/// retenter.
+class VerifyOtpDeviceAlreadyRegistered extends VerifyOtpResult {
+  const VerifyOtpDeviceAlreadyRegistered();
+}
+
+/// Toute autre défaillance lors de l'appel backend : réseau injoignable,
+/// timeout, 5xx, 429, réponse malformée. L'UI affiche un message générique
+/// et invite à réessayer.
+class VerifyOtpFailure extends VerifyOtpResult {
+  const VerifyOtpFailure();
 }
 
 /// Verifies an OTP code entered by the user. On success returns the
@@ -56,6 +72,15 @@ class VerifyOtpUseCase {
     } on OtpExpiredException catch (e, st) {
       await _logger.warn('auth.verify_otp.failed', error: e, stack: st);
       return const VerifyOtpExpired();
+    } on DeviceAlreadyRegisteredException catch (e, st) {
+      await _logger.warn('auth.verify_otp.failed', error: e, stack: st);
+      return const VerifyOtpDeviceAlreadyRegistered();
+    } catch (e, st) {
+      // Filet générique : réseau, timeout, 5xx, 429, payload malformé.
+      // Sans lui, l'exception traverse le controller et fige l'écran OTP
+      // sur son indicateur de chargement.
+      await _logger.warn('auth.verify_otp.failed', error: e, stack: st);
+      return const VerifyOtpFailure();
     }
   }
 }
