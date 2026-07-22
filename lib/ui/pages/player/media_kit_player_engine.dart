@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 import 'package:kidflix/core/domain/model/media_track.dart';
+import 'package:kidflix/shared/video_controller_config.dart';
 import 'package:kidflix/ui/pages/player/player_engine.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -25,7 +26,10 @@ class MediaKitPlayerEngine implements PlayerEngine {
     _player = Player(
       configuration: const PlayerConfiguration(logLevel: MPVLogLevel.warn),
     );
-    _controller = VideoController(_player);
+    _controller = VideoController(
+      _player,
+      configuration: videoControllerConfiguration(),
+    );
     // Use MaterialVideoControls (default via AdaptiveVideoControls).
     // The PlayerPage wraps the surface with a MaterialVideoControlsTheme
     // providing its custom top/bottom button bars and tuning.

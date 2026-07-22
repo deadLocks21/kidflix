@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:kidflix/shared/tmdb_image.dart';
+import 'package:kidflix/shared/video_controller_config.dart';
 import 'package:kidflix/shared/youtube_trailer_url.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -85,7 +86,10 @@ class _TrailerHeaderState extends State<TrailerHeader> {
     if (_disposed || !mounted) return;
 
     final player = Player();
-    final controller = VideoController(player);
+    final controller = VideoController(
+      player,
+      configuration: videoControllerConfiguration(),
+    );
     _completedSub = player.stream.completed.listen((done) {
       if (done && mounted) setState(() => _showFallback = true);
     });
