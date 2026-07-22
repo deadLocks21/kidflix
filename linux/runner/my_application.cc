@@ -22,6 +22,14 @@ static void first_frame_cb(MyApplication* self, FlView* view) {
 // Implements GApplication::activate.
 static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
+
+  // Flutter ne pose aucune icône de fenêtre par défaut sous Linux : sans cet
+  // appel, le dock et l'alt-tab affichent une icône générique. Le nom doit
+  // correspondre à `Icon=` du .desktop et à l'icône installée dans le thème
+  // hicolor (cf. `--icon-file kidflix.png` côté CI). Dans l'AppImage, c'est
+  // l'AppRun qui met le thème embarqué à portée de GTK via XDG_DATA_DIRS.
+  gtk_window_set_default_icon_name("kidflix");
+
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
 
