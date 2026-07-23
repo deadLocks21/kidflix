@@ -13,3 +13,23 @@ String formatDurationHuman(Duration d) {
   final minutes = totalMinutes % 60;
   return '${hours}h${minutes.toString().padLeft(2, '0')}';
 }
+
+/// Formats a [Duration] as a playback timecode: `m:ss` under an hour,
+/// `h:mm:ss` at or above one.
+///
+/// Distinct from [formatDurationHuman], which describes a *length* ("1h52")
+/// — this one labels a *position on a timeline*, where seconds matter and
+/// the fields must stay aligned as they tick.
+///
+/// Negative durations clamp to zero: a seek bar dragged to the far left
+/// while the position stream lags can briefly compute a negative value,
+/// and "-0:03" is never something to show.
+String formatTimecode(Duration d) {
+  final total = d.isNegative ? 0 : d.inSeconds;
+  final hours = total ~/ 3600;
+  final minutes = (total % 3600) ~/ 60;
+  final seconds = total % 60;
+  final paddedSeconds = seconds.toString().padLeft(2, '0');
+  if (hours == 0) return '$minutes:$paddedSeconds';
+  return '$hours:${minutes.toString().padLeft(2, '0')}:$paddedSeconds';
+}

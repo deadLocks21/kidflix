@@ -10,14 +10,17 @@ import 'package:kidflix/infrastructure/providers/catalog.usecases_provider.dart'
 import 'package:kidflix/infrastructure/providers/connectivity.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/offline_catalog.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/search.controller_provider.dart';
+import 'package:kidflix/infrastructure/providers/remote_catalog.provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/ui/pages/home/widgets/catalog_row.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/catalog_skeleton.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/home_profile_menu.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/movie_detail_modal.widget.dart';
+import 'package:kidflix/ui/pages/home/widgets/remote_control_button.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/search_app_bar.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/search_results.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/series_detail_modal.widget.dart';
+import 'package:kidflix/ui/pages/remote/widgets/remote_movie_detail_modal.widget.dart';
 
 /// Homepage catalog: vertical scroll of horizontal rows built for the
 /// active profile. Rows are filtered strictly by the profile's age
@@ -32,7 +35,13 @@ class HomePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final rows = ref.watch(homeCatalogRowsProvider);
+    // While driving a host, the home shows the *host's* catalogue —
+    // fetched from it, because the local account is not allowed to read
+    // another account's profile. Its own rows are used otherwise.
+    final drivingHost = ref.watch(viewingHostCatalogueProvider);
+    final rows = drivingHost
+        ? ref.watch(remoteHomeRowsProvider)
+        : ref.watch(homeCatalogRowsProvider);
     final isSearching = ref.watch(
       searchUiControllerProvider.select((s) => s.active),
     );
@@ -43,7 +52,7 @@ class HomePage extends ConsumerWidget {
       appBar: isSearching
           ? const SearchAppBar()
           : AppBar(
-              title: const Text('Kidflix'),
+              title: Text(drivingHost ? 'Sur l’autre appareil' : 'Kidflix'),
               actions: [
                 IconButton(
                   tooltip: 'Chercher un film',
@@ -51,6 +60,7 @@ class HomePage extends ConsumerWidget {
                   onPressed: () =>
                       ref.read(searchUiControllerProvider.notifier).activate(),
                 ),
+                const RemoteControlButton(),
                 const HomeProfileMenu(),
                 const SizedBox(width: 4),
               ],
@@ -64,9 +74,12 @@ class HomePage extends ConsumerWidget {
               children: [
                 _HomeBody(
                   rows: rows,
-                  onMovieTap: (movie) => _openDetail(context, ref, movie),
-                  onSeriesTap: (series) =>
-                      _openSeriesDetail(context, ref, series),
+                  onMovieTap: (movie) => drivingHost
+                      ? _openRemoteMovieDetail(context, ref, movie)
+                      : _openDetail(context, ref, movie),
+                  onSeriesTap: (series) => drivingHost
+                      ? _castSeriesUnsupported(context)
+                      : _openSeriesDetail(context, ref, series),
                 ),
                 const SearchResults(),
               ],
@@ -109,6 +122,27 @@ class HomePage extends ConsumerWidget {
     if (domain == null) return;
     if (!context.mounted) return;
     await showMovieDetailModal(context, MovieDetailDto.fromDomain(domain));
+  }
+
+  /// Opens the host's own detail for [movie] — fetched from the host —
+  /// with a play button that casts. The local account cannot fetch this
+  /// detail itself, so it is served over the socket like the rows.
+  Future<void> _openRemoteMovieDetail(
+    BuildContext context,
+    WidgetRef ref,
+    MovieDto movie,
+  ) => showRemoteMovieDetailModal(context, movieId: movie.id);
+
+  /// Casting a series from the remote is not wired yet — the host serves
+  /// movie detail only. Saying so beats a card that does nothing.
+  void _castSeriesUnsupported(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Les séries se lancent depuis l’appareil lui-même pour l’instant.',
+        ),
+      ),
+    );
   }
 
   Future<void> _openSeriesDetail(

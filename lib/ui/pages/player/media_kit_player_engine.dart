@@ -92,6 +92,18 @@ class MediaKitPlayerEngine implements PlayerEngine {
   Stream<bool> get playingStream => _player.stream.playing;
 
   @override
+  Stream<double> get volumeStream async* {
+    // Seeded like the track streams: mpv sets the initial volume during
+    // player construction, before anything can subscribe.
+    yield _player.state.volume;
+    yield* _player.stream.volume;
+  }
+
+  @override
+  Future<void> setVolume(double volume) =>
+      _player.setVolume(volume.clamp(0, 100));
+
+  @override
   Stream<AvailableTracks> get tracksStream async* {
     // Seed with the engine's current snapshot so the subscriber sees
     // tracks already discovered by mpv before our `listen()` call. The

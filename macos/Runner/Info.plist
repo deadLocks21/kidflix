@@ -33,6 +33,13 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<!-- Télécommande LAN — voir le commentaire détaillé dans ios/Runner/Info.plist. -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Kidflix cherche les autres appareils de la maison pour te permettre de lancer un film et de le piloter à distance.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_kidflix._tcp</string>
+	</array>
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>

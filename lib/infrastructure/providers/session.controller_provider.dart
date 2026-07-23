@@ -25,6 +25,8 @@ import 'package:kidflix/infrastructure/providers/authenticate_with_biometrics.us
 import 'package:kidflix/infrastructure/providers/in_memory_accounts_store.provider.dart';
 import 'package:kidflix/infrastructure/providers/profile_management.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/refresh_profiles.usecase_provider.dart';
+import 'package:kidflix/infrastructure/providers/remote_control.providers.dart';
+import 'package:kidflix/infrastructure/providers/remote_playback_host.controller.dart';
 import 'package:kidflix/infrastructure/providers/session.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/watch_progress.repository_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -695,4 +697,17 @@ Future<void> bootstrap(Ref ref) async {
   // and drains any queued writes once we're online — silent if there
   // is nothing to replay.
   ref.read(watchProgressSyncServiceProvider).start();
+  // Bring the LAN remote-control server back up if the user had enabled
+  // it. Fire-and-forget: a device that cannot bind or advertise must
+  // still boot into the catalogue, and the sheet surfaces the error.
+  //
+  // Strictly sequenced: the id and the name both land in the mDNS TXT
+  // record that `restore()` publishes. Starting the server before they
+  // are loaded advertises an empty id — which every remote drops, since
+  // the id is what a pairing token is keyed on.
+  unawaited(() async {
+    await ref.read(remoteDeviceIdProvider.notifier).load();
+    await ref.read(remoteDeviceNameProvider.notifier).load();
+    await ref.read(remoteHostControllerProvider.notifier).restore();
+  }().catchError((Object _) {}));
 }

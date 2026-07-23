@@ -46,6 +46,13 @@ abstract class PlayerEngine {
   /// Stream of the playing/paused state.
   Stream<bool> get playingStream;
 
+  /// Stream of the output volume on a 0..100 scale.
+  Stream<double> get volumeStream;
+
+  /// Sets the output volume. [volume] is clamped to 0..100 by the
+  /// implementation.
+  Future<void> setVolume(double volume);
+
   /// Stream of the audio + subtitle track lists currently advertised by
   /// the engine. Emits a fresh snapshot whenever the underlying media
   /// changes.

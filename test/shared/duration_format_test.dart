@@ -27,4 +27,40 @@ void main() {
       expect(formatDurationHuman(const Duration(minutes: 125)), '2h05');
     });
   });
+
+  group('formatTimecode', () {
+    test('zero renders as 0:00', () {
+      expect(formatTimecode(Duration.zero), '0:00');
+    });
+
+    test('seconds are zero-padded', () {
+      expect(formatTimecode(const Duration(seconds: 7)), '0:07');
+    });
+
+    test('under an hour omits the hour field', () {
+      expect(formatTimecode(const Duration(minutes: 12, seconds: 34)), '12:34');
+    });
+
+    test('exactly one hour adds the hour field', () {
+      expect(formatTimecode(const Duration(hours: 1)), '1:00:00');
+    });
+
+    test('minutes are zero-padded once hours appear', () {
+      expect(
+        formatTimecode(const Duration(hours: 1, minutes: 5, seconds: 3)),
+        '1:05:03',
+      );
+    });
+
+    test('sub-second remainders truncate rather than round up', () {
+      expect(formatTimecode(const Duration(milliseconds: 1999)), '0:01');
+    });
+
+    test('a negative duration clamps to zero', () {
+      // The remote's seek bar can compute a negative position while the
+      // thumb is dragged left of a lagging position stream; "-0:03" is
+      // never something to show.
+      expect(formatTimecode(const Duration(seconds: -3)), '0:00');
+    });
+  });
 }

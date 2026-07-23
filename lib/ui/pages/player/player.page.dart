@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:kidflix/core/application/dtos/episode_download.dto.dart';
 import 'package:kidflix/core/application/dtos/movie_download.dto.dart';
 import 'package:kidflix/core/application/dtos/series_playback_context.dart';
+import 'package:kidflix/core/application/remote/playback_remote_controls.dart';
 import 'package:kidflix/core/application/session_state.dart';
 import 'package:kidflix/core/application/usecases/pick_next_shuffle_episode.usecase.dart';
 import 'package:kidflix/core/application/usecases/resolve_continue_watching.usecase.dart';
@@ -15,6 +16,7 @@ import 'package:kidflix/core/application/usecases/save_watch_progress.usecase.da
 import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/media_track.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
+import 'package:kidflix/core/domain/model/remote_playback_state.dart';
 import 'package:kidflix/core/domain/model/track_preferences.dart';
 import 'package:kidflix/core/domain/model/watch_progress.dart';
 import 'package:kidflix/core/domain/services/kids_lock.service.dart';
@@ -24,11 +26,13 @@ import 'package:kidflix/infrastructure/providers/download.usecases_provider.dart
 import 'package:kidflix/infrastructure/providers/kids_lock.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/profile_pin.service_provider.dart';
+import 'package:kidflix/infrastructure/providers/remote_playback_host.controller.dart';
 import 'package:kidflix/infrastructure/providers/series.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/infrastructure/providers/track_preferences.usecases_provider.dart';
 import 'package:kidflix/infrastructure/providers/watch_progress.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/watch_progress.usecases_provider.dart';
+import 'package:kidflix/shared/track_labels.dart';
 import 'package:kidflix/ui/pages/player/media_kit_player_engine.dart';
 import 'package:kidflix/ui/pages/player/player_engine.dart';
 import 'package:kidflix/ui/pages/player/player_media_ref.dart';
@@ -150,8 +154,21 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<Duration?>? _durationSub;
   StreamSubscription<bool>? _playingSub;
+  StreamSubscription<double>? _volumeSub;
   StreamSubscription<AvailableTracks>? _tracksSub;
   StreamSubscription<SelectedTracks>? _selectedTracksSub;
+
+  /// Handle published to remote devices while this page is mounted. Held
+  /// as a field so [dispose] can hand back the *same* instance — see
+  /// [RemotePlaybackHost.detach] for why identity matters here.
+  late final _RemotePlaybackControls _remoteControls =
+      _RemotePlaybackControls(this);
+
+  /// Cached at bootstrap: [dispose] must detach without touching [ref].
+  RemotePlaybackHost? _remoteHost;
+
+  bool _isPlaying = false;
+  double _volume = 100;
 
   /// Track lists & current selection are backed by [ValueNotifier]s
   /// rather than `setState` fields because the audio / subtitle buttons
@@ -171,6 +188,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   bool _initialTracksApplied = false;
 
   _DownloadView? _lastDownload;
+
+  /// Set when [_bootstrap] threw. Turns the indefinite spinner into a
+  /// readable error with a way out.
+  String? _bootstrapError;
+
   String? _mediaTitle;
   Duration _position = Duration.zero;
   Duration? _lastObservedPosition;
@@ -220,7 +242,24 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     _kidsLock = ref.read(kidsLockServiceProvider);
     _pinService = ref.read(profilePinServiceProvider);
     _applyMobileSystemUi();
-    _bootstrap();
+    // Never fire-and-forget: an exception in here used to escape into
+    // `PlatformDispatcher.onError`, which marks it handled and returns —
+    // so the page sat on its spinner with nothing on screen, in the logs,
+    // or on the wire to say why.
+    unawaited(_bootstrap().catchError(_onBootstrapFailed));
+  }
+
+  void _onBootstrapFailed(Object error, StackTrace stack) {
+    if (_disposed || !mounted) return;
+    unawaited(
+      ref.read(loggerProvider).error(
+        'playback.bootstrap_failed',
+        attrs: {'content.id': _currentMediaId()},
+        error: error,
+        stack: stack,
+      ),
+    );
+    setState(() => _bootstrapError = error.toString());
   }
 
   @override
@@ -232,8 +271,20 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     _positionSub?.cancel();
     _durationSub?.cancel();
     _playingSub?.cancel();
+    _volumeSub?.cancel();
     _tracksSub?.cancel();
     _selectedTracksSub?.cancel();
+    // Deferred for the same reason as the initial publish: `detach`
+    // resets provider state, and a page is commonly disposed mid-frame
+    // (route pop). The identity check inside `detach` makes the delay
+    // safe — if a new player attached in between, this no-ops.
+    final remoteHost = _remoteHost;
+    final remoteControls = _remoteControls;
+    if (remoteHost != null) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => remoteHost.detach(remoteControls),
+      );
+    }
     _downloadedFractionNotifier.dispose();
     _audioTracksNotifier.dispose();
     _subtitleTracksNotifier.dispose();
@@ -271,6 +322,16 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   Future<void> _bootstrap() async {
     // Cache dispose-time dependencies while ref is still safe to read.
     _saveUseCase = ref.read(saveWatchProgressUseCaseProvider);
+    final remoteHost = ref.read(remotePlaybackHostProvider.notifier);
+    _remoteHost = remoteHost;
+    // Registering the handle is a plain field write on the notifier and is
+    // safe here. Publishing the first snapshot is NOT: it writes provider
+    // *state*, and this runs synchronously inside `initState` — i.e. while
+    // the tree is building, which Riverpod rejects. That threw, killed the
+    // rest of this method, and left the page on its spinner forever with
+    // no download ever started. Defer it by one frame.
+    remoteHost.attach(_remoteControls);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _publishRemoteState());
     final session = ref.read(sessionControllerProvider);
     if (session is ProfileSelected) {
       _profileId = session.profile.id;
@@ -335,6 +396,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         final movie = pool.where((m) => m.id == movieId).firstOrNull;
         if (_disposed) return;
         setState(() => _mediaTitle = movie?.title ?? '');
+        _publishRemoteState();
       case PlayerEpisodeRef(:final episodeId, :final seriesContext):
         // Fast path: when the route already carried a seriesId (modal,
         // continue-watching, in-player switch), fetch that series only
@@ -392,7 +454,78 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
               ? series!.title
               : '${series!.title} — S${episode.seasonNumber}E${episode.episodeNumber} · ${episode.title}';
         });
+        _publishRemoteState();
     }
+  }
+
+  /// Mirrors the current playback to any connected remote.
+  ///
+  /// Called from every stream listener, so it must stay cheap: it bails
+  /// out immediately when this device is not accepting remote control,
+  /// and the server itself coalesces the position-only pushes that make
+  /// up the bulk of the traffic.
+  void _publishRemoteState() {
+    if (_disposed) return;
+    final host = _remoteHost;
+    if (host == null) return;
+    if (!ref.read(remoteHostControllerProvider)) return;
+    final audioLabels = buildTrackLabels(_audioTracksNotifier.value);
+    final subtitleLabels = buildTrackLabels(_subtitleTracksNotifier.value);
+    host.publish(
+      RemotePlaybackState(
+        status: _remoteStatus(),
+        mediaId: _currentMediaId(),
+        mediaKind: switch (_currentMedia) {
+          PlayerMovieRef() => 'movie',
+          PlayerEpisodeRef() => 'episode',
+        },
+        title: _mediaTitle,
+        position: _position,
+        duration: _duration,
+        volume: _volume,
+        audioTracks: [
+          for (final t in _audioTracksNotifier.value)
+            RemoteTrackOption(
+              id: t.id,
+              label: audioLabels[t.id] ?? t.id,
+              language: t.language,
+            ),
+        ],
+        subtitleTracks: [
+          for (final t in _subtitleTracksNotifier.value)
+            RemoteTrackOption(
+              id: t.id,
+              label: subtitleLabels[t.id] ?? t.id,
+              language: t.language,
+            ),
+        ],
+        selectedAudioId: _selectedAudioIdNotifier.value,
+        selectedSubtitleId: _selectedSubtitleIdNotifier.value,
+        downloadedFraction: _downloadedFraction(),
+        locked: _isLocked,
+        canGoNext: _canGoNextRemote,
+        canGoPrevious: _previousEpisodeOrNull() != null,
+      ),
+    );
+  }
+
+  RemotePlaybackStatus _remoteStatus() {
+    if (_engine == null) return RemotePlaybackStatus.preparing;
+    return _isPlaying
+        ? RemotePlaybackStatus.playing
+        : RemotePlaybackStatus.paused;
+  }
+
+  /// Cheap "is a next episode reachable" test.
+  ///
+  /// Deliberately does not call [_nextEpisodeOrNull] in shuffle mode:
+  /// that draws a random pick, and running it on every position tick
+  /// would both waste work and churn the draw.
+  bool get _canGoNextRemote {
+    final media = _currentMedia;
+    if (media is! PlayerEpisodeRef || _series == null) return false;
+    if (media.seriesContext?.mode == SeriesPlaybackMode.shuffle) return true;
+    return _nextEpisodeOrNull() != null;
   }
 
   void _observeDownload() {
@@ -420,6 +553,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     if (_disposed) return;
     setState(() => _lastDownload = dto);
     _downloadedFractionNotifier.value = _downloadedFraction();
+    _publishRemoteState();
     if (_isTerminal(dto.status)) _flagDownloadInterrupted(dto);
     if (!_readyEmitted &&
         (dto.status == DownloadStatusDto.readyToPlay ||
@@ -502,6 +636,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       final previous = _lastObservedPosition;
       setState(() => _position = p);
       _lastObservedPosition = p;
+      _publishRemoteState();
       if (previous != null && (p - previous).abs() > _seekDetectionThreshold) {
         // Seek detected (user scrub) — flush position out-of-band so
         // multi-device clients see it without waiting up to 10s.
@@ -513,9 +648,11 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     _durationSub = engine.durationStream.listen((d) {
       if (_disposed) return;
       setState(() => _duration = d);
+      _publishRemoteState();
     });
     _playingSub = engine.playingStream.listen((playing) {
       if (_disposed) return;
+      _isPlaying = playing;
       if (playing) {
         WakelockPlus.enable();
         _startPeriodicSave();
@@ -523,12 +660,19 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         WakelockPlus.disable();
         _stopPeriodicSave();
       }
+      _publishRemoteState();
+    });
+    _volumeSub = engine.volumeStream.listen((volume) {
+      if (_disposed) return;
+      _volume = volume;
+      _publishRemoteState();
     });
     _tracksSub = engine.tracksStream.listen(_onTracksAvailable);
     _selectedTracksSub = engine.selectedTracksStream.listen((selected) {
       if (_disposed) return;
       _selectedAudioIdNotifier.value = selected.audioId;
       _selectedSubtitleIdNotifier.value = selected.subtitleId;
+      _publishRemoteState();
     });
     try {
       await engine.open(localPath, initialPosition: initialPosition);
@@ -592,6 +736,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     }
     _audioTracksNotifier.value = tracks.audio;
     _subtitleTracksNotifier.value = tracks.subtitle;
+    _publishRemoteState();
     // Wait until the engine has actually advertised real tracks before
     // attempting to apply the saved preferences. media_kit emits an
     // initial empty `Tracks()` snapshot during `open` — applying then
@@ -920,6 +1065,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     await _kidsLock.startLock();
     if (_disposed || !mounted) return;
     setState(() => _isLocked = true);
+    _publishRemoteState();
   }
 
   Future<void> _onUnlockTap() async {
@@ -935,6 +1081,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     await _kidsLock.stopLock();
     if (_disposed || !mounted) return;
     setState(() => _isLocked = false);
+    _publishRemoteState();
   }
 
   void _onCancelDownload() {
@@ -982,6 +1129,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       _durationSub = null;
       await _playingSub?.cancel();
       _playingSub = null;
+      await _volumeSub?.cancel();
+      _volumeSub = null;
       await _tracksSub?.cancel();
       _tracksSub = null;
       await _selectedTracksSub?.cancel();
@@ -1174,6 +1323,15 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     } catch (_) {
       // Best-effort persistence — failure must not interrupt playback.
     }
+  }
+
+  void _onRetryBootstrap() {
+    setState(() {
+      _bootstrapError = null;
+      _lastDownload = null;
+      _readyEmitted = false;
+    });
+    unawaited(_bootstrap().catchError(_onBootstrapFailed));
   }
 
   void _onRetryDownload() {
@@ -1553,6 +1711,16 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       );
     }
 
+    final bootstrapError = _bootstrapError;
+    if (bootstrapError != null) {
+      return PlayerErrorState(
+        status: DownloadStatusDto.failed,
+        errorMessage: bootstrapError,
+        onRetry: _onRetryBootstrap,
+        onBack: _onClose,
+      );
+    }
+
     final download = _lastDownload;
     if (download == null) {
       return const Center(
@@ -1576,5 +1744,109 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       bytesTotal: download.bytesTotal,
       onCancel: _onCancelDownload,
     );
+  }
+}
+
+/// Adapts the player page to the [PlaybackRemoteControls] port.
+///
+/// A separate object rather than making the State implement the port
+/// directly: it gives the host a handle whose identity is independent of
+/// the widget tree, and keeps the surface a remote can reach explicit and
+/// small — a remote can do these eleven things and nothing else.
+///
+/// Every method routes through the same handlers the on-device controls
+/// use, so a remote seek is clamped by the download guard and a remote
+/// track change is persisted to the profile's preferences exactly as a
+/// local one would be.
+class _RemotePlaybackControls implements PlaybackRemoteControls {
+  final _PlayerPageState _state;
+
+  _RemotePlaybackControls(this._state);
+
+  /// Guards every entry point: commands can arrive between the engine
+  /// being torn down and the page being unmounted.
+  PlayerEngine? get _engine => _state._disposed ? null : _state._engine;
+
+  @override
+  Future<void> play() async => _engine?.play();
+
+  @override
+  Future<void> pause() async => _engine?.pause();
+
+  @override
+  Future<void> togglePlay() async {
+    final engine = _engine;
+    if (engine == null) return;
+    if (_state._isPlaying) {
+      await engine.pause();
+    } else {
+      await engine.play();
+    }
+  }
+
+  @override
+  Future<void> seek(Duration position) async {
+    if (_engine == null) return;
+    // Routed through the relative helper so the in-flight-download clamp
+    // and the duration bounds apply to remote seeks too.
+    await _state._seekRelative(position - _state._position);
+  }
+
+  @override
+  Future<void> seekRelative(Duration delta) async {
+    if (_engine == null) return;
+    await _state._seekRelative(delta);
+  }
+
+  @override
+  Future<void> setAudioTrack(String trackId) async {
+    final engine = _engine;
+    if (engine == null) return;
+    await engine.setAudioTrack(trackId);
+    final track = _state._audioTracksNotifier.value
+        .where((t) => t.id == trackId)
+        .firstOrNull;
+    await _state._persistAudioPreference(track?.language);
+  }
+
+  @override
+  Future<void> setSubtitleTrack(String trackId) async {
+    final engine = _engine;
+    if (engine == null) return;
+    await engine.setSubtitleTrack(trackId);
+    if (trackId == 'no') {
+      await _state._persistSubtitlePreference(language: null, disabled: true);
+      return;
+    }
+    final track = _state._subtitleTracksNotifier.value
+        .where((t) => t.id == trackId)
+        .firstOrNull;
+    await _state._persistSubtitlePreference(
+      language: track?.language,
+      disabled: false,
+    );
+  }
+
+  @override
+  Future<void> setVolume(double volume) async => _engine?.setVolume(volume);
+
+  @override
+  Future<void> stop() async {
+    if (_state._disposed || !_state.mounted) return;
+    _state._onClose();
+  }
+
+  @override
+  Future<void> nextEpisode() async {
+    final next = _state._nextEpisodeOrNull();
+    if (next == null) return;
+    await _state._switchToEpisode(next.id);
+  }
+
+  @override
+  Future<void> previousEpisode() async {
+    final previous = _state._previousEpisodeOrNull();
+    if (previous == null) return;
+    await _state._switchToEpisode(previous.id);
   }
 }

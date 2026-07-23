@@ -21,6 +21,7 @@ import 'package:kidflix/ui/pages/home/widgets/resume_progress_bar.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/season_download_button.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/series/play_label.dart';
 import 'package:kidflix/ui/pages/home/widgets/trailer_header.widget.dart';
+import 'package:kidflix/ui/pages/remote/cast_playback.dart';
 
 const double _adaptiveBreakpointDp = 600;
 
@@ -324,10 +325,23 @@ class _PlayButton extends ConsumerWidget {
       children: [
         Expanded(
           child: FilledButton.icon(
-            icon: const Icon(Icons.play_arrow_rounded),
+            icon: Icon(
+              castTargetName(ref) == null
+                  ? Icons.play_arrow_rounded
+                  : Icons.cast_connected,
+            ),
             label: Text(label.label),
-            onPressed: () {
+            onPressed: () async {
+              final cast = await castIfRemoting(
+                context,
+                ref,
+                mediaId: label.target.id,
+                isEpisode: true,
+                seriesId: series.id,
+              );
+              if (!context.mounted) return;
               Navigator.of(context).pop();
+              if (cast) return;
               context.go(
                 '/player/episode/${label.target.id}?series=${series.id}',
               );
@@ -339,8 +353,18 @@ class _PlayButton extends ConsumerWidget {
           OutlinedButton.icon(
             icon: const Icon(Icons.shuffle_rounded),
             label: const Text('Aléatoire'),
-            onPressed: () {
+            onPressed: () async {
+              final cast = await castIfRemoting(
+                context,
+                ref,
+                mediaId: shufflePick.id,
+                isEpisode: true,
+                seriesId: series.id,
+                shuffle: true,
+              );
+              if (!context.mounted) return;
               Navigator.of(context).pop();
+              if (cast) return;
               context.go(
                 '/player/episode/${shufflePick.id}'
                 '?series=${series.id}&mode=shuffle',
@@ -562,7 +586,7 @@ class _EpisodeTile extends ConsumerWidget {
         seasonNumber: episode.seasonNumber,
         episodeNumber: episode.episodeNumber,
       ),
-      onTap: () {
+      onTap: () async {
         // Pre-cache so the manager resolves this episode regardless
         // of the parent's /catalog visibility, AND so the offline
         // series detail modal can rebuild the seasons tree.
@@ -584,7 +608,16 @@ class _EpisodeTile extends ConsumerWidget {
                 episodeNumber: episode.episodeNumber,
               ),
         );
+        final cast = await castIfRemoting(
+          context,
+          ref,
+          mediaId: episode.id,
+          isEpisode: true,
+          seriesId: episode.seriesId,
+        );
+        if (!context.mounted) return;
         Navigator.of(context).pop();
+        if (cast) return;
         context.go('/player/episode/${episode.id}?series=${episode.seriesId}');
       },
     );

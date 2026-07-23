@@ -45,6 +45,26 @@
 			<key>NSAllowsLocalNetworking</key>
 			<true/>
 		</dict>
+		<!--
+			Télécommande LAN : Kidflix annonce et découvre les autres
+			installations via Bonjour (_kidflix._tcp), puis ouvre une
+			WebSocket directe entre les deux appareils.
+
+			On passe par Bonjour et non par un broadcast/multicast UDP brut :
+			depuis iOS 14 ces derniers exigent l'entitlement
+			com.apple.developer.networking.multicast, accordé au cas par cas
+			par Apple. Les API Bonjour système ne demandent que les deux clés
+			ci-dessous plus l'autorisation « Réseau local » de l'utilisateur.
+
+			NSBonjourServices doit lister le type EXACT, sinon la découverte
+			renvoie silencieusement zéro résultat sur iOS 14+.
+		-->
+		<key>NSLocalNetworkUsageDescription</key>
+		<string>Kidflix cherche les autres appareils de la maison pour te permettre de lancer un film et de le piloter à distance.</string>
+		<key>NSBonjourServices</key>
+		<array>
+			<string>_kidflix._tcp</string>
+		</array>
 		<key>UIApplicationSceneManifest</key>
 		<dict>
 			<key>UIApplicationSupportsMultipleScenes</key>

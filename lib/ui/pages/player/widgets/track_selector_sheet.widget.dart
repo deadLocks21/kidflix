@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kidflix/core/domain/model/media_track.dart';
+import 'package:kidflix/shared/track_labels.dart';
 
 /// Outcome of [showTrackSelectorSheet]:
 ///
@@ -9,41 +10,6 @@ import 'package:kidflix/core/domain/model/media_track.dart';
 /// * Both null/false (i.e. tool returns `null`) → the user dismissed
 ///   the sheet without picking anything.
 typedef TrackSelection = ({String? id, bool disable});
-
-/// Common ISO 639 codes (2- and 3-letter, both bibliographic and
-/// terminological 3-letter variants) translated to user-facing French.
-/// mpv typically reports 3-letter codes (e.g. `fre`, `eng`); covering
-/// the 2-letter forms keeps us robust to backends that don't.
-const Map<String, String> _languageNames = {
-  'fr': 'Français',
-  'fre': 'Français',
-  'fra': 'Français',
-  'en': 'Anglais',
-  'eng': 'Anglais',
-  'es': 'Espagnol',
-  'spa': 'Espagnol',
-  'it': 'Italien',
-  'ita': 'Italien',
-  'de': 'Allemand',
-  'ger': 'Allemand',
-  'deu': 'Allemand',
-  'pt': 'Portugais',
-  'por': 'Portugais',
-  'nl': 'Néerlandais',
-  'dut': 'Néerlandais',
-  'nld': 'Néerlandais',
-  'ja': 'Japonais',
-  'jpn': 'Japonais',
-  'ko': 'Coréen',
-  'kor': 'Coréen',
-  'zh': 'Chinois',
-  'chi': 'Chinois',
-  'zho': 'Chinois',
-  'ar': 'Arabe',
-  'ara': 'Arabe',
-  'ru': 'Russe',
-  'rus': 'Russe',
-};
 
 /// Opens a dark-themed bottom sheet listing the available tracks of a
 /// given [kind] and lets the user pick one.
@@ -95,7 +61,7 @@ class _TrackSelectorContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final title = kind == MediaTrackKind.audio ? 'Piste audio' : 'Sous-titres';
-    final labels = _buildLabels(tracks);
+    final labels = buildTrackLabels(tracks);
     return Theme(
       data: ThemeData.dark(useMaterial3: true).copyWith(
         scaffoldBackgroundColor: Colors.black,
@@ -131,34 +97,6 @@ class _TrackSelectorContent extends StatelessWidget {
     );
   }
 
-  /// Computes a unique, human-readable label per track. Two passes:
-  /// first compute the natural label for each track ; then, for any
-  /// label shared by ≥ 2 tracks, append `· #${id}` to disambiguate.
-  static Map<String, String> _buildLabels(List<MediaTrack> tracks) {
-    final natural = <String, String>{
-      for (final t in tracks) t.id: _naturalLabel(t),
-    };
-    final counts = <String, int>{};
-    for (final label in natural.values) {
-      counts[label] = (counts[label] ?? 0) + 1;
-    }
-    return {
-      for (final t in tracks)
-        t.id: counts[natural[t.id]]! > 1
-            ? '${natural[t.id]} · #${t.id}'
-            : natural[t.id]!,
-    };
-  }
-
-  static String _naturalLabel(MediaTrack track) {
-    final title = track.title?.trim();
-    if (title != null && title.isNotEmpty) return title;
-    final lang = track.language;
-    if (lang != null && lang.isNotEmpty) {
-      return _languageNames[lang] ?? lang.toUpperCase();
-    }
-    return 'Piste ${track.id}';
-  }
 }
 
 class _TrackTile extends StatelessWidget {

@@ -67,6 +67,24 @@ bool _isManageSubRoute(String path) =>
 
 bool _isPlayerRoute(String path) => path.startsWith('/player/');
 
+/// Identity of a player page, derived from the **concrete** location.
+///
+/// GoRouter builds its page key from the route *pattern*
+/// (`/player/:movieId`), so `/player/A` and `/player/B` share one page
+/// key: Flutter would reuse the same `Element`, keep the existing
+/// `PlayerPageState`, never re-run `initState`, and go on playing the
+/// first film while the URL claims the second.
+///
+/// That never bit the app while the only way into the player was from
+/// the catalogue — the page always unmounted in between. A remote
+/// sending `playMedia` while a film is already up navigates player →
+/// player directly, which is exactly the case the pattern-level key gets
+/// wrong. Keying on the full URI (query string included, so a change of
+/// series or shuffle mode also counts) forces a genuine remount.
+ValueKey<String> playerPageKey(Uri location) => ValueKey<String>(
+  location.toString(),
+);
+
 bool _isSettingsRoute(String path) =>
     path == AppRoutes.settings ||
     path == AppRoutes.settingsProfile ||
@@ -181,8 +199,10 @@ GoRouter appRouter(Ref ref) {
       ),
       GoRoute(
         path: AppRoutes.player,
-        builder: (_, s) =>
-            PlayerPage.movie(movieId: s.pathParameters['movieId']!),
+        builder: (_, s) => PlayerPage.movie(
+          key: playerPageKey(s.uri),
+          movieId: s.pathParameters['movieId']!,
+        ),
       ),
       GoRoute(
         path: AppRoutes.playerEpisode,
@@ -200,6 +220,7 @@ GoRouter appRouter(Ref ref) {
             );
           }
           return PlayerPage.episode(
+            key: playerPageKey(s.uri),
             episodeId: s.pathParameters['episodeId']!,
             seriesContext: seriesContext,
           );

@@ -6,6 +6,7 @@ import 'package:kidflix/core/application/dtos/wishlist_entry.dto.dart';
 import 'package:kidflix/core/domain/model/wishlist_entry.dart';
 import 'package:kidflix/infrastructure/providers/wishlist.controller_provider.dart';
 import 'package:kidflix/ui/pages/wishlist/widgets/wishlist_entry_actions_sheet.widget.dart';
+import 'package:kidflix/ui/pages/remote/cast_playback.dart';
 import 'package:kidflix/ui/router/app_router.dart';
 
 /// One row of the wishlist list view.
@@ -42,7 +43,7 @@ class WishlistCard extends ConsumerWidget {
       clipBehavior: Clip.antiAlias,
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: InkWell(
-        onTap: canPlay ? () => _openPlayer(context) : null,
+        onTap: canPlay ? () => _openPlayer(context, ref) : null,
         onLongPress: () => showWishlistEntryActionsSheet(context, entry: entry),
         child: Padding(
           padding: const EdgeInsets.all(8),
@@ -83,7 +84,7 @@ class WishlistCard extends ConsumerWidget {
                 IconButton(
                   icon: const Icon(Icons.play_arrow),
                   tooltip: 'Lire',
-                  onPressed: () => _openPlayer(context),
+                  onPressed: () => _openPlayer(context, ref),
                 ),
               IconButton(
                 icon: const Icon(Icons.delete_outline),
@@ -97,9 +98,14 @@ class WishlistCard extends ConsumerWidget {
     );
   }
 
-  void _openPlayer(BuildContext context) {
+  /// Casts like every other play affordance when this device is driving
+  /// a host. This path was missed when casting was introduced, so a tap
+  /// here started the film on the phone being used as a remote.
+  Future<void> _openPlayer(BuildContext context, WidgetRef ref) async {
     final catalogId = entry.catalogId;
     if (catalogId == null) return;
+    final cast = await castIfRemoting(context, ref, mediaId: catalogId);
+    if (cast || !context.mounted) return;
     context.push(AppRoutes.player.replaceFirst(':movieId', catalogId));
   }
 

@@ -37,9 +37,18 @@ part of 'dio.provider.dart';
 /// `/auth/*` endpoints (no header at all) and exempts `GET /profiles` from
 /// `X-Profile-Id` injection (bootstrap route).
 ///
-/// Both callbacks are read via `ref.read` (not `ref.watch`) so login/logout
-/// transitions AND profile-selection transitions do NOT rebuild this `Dio`.
-/// The interceptor reads the latest values lazily at every request.
+/// The same interceptor watches responses for `401 invalid_token` and hands
+/// off to [SessionController.handleExpiredToken], which re-issues an OTP and
+/// drops the user on the verification screen. `unawaited` keeps the error
+/// path non-blocking: the original `DioException` still surfaces to the
+/// calling repository, the recovery runs beside it.
+///
+/// All three callbacks are read via `ref.read` (not `ref.watch`) so
+/// login/logout transitions AND profile-selection transitions do NOT rebuild
+/// this `Dio`. The interceptor reads the latest values lazily at every
+/// request. Reading `sessionControllerProvider` lazily also breaks what would
+/// otherwise be a build-time cycle (`dio → sessionController → authService →
+/// authRepository → dio`).
 
 @ProviderFor(dio)
 final dioProvider = DioProvider._();
@@ -73,9 +82,18 @@ final dioProvider = DioProvider._();
 /// `/auth/*` endpoints (no header at all) and exempts `GET /profiles` from
 /// `X-Profile-Id` injection (bootstrap route).
 ///
-/// Both callbacks are read via `ref.read` (not `ref.watch`) so login/logout
-/// transitions AND profile-selection transitions do NOT rebuild this `Dio`.
-/// The interceptor reads the latest values lazily at every request.
+/// The same interceptor watches responses for `401 invalid_token` and hands
+/// off to [SessionController.handleExpiredToken], which re-issues an OTP and
+/// drops the user on the verification screen. `unawaited` keeps the error
+/// path non-blocking: the original `DioException` still surfaces to the
+/// calling repository, the recovery runs beside it.
+///
+/// All three callbacks are read via `ref.read` (not `ref.watch`) so
+/// login/logout transitions AND profile-selection transitions do NOT rebuild
+/// this `Dio`. The interceptor reads the latest values lazily at every
+/// request. Reading `sessionControllerProvider` lazily also breaks what would
+/// otherwise be a build-time cycle (`dio → sessionController → authService →
+/// authRepository → dio`).
 
 final class DioProvider extends $FunctionalProvider<Dio, Dio, Dio>
     with $Provider<Dio> {
@@ -108,9 +126,18 @@ final class DioProvider extends $FunctionalProvider<Dio, Dio, Dio>
   /// `/auth/*` endpoints (no header at all) and exempts `GET /profiles` from
   /// `X-Profile-Id` injection (bootstrap route).
   ///
-  /// Both callbacks are read via `ref.read` (not `ref.watch`) so login/logout
-  /// transitions AND profile-selection transitions do NOT rebuild this `Dio`.
-  /// The interceptor reads the latest values lazily at every request.
+  /// The same interceptor watches responses for `401 invalid_token` and hands
+  /// off to [SessionController.handleExpiredToken], which re-issues an OTP and
+  /// drops the user on the verification screen. `unawaited` keeps the error
+  /// path non-blocking: the original `DioException` still surfaces to the
+  /// calling repository, the recovery runs beside it.
+  ///
+  /// All three callbacks are read via `ref.read` (not `ref.watch`) so
+  /// login/logout transitions AND profile-selection transitions do NOT rebuild
+  /// this `Dio`. The interceptor reads the latest values lazily at every
+  /// request. Reading `sessionControllerProvider` lazily also breaks what would
+  /// otherwise be a build-time cycle (`dio → sessionController → authService →
+  /// authRepository → dio`).
   DioProvider._()
     : super(
         from: null,
@@ -144,4 +171,4 @@ final class DioProvider extends $FunctionalProvider<Dio, Dio, Dio>
   }
 }
 
-String _$dioHash() => r'b8ddc9b24566b2174359cef7d576fd5455256304';
+String _$dioHash() => r'53c7833e32058245e024ce48b8728b2fd422b1a6';

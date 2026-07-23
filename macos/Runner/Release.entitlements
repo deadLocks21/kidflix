@@ -6,5 +6,13 @@
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<!--
+		Requis par la télécommande LAN : le sandbox macOS bloque tout
+		`HttpServer.bind` sans cet entitlement. DebugProfile.entitlements
+		l'avait déjà, pas celui-ci — sans lui la fonctionnalité marchait en
+		debug et échouait silencieusement en release.
+	-->
+	<key>com.apple.security.network.server</key>
+	<true/>
 </dict>
 </plist>

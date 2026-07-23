@@ -11,6 +11,7 @@ import 'package:kidflix/ui/pages/home/widgets/download_intent_button.widget.dart
 import 'package:kidflix/ui/pages/home/widgets/favorite_button.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/seen_button.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/trailer_header.widget.dart';
+import 'package:kidflix/ui/pages/remote/cast_playback.dart';
 
 /// Width threshold to choose between dialog and bottom-sheet presentation.
 const double _adaptiveBreakpointDp = 600;
@@ -116,10 +117,17 @@ class MovieDetailContent extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(_metaLine(movie), style: theme.textTheme.bodyMedium),
                 const SizedBox(height: 16),
-                Row(
+                // Wrap, not Row: the play label grows with the cast
+                // target's name ("Lire sur MacBook Pro"), which the user
+                // chooses and can make arbitrarily long. A Row overflows;
+                // a Flexible squeezes the label away to nothing. Flowing
+                // onto a second line keeps every action readable.
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     _PlayButton(movie: movie),
-                    const SizedBox(width: 8),
                     DownloadIntentButton(
                       mediaId: movie.id,
                       isEpisode: false,
@@ -144,7 +152,6 @@ class MovieDetailContent extends StatelessWidget {
                           ),
                       ],
                     ),
-                    const SizedBox(width: 4),
                     FavoriteButton(target: MovieFavoriteTarget(movie.id)),
                     SeenButton(movieId: movie.id),
                   ],
@@ -219,10 +226,15 @@ class _PlayButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final castTarget = castTargetName(ref);
     return FilledButton.icon(
-      icon: const Icon(Icons.play_arrow),
-      label: const Text('Lire'),
-      onPressed: () {
+      icon: Icon(castTarget == null ? Icons.play_arrow : Icons.cast_connected),
+      label: Text(
+        castTarget == null ? 'Lire' : 'Lire sur $castTarget',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      onPressed: () async {
         // Pre-cache the full display snapshot so the manager can resolve
         // this movie even if the parent profile cannot see it via
         // /catalog, and so the offline home can render rows + the detail
@@ -255,7 +267,12 @@ class _PlayButton extends ConsumerWidget {
                 ],
               ),
         );
+        final cast = await castIfRemoting(context, ref, mediaId: movie.id);
+        if (!context.mounted) return;
         Navigator.of(context).pop();
+        // Casting already started the film elsewhere — opening the local
+        // player too would download and play the same title twice.
+        if (cast) return;
         context.go('/player/${movie.id}');
       },
     );
