@@ -16,6 +16,7 @@ import 'package:kidflix/core/application/usecases/save_watch_progress.usecase.da
 import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/media_track.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
+import 'package:kidflix/core/domain/model/remote_download.dart';
 import 'package:kidflix/core/domain/model/remote_playback_state.dart';
 import 'package:kidflix/core/domain/model/track_preferences.dart';
 import 'package:kidflix/core/domain/model/watch_progress.dart';
@@ -260,6 +261,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       ),
     );
     setState(() => _bootstrapError = error.toString());
+    // Reaches any connected remote, which would otherwise sit on a
+    // spinner with no idea the host had given up.
+    _publishRemoteState();
   }
 
   @override
@@ -501,11 +505,43 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         ],
         selectedAudioId: _selectedAudioIdNotifier.value,
         selectedSubtitleId: _selectedSubtitleIdNotifier.value,
-        downloadedFraction: _downloadedFraction(),
+        download: _remoteDownloadSnapshot(),
         locked: _isLocked,
         canGoNext: _canGoNextRemote,
         canGoPrevious: _previousEpisodeOrNull() != null,
       ),
+    );
+  }
+
+  /// Projects the page's download bookkeeping onto the wire model, so a
+  /// remote can distinguish "still fetching", "stuck" and "died mid-play"
+  /// instead of seeing one undifferentiated spinner.
+  RemoteDownloadSnapshot _remoteDownloadSnapshot() {
+    // A bootstrap that threw never produced a download at all, but from
+    // the remote's point of view it is the same situation: this title is
+    // not going to play, here is why, try again.
+    final bootstrapError = _bootstrapError;
+    if (bootstrapError != null) {
+      return RemoteDownloadSnapshot(
+        status: RemoteDownloadStatus.failed,
+        errorMessage: bootstrapError,
+      );
+    }
+    final download = _lastDownload;
+    if (download == null) return RemoteDownloadSnapshot.none;
+    return RemoteDownloadSnapshot(
+      status: switch (download.status) {
+        DownloadStatusDto.notStarted => RemoteDownloadStatus.none,
+        DownloadStatusDto.downloading => RemoteDownloadStatus.downloading,
+        DownloadStatusDto.readyToPlay => RemoteDownloadStatus.readyToPlay,
+        DownloadStatusDto.complete => RemoteDownloadStatus.complete,
+        DownloadStatusDto.failed => RemoteDownloadStatus.failed,
+        DownloadStatusDto.cancelled => RemoteDownloadStatus.cancelled,
+      },
+      bytesReceived: download.bytesReceived,
+      bytesTotal: download.bytesTotal,
+      errorMessage: download.errorMessage,
+      interrupted: _downloadInterrupted,
     );
   }
 
@@ -589,6 +625,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   void _flagDownloadInterrupted(_DownloadView dl) {
     if (_engine == null || _downloadInterrupted) return;
     setState(() => _downloadInterrupted = true);
+    _publishRemoteState();
     unawaited(
       ref.read(loggerProvider).warn(
         'playback.download_interrupted',
@@ -1834,6 +1871,21 @@ class _RemotePlaybackControls implements PlaybackRemoteControls {
   Future<void> stop() async {
     if (_state._disposed || !_state.mounted) return;
     _state._onClose();
+  }
+
+  @override
+  Future<void> retryDownload() async {
+    if (_state._disposed || !_state.mounted) return;
+    // A bootstrap that threw never got as far as starting a download, so
+    // it needs the whole sequence rerun rather than just the transfer.
+    if (_state._bootstrapError != null) {
+      _state._onRetryBootstrap();
+      return;
+    }
+    if (_state._lastDownload?.status case DownloadStatusDto.failed ||
+        DownloadStatusDto.cancelled) {
+      _state._onRetryDownload();
+    }
   }
 
   @override

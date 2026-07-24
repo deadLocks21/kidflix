@@ -32,6 +32,10 @@ abstract class PlaybackRemoteControls {
   /// Leaves the player and returns to the catalogue.
   Future<void> stop();
 
+  /// Restarts a download that failed, or re-runs a bootstrap that threw.
+  /// No-op when nothing went wrong.
+  Future<void> retryDownload();
+
   /// No-ops when the player has no series context or is at an edge.
   Future<void> nextEpisode();
 

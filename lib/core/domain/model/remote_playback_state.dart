@@ -1,3 +1,4 @@
+import 'package:kidflix/core/domain/model/remote_download.dart';
 import 'package:kidflix/core/domain/model/remote_session.dart';
 
 /// What the host device is currently doing, as seen by a remote.
@@ -100,10 +101,17 @@ class RemotePlaybackState {
   final String? selectedAudioId;
   final String? selectedSubtitleId;
 
-  /// 0..1 while the file is still downloading, null once complete. Lets
-  /// the remote grey out the not-yet-seekable part of the timeline the
-  /// same way the host does.
-  final double? downloadedFraction;
+  /// How the host's download of this title is going. Carries the byte
+  /// counts and any failure, so a remote can tell "still fetching" from
+  /// "stuck" and offer a retry.
+  final RemoteDownloadSnapshot download;
+
+  /// 0..1 while the file is still downloading, null once complete. Greys
+  /// out the not-yet-seekable part of the timeline, as the host does.
+  /// Derived rather than carried: it is the same number as
+  /// [RemoteDownloadSnapshot.fraction] and duplicating it on the wire
+  /// only creates a way for the two to disagree.
+  double? get downloadedFraction => download.fraction;
 
   /// Kids lock engaged on the host. Remote control stays fully available
   /// — that is the point: a parent can drive a locked device — but the
@@ -131,7 +139,7 @@ class RemotePlaybackState {
     this.subtitleTracks = const [],
     this.selectedAudioId,
     this.selectedSubtitleId,
-    this.downloadedFraction,
+    this.download = RemoteDownloadSnapshot.none,
     this.locked = false,
     this.canGoNext = false,
     this.canGoPrevious = false,
@@ -156,7 +164,7 @@ class RemotePlaybackState {
     List<RemoteTrackOption>? subtitleTracks,
     String? selectedAudioId,
     String? selectedSubtitleId,
-    double? downloadedFraction,
+    RemoteDownloadSnapshot? download,
     bool? locked,
     bool? canGoNext,
     bool? canGoPrevious,
@@ -173,7 +181,7 @@ class RemotePlaybackState {
     subtitleTracks: subtitleTracks ?? this.subtitleTracks,
     selectedAudioId: selectedAudioId ?? this.selectedAudioId,
     selectedSubtitleId: selectedSubtitleId ?? this.selectedSubtitleId,
-    downloadedFraction: downloadedFraction ?? this.downloadedFraction,
+    download: download ?? this.download,
     locked: locked ?? this.locked,
     canGoNext: canGoNext ?? this.canGoNext,
     canGoPrevious: canGoPrevious ?? this.canGoPrevious,
@@ -192,7 +200,7 @@ class RemotePlaybackState {
     'subtitleTracks': [for (final t in subtitleTracks) t.toJson()],
     'selectedAudioId': selectedAudioId,
     'selectedSubtitleId': selectedSubtitleId,
-    'downloadedFraction': downloadedFraction,
+    'download': download.toJson(),
     'locked': locked,
     'canGoNext': canGoNext,
     'canGoPrevious': canGoPrevious,
@@ -239,7 +247,12 @@ class RemotePlaybackState {
       subtitleTracks: tracks('subtitleTracks'),
       selectedAudioId: stringOf('selectedAudioId'),
       selectedSubtitleId: stringOf('selectedSubtitleId'),
-      downloadedFraction: doubleOf('downloadedFraction'),
+      download: switch (json['download']) {
+        final Map raw => RemoteDownloadSnapshot.fromJson(
+          Map<String, Object?>.from(raw),
+        ),
+        _ => RemoteDownloadSnapshot.none,
+      },
       locked: json['locked'] == true,
       canGoNext: json['canGoNext'] == true,
       canGoPrevious: json['canGoPrevious'] == true,

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kidflix/core/application/remote/remote_protocol.dart';
 import 'package:kidflix/core/domain/model/remote_command.dart';
+import 'package:kidflix/core/domain/model/remote_download.dart';
 import 'package:kidflix/core/domain/model/remote_playback_state.dart';
 
 void main() {
@@ -35,7 +36,11 @@ void main() {
       subtitleTracks: [RemoteTrackOption(id: '2', label: 'Anglais')],
       selectedAudioId: '1',
       selectedSubtitleId: 'no',
-      downloadedFraction: 0.5,
+      download: RemoteDownloadSnapshot(
+        status: RemoteDownloadStatus.downloading,
+        bytesReceived: 50,
+        bytesTotal: 100,
+      ),
       locked: true,
       canGoNext: true,
     );
@@ -56,6 +61,7 @@ void main() {
     expect(decoded.subtitleTracks.single.id, equals('2'));
     expect(decoded.selectedSubtitleId, equals('no'));
     expect(decoded.downloadedFraction, equals(0.5));
+    expect(decoded.download.status, equals(RemoteDownloadStatus.downloading));
     expect(decoded.locked, isTrue);
     expect(decoded.canGoNext, isTrue);
     expect(decoded.canGoPrevious, isFalse);

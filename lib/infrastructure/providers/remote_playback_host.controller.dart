@@ -193,6 +193,8 @@ class RemotePlaybackHost extends _$RemotePlaybackHost {
           await controls.setVolume(volume);
         case RemoteStopCommand():
           await controls.stop();
+        case RemoteRetryDownloadCommand():
+          await controls.retryDownload();
         case RemoteNextEpisodeCommand():
           await controls.nextEpisode();
         case RemotePreviousEpisodeCommand():

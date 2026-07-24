@@ -15,6 +15,7 @@ void main() {
       const RemoteSetAudioTrackCommand('3'),
       const RemoteSetSubtitleTrackCommand('no'),
       const RemoteSetVolumeCommand(65.5),
+      const RemoteRetryDownloadCommand(),
       const RemoteSelectProfileCommand('profile-4'),
       const RemoteSubmitProfilePinCommand('1234'),
       const RemoteCancelProfilePinCommand(),

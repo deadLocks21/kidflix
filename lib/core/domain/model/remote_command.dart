@@ -79,6 +79,7 @@ sealed class RemoteCommand {
         _ => null,
       },
       'cancelProfilePin' => const RemoteCancelProfilePinCommand(),
+      'retryDownload' => const RemoteRetryDownloadCommand(),
       'playMedia' => switch (stringOf('mediaId')) {
         final String id => RemotePlayMediaCommand(
           mediaId: id,
@@ -179,6 +180,17 @@ class RemoteSetVolumeCommand extends RemoteCommand {
   String get type => 'setVolume';
   @override
   Map<String, Object?> get payload => {'volume': volume};
+}
+
+/// Restarts a download that failed on the host.
+///
+/// Exists so a stalled film does not require walking to the device: the
+/// remote already shows why it stopped, and this is the other half of
+/// that — being able to do something about it from here.
+class RemoteRetryDownloadCommand extends RemoteCommand {
+  const RemoteRetryDownloadCommand();
+  @override
+  String get type => 'retryDownload';
 }
 
 /// Picks a profile on the host.

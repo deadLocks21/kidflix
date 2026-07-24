@@ -5,6 +5,7 @@ import 'package:kidflix/core/domain/model/remote_playback_state.dart';
 import 'package:kidflix/core/domain/services/remote_control_client.service.dart';
 import 'package:kidflix/infrastructure/providers/remote_control.providers.dart';
 import 'package:kidflix/shared/duration_format.dart';
+import 'package:kidflix/ui/pages/remote/widgets/remote_download_status.widget.dart';
 import 'package:kidflix/ui/pages/remote/widgets/remote_profile_gate.widget.dart';
 import 'package:kidflix/ui/pages/remote/widgets/remote_track_sheet.dart';
 import 'package:kidflix/ui/theme/kidflix_palette.dart';
@@ -79,6 +80,10 @@ class _RemoteControlPanelState extends ConsumerState<RemoteControlPanel> {
                 ],
               ),
             ),
+          RemoteDownloadStatusCard(
+            download: playback.download,
+            onRetry: () => _send(const RemoteRetryDownloadCommand()),
+          ),
           const SizedBox(height: 16),
           _Timeline(
             playback: playback,
@@ -322,7 +327,13 @@ class _TransportRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final preparing = playback.status == RemotePlaybackStatus.preparing;
+    // A failed download leaves the host "preparing" forever. Spinning
+    // there would promise progress that is not coming — the card above
+    // already explains the failure and offers the retry, so the button
+    // just goes inert.
+    final stalled = playback.download.canRetry;
+    final preparing =
+        playback.status == RemotePlaybackStatus.preparing && !stalled;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
@@ -341,7 +352,7 @@ class _TransportRow extends StatelessWidget {
         IconButton.filled(
           tooltip: playback.isPlaying ? 'Pause' : 'Lire',
           iconSize: 40,
-          onPressed: preparing ? null : onTogglePlay,
+          onPressed: preparing || stalled ? null : onTogglePlay,
           icon: preparing
               ? const SizedBox(
                   width: 24,
