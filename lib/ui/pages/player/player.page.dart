@@ -1728,14 +1728,32 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     if (engine != null) {
       final mobileTheme = _buildMobileTheme(context);
       final desktopTheme = _buildDesktopTheme(context);
-      final controls = MaterialVideoControlsTheme(
-        key: ValueKey(_isLocked),
-        normal: mobileTheme,
-        fullscreen: mobileTheme,
-        child: MaterialDesktopVideoControlsTheme(
-          normal: desktopTheme,
-          fullscreen: desktopTheme,
-          child: engine.buildSurface(),
+      // [ObjectKey] on the engine: an in-place episode switch
+      // ([_switchToEpisode]) swaps the engine without remounting the
+      // page, so media_kit's `Video` would land at the same position in
+      // the tree with a new `VideoController` and a null key — Flutter
+      // reuses the Element, `VideoState.initState` never re-runs, and
+      // `didUpdateWidget` ignores the controller change. Every control
+      // (play/pause, seek bar, position) stays subscribed to the *old*,
+      // already-disposed `Player`, whose streams are closed for good:
+      // the new episode plays, the chrome sits frozen on ▶.
+      //
+      // The page does null out `_engine` before rebootstrapping, but
+      // whether a frame is actually painted in that window is a race —
+      // it is, when the download gate or the resume dialog shows, and it
+      // isn't when the next episode is already complete on disk. Keying
+      // on engine identity forces the remount either way.
+      final controls = KeyedSubtree(
+        key: ObjectKey(engine),
+        child: MaterialVideoControlsTheme(
+          key: ValueKey(_isLocked),
+          normal: mobileTheme,
+          fullscreen: mobileTheme,
+          child: MaterialDesktopVideoControlsTheme(
+            normal: desktopTheme,
+            fullscreen: desktopTheme,
+            child: engine.buildSurface(),
+          ),
         ),
       );
       return Stack(
