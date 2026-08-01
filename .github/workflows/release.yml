@@ -1,37 +1,50 @@
 # Workflow de release consolidé, déclenché sur push d'un tag `v*`.
-# Couvre 5 plateformes en parallèle + uploads stores + création GitHub Release.
+# Couvre iOS, Android, Windows, Linux et macOS en parallèle + uploads stores +
+# création GitHub Release.
 #
-# Pipeline en 3 étages "fail-fast au build, atomic à la publish/release" :
+# Note macOS : PAS de distribution App Store. macOS n'est distribué qu'en canal
+# DIRECT (build-macos : .app Developer ID notarisé, consommé par
+# tool/updater), au même titre que Windows/Linux.
+#
+# Pipeline "fail-fast au build (gate strict) → GitHub Release → stores" :
 #
 #   1) prepare        Calcule la version (depuis le tag ou pubspec.yaml).
 #
 #   2) Builds parallèle (gate strict) :
-#        build-ios      → IPA signé (artifact, pas encore publié)
-#        build-android  → AAB signé (artifact, pas encore publié)
-#        build-macos    → .pkg signé (artifact, pas encore publié)
-#        build-windows  → .zip non signé
-#        build-linux    → .AppImage
+#        build-ios          → IPA signé (artifact) puis TestFlight — pas attaché
+#                             à la GitHub Release (signé App Store, non sideloadable)
+#        build-android      → AAB signé (artifact → Play Store, pas attaché à la
+#                             GitHub Release) + APK universel (sideload, attaché)
+#        build-windows      → .zip non signé
+#        build-linux        → .AppImage
+#        build-macos        → .app Developer ID notarisé (hors App Store)
+#        build-updater      → binaires updater Win/Linux/macOS (matrice, tool/updater)
 #      Si UN SEUL plante, aucun upload store n'est tenté.
 #
-#   3) build-gate     Job sentinelle qui vérifie que les 5 builds sont verts.
+#   3) build-gate     Job sentinelle qui vérifie que TOUS les builds sont verts —
+#                     dont l'app macOS (build-macos) et l'updater (build-updater,
+#                     matrice qui inclut macOS).
 #
-#   4) Publishes parallèle (déclenchés après build-gate) :
-#        publish-ios     → TestFlight "Kidflix Internal"
-#        publish-android → Play Store piste "internal"
-#        publish-macos   → TestFlight macOS (groupe partagé via Universal Purchase)
-#      Windows et Linux n'ont pas de store dans ce pipeline (artifacts only).
-#
-#   5) release        Crée la GitHub Release avec les 6 assets attachés.
+#   4) release        Crée la GitHub Release dès le gate franchi — sans attendre
+#                     les stores (qui coûtent jusqu'à 90 min de processing Apple).
+#                     Assets attachés : apps desktop (Windows, Linux, macOS),
+#                     installateur + binaires updater, et l'APK universel.
+#                     PAS l'AAB ni l'IPA (non installables directement, déjà
+#                     publiés sur les stores) — cf. le contrat de nommage des
+#                     assets documenté dans le job.
 #                     Notes = changelog semantic-release relu depuis le corps
 #                     du commit `chore(release)` taggé (PAS le message
 #                     générique de `release_notes.json`, réservé aux stores).
-#                     Skippée si workflow_dispatch (pas de tag) — pour tester
-#                     l'ensemble du pipeline sans polluer les Releases GitHub.
+#
+#   5) Publishes parallèle (déclenchés APRÈS la GitHub Release) :
+#        publish-ios     → TestFlight "Kidflix Internal"
+#        publish-android → Play Store piste "internal"
+#      Windows, Linux et macOS n'ont pas de store ici (artifacts only).
 #
 # Secrets requis (Settings → Secrets and variables → Actions) :
 #   APP_STORE_CONNECT_KEY_IDENTIFIER, APP_STORE_CONNECT_ISSUER_ID,
 #   APP_STORE_CONNECT_PRIVATE_KEY, CERTIFICATE_PRIVATE_KEY,
-#   MAC_INSTALLER_CERTIFICATE_P12_BASE64, MAC_INSTALLER_CERTIFICATE_PASSWORD,
+#   DEVELOPER_ID_APPLICATION_P12_BASE64, DEVELOPER_ID_APPLICATION_PASSWORD,
 #   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
 #   ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD,
 #   GCLOUD_SERVICE_ACCOUNT_CREDENTIALS,
@@ -170,6 +183,7 @@ jobs:
           flutter build ipa --release \
             --build-name="$VERSION" \
             --build-number="${{ steps.build-number.outputs.build_number }}" \
+            --dart-define=APP_VERSION="$VERSION+${{ steps.build-number.outputs.build_number }}" \
             --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
             --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
             --dart-define=SIGNOZ_ENV="$SIGNOZ_ENV" \
@@ -267,6 +281,7 @@ jobs:
           flutter build appbundle --release \
             --build-name="$VERSION" \
             --build-number="${{ steps.build-number.outputs.build_number }}" \
+            --dart-define=APP_VERSION="$VERSION+${{ steps.build-number.outputs.build_number }}" \
             --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
             --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
             --dart-define=SIGNOZ_ENV="$SIGNOZ_ENV"
@@ -282,9 +297,18 @@ jobs:
           flutter build apk --release \
             --build-name="$VERSION" \
             --build-number="${{ steps.build-number.outputs.build_number }}" \
+            --dart-define=APP_VERSION="$VERSION+${{ steps.build-number.outputs.build_number }}" \
             --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
             --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
             --dart-define=SIGNOZ_ENV="$SIGNOZ_ENV"
+
+      # `flutter build apk` sort un `app-release.apk` générique : on le renomme
+      # au schéma d'assets de la Release (cf. job release) avant l'upload, pour
+      # que le nom de l'artifact soit déjà le nom final.
+      - name: Renomme l'APK au schéma kidflix-android-<version>.apk
+        run: |
+          mv build/app/outputs/flutter-apk/app-release.apk \
+             "build/app/outputs/flutter-apk/kidflix-android-${VERSION}.apk"
 
       - name: Upload AAB + APK + mapping artifact
         uses: actions/upload-artifact@v4
@@ -297,6 +321,21 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+  # ────────────────────────────────────────────────────────────────────────
+  # BUILD macOS — .app signé Developer ID + notarisé, zippé (ditto), attaché à
+  # la GitHub Release. C'est l'UNIQUE canal de distribution macOS (plus d'App
+  # Store), consommé par l'updater (tool/updater) : l'équivalent macOS du .zip
+  # Windows / de l'AppImage. Deux propriétés clés :
+  #   - PAS de sandbox (entitlements DirectRelease.entitlements) : l'app doit
+  #     piloter la fenêtre de MAJ via des fichiers hors container ;
+  #   - signature « Developer ID Application », puis notarisation Apple → aucune
+  #     alerte Gatekeeper au téléchargement.
+  #
+  # ⚠️ Secrets à ajouter EN PLUS de l'App Store Connect (Settings → Secrets) :
+  #   DEVELOPER_ID_APPLICATION_P12_BASE64  — cert « Developer ID Application » (.p12 en base64)
+  #   DEVELOPER_ID_APPLICATION_PASSWORD    — mot de passe du .p12
+  # La notarisation réutilise la clé APP_STORE_CONNECT_* déjà présente (notarytool).
+  # ────────────────────────────────────────────────────────────────────────
   build-macos:
     name: Build macOS (${{ needs.prepare.outputs.version }})
     needs: prepare
@@ -307,11 +346,8 @@ jobs:
       APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
       APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
       APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
-      CERTIFICATE_PRIVATE_KEY: ${{ secrets.CERTIFICATE_PRIVATE_KEY }}
-      MAC_INSTALLER_CERTIFICATE_P12_BASE64: ${{ secrets.MAC_INSTALLER_CERTIFICATE_P12_BASE64 }}
-      MAC_INSTALLER_CERTIFICATE_PASSWORD: ${{ secrets.MAC_INSTALLER_CERTIFICATE_PASSWORD }}
-      BUNDLE_ID: "fr.dtfh.kidflix"
-      APP_STORE_APPLE_ID: "6769453662"
+      DEVELOPER_ID_APPLICATION_P12_BASE64: ${{ secrets.DEVELOPER_ID_APPLICATION_P12_BASE64 }}
+      DEVELOPER_ID_APPLICATION_PASSWORD: ${{ secrets.DEVELOPER_ID_APPLICATION_PASSWORD }}
       VERSION: ${{ needs.prepare.outputs.version }}
 
     steps:
@@ -342,39 +378,16 @@ jobs:
       - name: Initialize keychain
         run: keychain initialize
 
-      - name: Fetch Mac App Store signing files (create if missing)
+      - name: Add Developer ID Application certificate to keychain
+        # Cert account-wide (pas lié à un bundle ID) → importé depuis un secret
+        # base64.
         run: |
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --type MAC_APP_STORE \
-            --certificate-key=@env:CERTIFICATE_PRIVATE_KEY \
-            --create
-
-      - name: Add Mac App Distribution certificate to keychain
-        run: keychain add-certificates
-
-      - name: Add Mac Installer Distribution certificate to keychain
-        # Cert installer account-wide, injecté depuis secret base64 (pas généré
-        # par fetch-signing-files qui ne couvre que les certs liés à un bundle ID).
-        run: |
-          INSTALLER_P12="$RUNNER_TEMP/mac_installer.p12"
-          echo "$MAC_INSTALLER_CERTIFICATE_P12_BASE64" | base64 --decode > "$INSTALLER_P12"
+          P12="$RUNNER_TEMP/developer_id.p12"
+          echo "$DEVELOPER_ID_APPLICATION_P12_BASE64" | base64 --decode > "$P12"
           keychain add-certificates \
-            -c "$INSTALLER_P12" \
-            --certificate-password=@env:MAC_INSTALLER_CERTIFICATE_PASSWORD
-
-      - name: Verify keychain contents (debug)
-        # 2 identités obligatoires : "Apple Distribution" (signe le .app) +
-        # "3rd Party Mac Developer Installer" (signe le .pkg).
-        run: |
-          security find-identity -v -p basic
-          N=$(security find-identity -v -p basic | tail -1 | grep -oE '[0-9]+' | head -1)
-          if [ "${N:-0}" -lt 2 ]; then
-            echo "ERROR: expected at least 2 identities, got ${N:-0}"
-            exit 1
-          fi
-
-      - name: Set up code signing on macOS Xcode project
-        run: xcode-project use-profiles --project macos/Runner.xcodeproj
+            -c "$P12" \
+            --certificate-password=@env:DEVELOPER_ID_APPLICATION_PASSWORD
+          security find-identity -v -p codesigning
 
       - run: flutter pub get
 
@@ -392,70 +405,88 @@ jobs:
           cd macos
           pod install
 
-      - name: Compute build number from App Store Connect (macOS)
-        # `--platform MAC_OS` CRUCIAL : build number macOS séparé d'iOS
-        # malgré Universal Purchase.
-        id: build-number
-        run: |
-          LATEST_BUILD=$(app-store-connect get-latest-build-number \
-            "$APP_STORE_APPLE_ID" \
-            --platform MAC_OS)
-          BUILD_NUMBER=$((LATEST_BUILD + 1))
-          echo "Next macOS build number: $BUILD_NUMBER"
-          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
-
-      - name: Build macOS release
+      - name: Build macOS release (non signé — on re-signe Developer ID ensuite)
+        # On désactive la signature au build (sinon xcodebuild échoue faute de
+        # profil : ce job n'utilise PAS `xcode-project use-profiles`). On signe
+        # nous-mêmes juste après, avec le cert Developer ID + les entitlements
+        # non-sandbox. L'ajout au .xcconfig est éphémère (checkout jetable).
         env:
           SIGNOZ_INGEST_URL: ${{ secrets.SIGNOZ_INGEST_URL }}
           SIGNOZ_INGESTION_KEY: ${{ secrets.SIGNOZ_INGESTION_KEY }}
         run: |
+          cat >> macos/Runner/Configs/Release.xcconfig <<'EOF'
+          CODE_SIGNING_ALLOWED = NO
+          CODE_SIGNING_REQUIRED = NO
+          CODE_SIGN_IDENTITY =
+          CODE_SIGN_STYLE = Manual
+          DEVELOPMENT_TEAM =
+          PROVISIONING_PROFILE_SPECIFIER =
+          EOF
+
           flutter build macos --release \
             --build-name="$VERSION" \
-            --build-number="${{ steps.build-number.outputs.build_number }}" \
+            --build-number="${{ github.run_number }}" \
+            --dart-define=APP_VERSION="$VERSION+${{ github.run_number }}" \
             --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
             --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
             --dart-define=SIGNOZ_ENV="$SIGNOZ_ENV"
 
-      - name: Package .app into signed .pkg
-        # productbuild (création) + productsign (signature) séparés pour avoir
-        # un message d'erreur précis. `--timestamp=none` évite l'appel
-        # timestamp.apple.com qui peut hang. `< /dev/null` ferme stdin.
+      - name: Sign (Developer ID + hardened runtime, non-sandbox), notarize, staple, zip
         run: |
           set -euo pipefail
 
-          APP_PATH=$(find build/macos/Build/Products/Release -maxdepth 1 -name "*.app" -type d | head -1)
-          if [ -z "$APP_PATH" ]; then
-            echo "No .app bundle found"
-            ls -la build/macos/Build/Products/Release/ || true
-            exit 1
+          APP=$(find build/macos/Build/Products/Release -maxdepth 1 -name '*.app' -type d | head -1)
+          if [ -z "$APP" ]; then
+            echo "No .app bundle found"; ls -la build/macos/Build/Products/Release/ || true; exit 1
           fi
 
-          INSTALLER_IDENTITY=$(security find-identity -v -p basic \
-            | grep "3rd Party Mac Developer Installer" \
-            | head -1 \
+          IDENTITY=$(security find-identity -v -p codesigning \
+            | grep "Developer ID Application" | head -1 \
             | sed -E 's/^[[:space:]]*[0-9]+\)[[:space:]]+[A-F0-9]+[[:space:]]+"(.*)"$/\1/')
-          if [ -z "$INSTALLER_IDENTITY" ]; then
-            echo "ERROR: no installer identity found"
-            security find-identity -v
-            exit 1
+          if [ -z "$IDENTITY" ]; then
+            echo "ERROR: no Developer ID Application identity"; security find-identity -v; exit 1
           fi
+          ENT="macos/Runner/DirectRelease.entitlements"
 
-          PKG_NAME="kidflix-${VERSION}-${{ steps.build-number.outputs.build_number }}.pkg"
-          UNSIGNED_PKG="$RUNNER_TEMP/unsigned.pkg"
+          # Signer les binaires imbriqués (frameworks, dylibs) AVANT le bundle,
+          # tous en hardened runtime (`--options runtime`, requis par notarytool).
+          find "$APP/Contents/Frameworks" -name '*.dylib' -type f -print0 2>/dev/null \
+            | while IFS= read -r -d '' f; do
+                codesign --force --options runtime --timestamp --sign "$IDENTITY" "$f"
+              done
+          find "$APP/Contents/Frameworks" -maxdepth 1 -name '*.framework' -type d -print0 2>/dev/null \
+            | while IFS= read -r -d '' fw; do
+                codesign --force --options runtime --timestamp --sign "$IDENTITY" "$fw"
+              done
 
-          productbuild --component "$APP_PATH" /Applications "$UNSIGNED_PKG"
-          productsign \
-            --sign "$INSTALLER_IDENTITY" \
-            --timestamp=none \
-            "$UNSIGNED_PKG" "$PKG_NAME" < /dev/null
-          pkgutil --check-signature "$PKG_NAME"
-          echo "PKG_PATH=$PWD/$PKG_NAME" >> "$GITHUB_ENV"
+          codesign --force --options runtime --timestamp \
+            --entitlements "$ENT" --sign "$IDENTITY" "$APP"
+          codesign --verify --strict --verbose=2 "$APP"
 
-      - name: Upload .pkg artifact
+          ZIP="kidflix-macos-${VERSION}.zip"
+          ditto -c -k --keepParent "$APP" "$ZIP"
+
+          # Notarisation via la clé App Store Connect (écrite dans un .p8 temporaire).
+          KEY="$RUNNER_TEMP/asc_key.p8"
+          printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$KEY"
+          xcrun notarytool submit "$ZIP" \
+            --key "$KEY" \
+            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            --issuer "$APP_STORE_CONNECT_ISSUER_ID" \
+            --wait
+
+          # Staple le ticket SUR le .app (impossible sur un .zip), puis re-zippe :
+          # l'app se lance ainsi même hors-ligne, sans vérification en ligne.
+          xcrun stapler staple "$APP"
+          rm -f "$ZIP"
+          ditto -c -k --keepParent "$APP" "$ZIP"
+          echo "MACOS_ZIP=$PWD/$ZIP" >> "$GITHUB_ENV"
+
+      - name: Upload macOS direct artifact
         uses: actions/upload-artifact@v4
         with:
           name: kidflix-macos
-          path: ${{ env.PKG_PATH }}
+          path: ${{ env.MACOS_ZIP }}
           retention-days: 14
           if-no-files-found: error
 
@@ -491,6 +522,7 @@ jobs:
           flutter build windows --release `
             --build-name="$env:VERSION" `
             --build-number="${{ github.run_number }}" `
+            --dart-define=APP_VERSION="$env:VERSION+${{ github.run_number }}" `
             --dart-define=SIGNOZ_INGEST_URL="$env:SIGNOZ_INGEST_URL" `
             --dart-define=SIGNOZ_INGESTION_KEY="$env:SIGNOZ_INGESTION_KEY" `
             --dart-define=SIGNOZ_ENV="$env:SIGNOZ_ENV"
@@ -500,7 +532,7 @@ jobs:
         # → on zippe tout le dossier Release pour un archive autonome.
         shell: pwsh
         run: |
-          $zipName = "kidflix-windows-$env:VERSION-${{ github.run_number }}.zip"
+          $zipName = "kidflix-windows-$env:VERSION.zip"
           $sourceDir = "build/windows/x64/runner/Release"
           if (-not (Test-Path $sourceDir)) {
             Write-Error "Build output directory not found: $sourceDir"
@@ -564,6 +596,7 @@ jobs:
           flutter build linux --release \
             --build-name="$VERSION" \
             --build-number="${{ github.run_number }}" \
+            --dart-define=APP_VERSION="$VERSION+${{ github.run_number }}" \
             --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
             --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
             --dart-define=SIGNOZ_ENV="$SIGNOZ_ENV"
@@ -641,7 +674,10 @@ jobs:
           # requièrent FUSE2 pour s'auto-monter. Sur GHA, FUSE n'est pas dispo.
           APPIMAGE_EXTRACT_AND_RUN: "1"
         run: |
-          APPIMAGE_NAME="Kidflix-${VERSION}-${{ github.run_number }}-x86_64.AppImage"
+          # Schéma d'assets `kidflix-<plateforme>-<version>` (cf. job release) ;
+          # le suffixe `-x86_64.AppImage` est ce que matchent les updaters déjà
+          # installés (tool/updater/lib/github.dart) — à ne pas retirer.
+          APPIMAGE_NAME="kidflix-linux-${VERSION}-x86_64.AppImage"
 
           # Résolu via ldconfig plutôt qu'en dur : si un jour le runner ne
           # fournit plus libmpv.so.1, on veut échouer ICI avec un message clair
@@ -738,16 +774,24 @@ jobs:
           if-no-files-found: error
 
   # ───────────────────────────────────────────────────────────────────────
-  # UPDATER — Binaire installateur/launcher/auto-updater (Windows + Linux).
+  # UPDATER — Binaire installateur/launcher/auto-updater (Windows, Linux, macOS).
   # Indépendant des builds d'app : c'est un petit CLI Dart (tool/updater)
   # attaché à la release pour que l'utilisateur le télécharge une seule fois.
+  # Bootstrap : téléchargé UNE fois, ensuite il met à jour l'app ET lui-même.
+  #
+  # macOS : on ne distribue PAS le binaire nu (téléchargé via navigateur il
+  # serait tué par Gatekeeper — un exécutable nu ne peut pas être « staplé »).
+  # Étapes supplémentaires (gardées par `if: runner.os == 'macOS'`) : on l'emballe
+  # dans « Kidflix Installer.app », signé Developer ID + notarisé + STAPLÉ, zippé
+  # via ditto. Un .app staplé passe Gatekeeper au double-clic, hors-ligne. Secrets
+  # DEVELOPER_ID_APPLICATION_* + APP_STORE_CONNECT_*.
   # ───────────────────────────────────────────────────────────────────────
 
   build-updater:
     name: Build Updater (${{ matrix.label }})
     needs: prepare
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -760,6 +804,19 @@ jobs:
             label: Linux
             out: kidflix-updater-linux
             artifact: kidflix-updater-linux
+          - os: macos-15
+            label: macOS
+            out: kidflix-updater-macos
+            artifact: kidflix-updater-macos
+
+    env:
+      # Utilisés uniquement par les étapes macOS (ignorés sur Win/Linux).
+      APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+      DEVELOPER_ID_APPLICATION_P12_BASE64: ${{ secrets.DEVELOPER_ID_APPLICATION_P12_BASE64 }}
+      DEVELOPER_ID_APPLICATION_PASSWORD: ${{ secrets.DEVELOPER_ID_APPLICATION_PASSWORD }}
+      VERSION: ${{ needs.prepare.outputs.version }}
 
     steps:
       - uses: actions/checkout@v4
@@ -768,17 +825,167 @@ jobs:
         with:
           sdk: "3.11.5"
 
+      # ── macOS uniquement : Xcode + import du cert Developer ID ──────────────
+      - name: Select Xcode 26.3
+        if: runner.os == 'macOS'
+        run: sudo xcode-select -s /Applications/Xcode_26.3.app/Contents/Developer
+
+      - name: Setup Python (requis par codemagic-cli-tools)
+        if: runner.os == 'macOS'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install codemagic-cli-tools
+        if: runner.os == 'macOS'
+        run: pip install codemagic-cli-tools
+
+      - name: Initialize keychain
+        if: runner.os == 'macOS'
+        run: keychain initialize
+
+      - name: Add Developer ID Application certificate to keychain
+        if: runner.os == 'macOS'
+        run: |
+          P12="$RUNNER_TEMP/developer_id.p12"
+          echo "$DEVELOPER_ID_APPLICATION_P12_BASE64" | base64 --decode > "$P12"
+          keychain add-certificates \
+            -c "$P12" \
+            --certificate-password=@env:DEVELOPER_ID_APPLICATION_PASSWORD
+
       - name: Resolve updater deps
         working-directory: tool/updater
         run: dart pub get
 
-      # Sous-système console : l'install affiche ses prompts ; les lancements
-      # quotidiens passent par un wrapper caché (VBS Windows / .desktop Linux).
+      # CLI console autonome (pas de Flutter) : `dart compile exe` produit un
+      # binaire natif. Les lancements quotidiens passent par un wrapper caché
+      # (VBS Windows / .desktop Linux / .app lanceur macOS) généré à l'installation.
       - name: Compile updater
         working-directory: tool/updater
         run: dart compile exe bin/kidflix_updater.dart -o "${{ matrix.out }}"
 
+      # macOS : emballe le binaire dans « Kidflix Installer.app », signé
+      # Developer ID + hardened runtime, notarisé ET STAPLÉ (possible sur un .app,
+      # pas sur un binaire nu). C'est l'artefact que l'utilisateur télécharge :
+      # un .app staplé passe Gatekeeper au double-clic, hors-ligne, sans `xattr`.
+      # `--options runtime` requis par notarytool — et, avec lui, l'entitlement
+      # `allow-unsigned-executable-memory` (macos/Installer.entitlements) SANS
+      # LEQUEL le binaire Dart AOT est tué au démarrage par le noyau
+      # (SIGKILL / CODESIGNING « Invalid Page ») : `dart compile exe` remappe son
+      # snapshot en mémoire anonyme exécutable. Cf. le commentaire du fichier.
+      - name: Package installer .app (Developer ID + notarize + staple) (macOS)
+        if: runner.os == 'macOS'
+        working-directory: tool/updater
+        run: |
+          set -euo pipefail
+          APP="Kidflix Installer.app"
+          rm -rf "$APP"
+          mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+          cp "${{ matrix.out }}" "$APP/Contents/MacOS/kidflix-installer"
+          chmod +x "$APP/Contents/MacOS/kidflix-installer"
+
+          # SECONDE copie du MÊME binaire, signée en autonome plus bas. C'est
+          # elle que l'installateur relocalise dans `<root>/updater/` et que
+          # l'auto-MAJ extrait — cf. _relocatableBinary() dans lib/installer.dart.
+          # L'exécutable principal, lui, se fait sceller le hash de l'Info.plist
+          # par la signature du BUNDLE : copié hors de Contents/MacOS/ il devient
+          # invalide et le hardened runtime le tue au démarrage.
+          cp "${{ matrix.out }}" "$APP/Contents/Resources/kidflix-updater"
+          chmod +x "$APP/Contents/Resources/kidflix-updater"
+
+          cat > "$APP/Contents/Info.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+          <key>CFBundleName</key><string>Kidflix Installer</string>
+          <key>CFBundleDisplayName</key><string>Kidflix Installer</string>
+          <key>CFBundleIdentifier</key><string>fr.dtfh.kidflix.installer</string>
+          <key>CFBundleExecutable</key><string>kidflix-installer</string>
+          <key>CFBundlePackageType</key><string>APPL</string>
+          <key>CFBundleIconFile</key><string>AppIcon</string>
+          <key>CFBundleShortVersionString</key><string>1.0</string>
+          <key>CFBundleVersion</key><string>1</string>
+          <key>LSMinimumSystemVersion</key><string>11.0</string>
+          <key>NSHighResolutionCapable</key><true/>
+          </dict>
+          </plist>
+          PLIST
+
+          # Icône (best-effort) depuis l'icône de l'app.
+          ICON_SRC="$GITHUB_WORKSPACE/assets/icon/app_icon.png"
+          if [ -f "$ICON_SRC" ]; then
+            mkdir -p AppIcon.iconset
+            for s in 16 32 128 256 512; do
+              sips -z $s $s "$ICON_SRC" --out "AppIcon.iconset/icon_${s}x${s}.png" >/dev/null 2>&1 || true
+              d=$((s * 2)); sips -z $d $d "$ICON_SRC" --out "AppIcon.iconset/icon_${s}x${s}@2x.png" >/dev/null 2>&1 || true
+            done
+            iconutil -c icns AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns" 2>/dev/null || true
+          fi
+
+          IDENTITY=$(security find-identity -v -p codesigning \
+            | grep "Developer ID Application" | head -1 \
+            | sed -E 's/^[[:space:]]*[0-9]+\)[[:space:]]+[A-F0-9]+[[:space:]]+"(.*)"$/\1/')
+          if [ -z "$IDENTITY" ]; then
+            echo "ERROR: no Developer ID Application identity"; security find-identity -v; exit 1
+          fi
+
+          # Signer le binaire interne PUIS le bundle (hardened runtime +
+          # entitlements). Le binaire interne DOIT porter les entitlements : à
+          # l'auto-MAJ, l'updater l'extrait du .app et l'exécute nu.
+          # ORDRE IMPORTANT : la copie relocalisable D'ABORD et SEULE (contexte
+          # hors-bundle → aucun Info.plist scellé dans sa signature), puis
+          # l'exécutable principal, puis le bundle. Signer le bundle re-signe
+          # son exécutable principal mais PAS un Mach-O rangé dans Resources/ :
+          # la copie autonome survit donc intacte.
+          ENT="macos/Installer.entitlements"
+          codesign --force --options runtime --timestamp \
+            --entitlements "$ENT" --sign "$IDENTITY" "$APP/Contents/Resources/kidflix-updater"
+          codesign --force --options runtime --timestamp \
+            --entitlements "$ENT" --sign "$IDENTITY" "$APP/Contents/MacOS/kidflix-installer"
+          codesign --force --options runtime --timestamp \
+            --entitlements "$ENT" --sign "$IDENTITY" "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+
+          # Garde-fous. Le CI restait vert avec un artefact mort-né parce qu'il
+          # ne lançait jamais rien : on exécute donc pour de vrai les DEUX
+          # chemins, chacun ayant son mode de mort propre.
+          #  1. le .app au double-clic (1re install) : tué sans l'entitlement.
+          #  2. la copie relocalisée hors du bundle (lancement quotidien via
+          #     ~/Applications/Kidflix.app, et auto-MAJ) : tuée si elle porte
+          #     une signature de bundle.
+          codesign -d --entitlements - --xml "$APP" 2>/dev/null \
+            | grep -q 'allow-unsigned-executable-memory' \
+            || { echo "ERROR: entitlement allow-unsigned-executable-memory absent"; exit 1; }
+          "$APP/Contents/MacOS/kidflix-installer" --check
+
+          RELOC="$RUNNER_TEMP/reloc-check/kidflix-updater"
+          mkdir -p "$(dirname "$RELOC")"
+          cp "$APP/Contents/Resources/kidflix-updater" "$RELOC"
+          chmod +x "$RELOC"
+          codesign --verify --strict "$RELOC" \
+            || { echo "ERROR: la copie relocalisée a une signature invalide hors bundle"; exit 1; }
+          "$RELOC" --check
+
+          # Notariser le .app puis STAPLER le ticket → lancement hors-ligne OK.
+          KEY="$RUNNER_TEMP/asc_key.p8"
+          printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$KEY"
+          ditto -c -k --keepParent "$APP" "installer-unstapled.zip"
+          xcrun notarytool submit "installer-unstapled.zip" \
+            --key "$KEY" \
+            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            --issuer "$APP_STORE_CONNECT_ISSUER_ID" \
+            --wait
+          xcrun stapler staple "$APP"
+
+          ZIP="kidflix-installer-macos-${VERSION}.zip"
+          ditto -c -k --keepParent "$APP" "$ZIP"
+          echo "INSTALLER_ZIP=tool/updater/$ZIP" >> "$GITHUB_ENV"
+
+      # Win/Linux : on attache le binaire nu (téléchargé via curl à l'auto-MAJ,
+      # jamais mis en quarantaine). macOS a son propre upload (.app) ci-dessous.
       - name: Upload updater artifact
+        if: runner.os != 'macOS'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
@@ -786,25 +993,46 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+      - name: Upload installer .app (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: kidflix-installer-macos
+          path: ${{ env.INSTALLER_ZIP }}
+          retention-days: 14
+          if-no-files-found: error
+
   # ═══════════════════════════════════════════════════════════════════════
-  # BUILD GATE — Sentinelle qui valide que les 5 builds sont verts
+  # BUILD GATE — Sentinelle qui valide que les builds sont verts
   # ═══════════════════════════════════════════════════════════════════════
 
   build-gate:
     name: All builds passed
-    needs: [build-ios, build-android, build-macos, build-windows, build-linux]
+    # TOUS les builds doivent être verts avant publication — dont l'app macOS
+    # (build-macos) et l'updater (build-updater, matrice qui inclut macOS). Un
+    # échec de signature/notarisation macOS bloque donc tout le pipeline, y
+    # compris les publications iOS/Android.
+    needs:
+      [
+        build-ios,
+        build-android,
+        build-windows,
+        build-linux,
+        build-macos,
+        build-updater,
+      ]
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
-      - run: echo "✓ All 5 platform builds succeeded — proceeding to store uploads"
+      - run: echo "✓ Tous les builds sont verts (apps + updater, dont macOS) — publication autorisée"
 
   # ═══════════════════════════════════════════════════════════════════════
-  # PUBLISHES — Uploads stores (déclenchés après build-gate uniquement)
+  # PUBLISHES — Uploads stores (déclenchés APRÈS la GitHub Release)
   # ═══════════════════════════════════════════════════════════════════════
 
   publish-ios:
     name: Publish iOS to TestFlight
-    needs: [prepare, build-gate]
+    needs: [release]
     # macos-15 obligatoire : `app-store-connect publish` utilise `altool`
     # qui ne tourne que sur macOS (composant de Xcode).
     # 120 min de timeout pour couvrir : upload (~5 min) + Apple processing
@@ -856,7 +1084,7 @@ jobs:
 
   publish-android:
     name: Publish Android to Play Store
-    needs: [prepare, build-gate]
+    needs: [release]
     # ubuntu-latest : `google-play bundles publish` utilise l'API Google
     # directement (pas de dépendance macOS).
     runs-on: ubuntu-latest
@@ -892,60 +1120,22 @@ jobs:
             --track internal \
             --release-notes "@file:release_notes_android.json"
 
-  publish-macos:
-    name: Publish macOS to TestFlight
-    needs: [prepare, build-gate]
-    # 120 min de timeout : même justification que publish-ios. Le processing
-    # Apple pour les .pkg macOS est souvent plus lent que pour les .ipa.
-    runs-on: macos-15
-    timeout-minutes: 120
-
-    env:
-      APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
-      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
-      APP_STORE_CONNECT_MAX_FIND_BUILD_WAIT: "90"
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Python (requis par codemagic-cli-tools)
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install codemagic-cli-tools
-        run: pip install codemagic-cli-tools
-
-      - name: Download macOS artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: kidflix-macos
-          path: artifacts/
-
-      - name: Publish to TestFlight (internal beta group, macOS)
-        # Même groupe "Kidflix Internal" que iOS — Universal Purchase, les
-        # testeurs avec un Mac voient le build macOS dans leur TestFlight.
-        run: |
-          WHATS_NEW=$(jq -r '.[] | select(.language=="fr-FR") | .text' release_notes.json)
-          PKG_PATH=$(find artifacts -type f -name '*.pkg' | head -1)
-          echo "Uploading: $PKG_PATH"
-          app-store-connect publish \
-            --path "$PKG_PATH" \
-            --testflight \
-            --beta-group "Kidflix Internal" \
-            --expire-build-submitted-for-review \
-            --locale fr-FR \
-            --whats-new "$WHATS_NEW" \
-            --max-find-build-wait 90
-
   # ═══════════════════════════════════════════════════════════════════════
-  # GITHUB RELEASE — Tous les artifacts attachés, après publishes verts
+  # GITHUB RELEASE — Assets installables attachés, dès le gate franchi
+  # (AVANT les publications stores, qui en dépendent).
   # ═══════════════════════════════════════════════════════════════════════
 
   release:
     name: Create GitHub Release
-    needs: [prepare, publish-ios, publish-android, publish-macos, build-updater]
+    # Déclenchée dès que le gate est franchi (build-gate = tous les builds verts,
+    # dont build-macos) ; build-updater est aussi listé pour attacher ses
+    # binaires. La GitHub Release sort AVANT les publications stores, qui en
+    # dépendent (publish-* → needs: release) : elle n'attend donc plus les ~90 min
+    # de processing Apple.
+    # NB : `prepare` DOIT rester dans needs — needs.<job>.outputs n'est exposé
+    # qu'aux dépendances directes ; sans lui, needs.prepare.outputs.version est
+    # vide et le titre devient « Kidflix v ».
+    needs: [prepare, build-gate, build-updater]
     # TEMPORAIRE : condition `if: startsWith(github.ref, 'refs/tags/v')`
     # désactivée pour pouvoir tester le job release via workflow_dispatch
     # sans avoir à tagger. À RESTAURER une fois la validation faite.
@@ -1012,26 +1202,55 @@ jobs:
 
       - name: Create GitHub Release
         run: |
-          IPA=$(find artifacts -type f -name '*.ipa' | head -1)
-          AAB=$(find artifacts -type f -name '*.aab' | head -1)
-          APK=$(find artifacts -type f -name '*.apk' | head -1)
-          MAPPING=$(find artifacts -type f -name 'mapping.txt' | head -1)
-          PKG=$(find artifacts -type f -name '*.pkg' | head -1)
-          WIN_ZIP=$(find artifacts -type f -name '*.zip' | head -1)
-          APPIMAGE=$(find artifacts -type f -name '*.AppImage' | head -1)
-          UPD_WIN=$(find artifacts -type f -name 'kidflix-updater-windows.exe' | head -1)
-          UPD_LINUX=$(find artifacts -type f -name 'kidflix-updater-linux' | head -1)
+          set -euo pipefail
 
+          # Schéma des assets : `kidflix-<plateforme>-<version>.<ext>`, tout en
+          # minuscules, sans numéro de run (la version du tag suffit à situer le
+          # binaire). Ces noms sont un CONTRAT avec les updaters DÉJÀ INSTALLÉS,
+          # qui résolvent les assets de la release `latest` par nom
+          # (tool/updater/lib/github.dart) :
+          #   - app Windows           `^kidflix-windows-.*\.zip$`
+          #   - app macOS             `^kidflix-macos-.*\.zip$`
+          #   - app Linux             `x86_64\.AppImage$`
+          #   - installateur macOS    `^kidflix-installer-macos-.*\.zip$`
+          #   - updater Win/Linux     nom EXACT, non versionné (cible mouvante)
+          # Deux pièges : ne jamais renommer l'installateur macOS en
+          # `kidflix-macos-installer-*` (il matcherait la regex de l'app), et ne
+          # jamais versionner les binaires updater (les installations existantes
+          # les cherchent au nom exact pour s'auto-mettre à jour).
+          #
+          # AAB et IPA ne sont volontairement PAS attachés : ni l'un ni l'autre
+          # n'est installable par un utilisateur (l'AAB ne sert qu'au Play Store,
+          # l'IPA est signé App Store) et ils sont déjà publiés par les jobs
+          # publish-android / publish-ios. L'APK universel, lui, reste attaché
+          # pour le sideload.
+          #
+          # `mapping.txt` EST attaché volontairement : R8 est actif (le plugin
+          # Gradle de Flutter l'active par défaut en release), et cette table de
+          # désobfuscation est le seul moyen de relire les stack traces des
+          # crashs de la version publiée. C'est le seul asset non installable
+          # qu'on garde — il ne pèse rien à côté des binaires.
+          #
+          # On n'attache par ailleurs que les assets réellement présents :
+          # certaines plateformes peuvent être désactivées, et passer un
+          # argument vide à `gh release create` fait échouer la commande.
+          ASSETS=()
           echo "Releasing assets:"
-          echo "  iOS IPA     : $IPA"
-          echo "  Android AAB : $AAB"
-          echo "  Android APK : $APK"
-          echo "  Mapping     : $MAPPING"
-          echo "  macOS PKG   : $PKG"
-          echo "  Windows ZIP : $WIN_ZIP"
-          echo "  Linux AppImg: $APPIMAGE"
-          echo "  Updater Win : $UPD_WIN"
-          echo "  Updater Lin : $UPD_LINUX"
+          while IFS= read -r f; do
+            [ -n "$f" ] || continue
+            echo "  - $f"
+            ASSETS+=("$f")
+          done < <(find artifacts -type f \
+            \( -name '*.apk' \
+               -o -name 'mapping.txt' \
+               -o -name '*.zip' -o -name '*.AppImage' \
+               -o -name 'kidflix-updater-windows.exe' \
+               -o -name 'kidflix-updater-linux' \) | sort)
+
+          if [ ${#ASSETS[@]} -eq 0 ]; then
+            echo "ERROR: no release assets found"
+            exit 1
+          fi
 
           # Tag name : `v<version>` si on est sur un tag, sinon nom synthétique
           # avec run_number pour éviter toute collision avec un tag git existant
@@ -1047,5 +1266,4 @@ jobs:
           gh release create "$RELEASE_TAG" \
             --title "Kidflix v$VERSION" \
             --notes-file notes.md \
-            "$IPA" "$AAB" "$APK" "$MAPPING" "$PKG" "$WIN_ZIP" "$APPIMAGE" \
-            "$UPD_WIN" "$UPD_LINUX"
+            "${ASSETS[@]}"
