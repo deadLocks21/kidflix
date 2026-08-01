@@ -20,19 +20,48 @@ class Release {
   final List<ReleaseAsset> assets;
 
   /// Asset correspondant à l'app pour la plateforme courante.
-  ///  - Windows : `kidflix-windows-<v>-<run>.zip`
-  ///  - Linux   : `Kidflix-<v>-<run>-x86_64.AppImage`
+  ///  - Windows : `kidflix-windows-<v>.zip`
+  ///  - macOS   : `kidflix-macos-<v>.zip` (.app signé Developer ID zippé)
+  ///  - Linux   : `kidflix-linux-<v>-x86_64.AppImage`
+  ///
+  /// Les regex restent volontairement larges : elles doivent continuer à matcher
+  /// les anciens noms (`kidflix-windows-<v>-<run>.zip`,
+  /// `Kidflix-<v>-<run>-x86_64.AppImage`) et, surtout, un updater déjà installé
+  /// applique les regex de SA version aux assets des releases futures. Le nom des
+  /// assets produits par la CI est donc un contrat : cf. le job `release` de
+  /// `.github/workflows/release.yml`.
   ReleaseAsset? get appAsset {
-    final re = Platform.isWindows
-        ? RegExp(r'^kidflix-windows-.*\.zip$', caseSensitive: false)
-        : RegExp(r'x86_64\.AppImage$', caseSensitive: false);
+    final RegExp re;
+    if (Platform.isWindows) {
+      re = RegExp(r'^kidflix-windows-.*\.zip$', caseSensitive: false);
+    } else if (Platform.isMacOS) {
+      re = RegExp(r'^kidflix-macos-.*\.zip$', caseSensitive: false);
+    } else {
+      re = RegExp(r'x86_64\.AppImage$', caseSensitive: false);
+    }
     return _firstWhereOrNull(assets, (a) => re.hasMatch(a.name));
   }
 
   /// Asset du binaire updater lui-même (pour l'auto-mise à jour de l'updater).
   ///  - Windows : `kidflix-updater-windows.exe`
   ///  - Linux   : `kidflix-updater-linux`
+  ///  - macOS   : `kidflix-installer-macos-<v>.zip` — un `.app` notarisé
+  ///    + staplé (pas un binaire nu, qui serait tué par Gatekeeper au 1ᵉʳ
+  ///    téléchargement). L'auto-MAJ en extrait le binaire interne (cf.
+  ///    Installer._selfUpdateUpdater). Téléchargé par curl, donc jamais mis en
+  ///    quarantaine côté install existante.
+  ///
+  /// Deux noms à ne pas casser côté CI : l'installateur macOS doit garder le
+  /// préfixe `kidflix-installer-macos-` (renommé en `kidflix-macos-installer-*`
+  /// il matcherait la regex de [appAsset] et l'app s'installerait depuis
+  /// l'installateur), et les binaires updater doivent rester **non versionnés** —
+  /// les installations existantes les cherchent au nom exact.
   ReleaseAsset? get updaterAsset {
+    if (Platform.isMacOS) {
+      final re =
+          RegExp(r'^kidflix-installer-macos-.*\.zip$', caseSensitive: false);
+      return _firstWhereOrNull(assets, (a) => re.hasMatch(a.name));
+    }
     final wanted = Platform.isWindows
         ? 'kidflix-updater-windows.exe'
         : 'kidflix-updater-linux';

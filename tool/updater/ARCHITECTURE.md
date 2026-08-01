@@ -1,8 +1,9 @@
-# Système d'installation & de mise à jour desktop (Windows / Linux)
+# Système d'installation & de mise à jour desktop (Windows / Linux / macOS)
 
 Guide d'architecture **réutilisable** pour donner à une app Flutter desktop un
 canal de distribution auto-update, là où il n'existe pas d'équivalent TestFlight
-/ store (Windows, Linux).
+/ store — ou là où on choisit de s'en passer (Windows, Linux, et macOS depuis
+l'abandon du Mac App Store : cf. [MACOS_SETUP.md](MACOS_SETUP.md)).
 
 Conçu pour Kidflix mais pensé pour être **répliqué** : la fin du document liste
 précisément ce qu'il faut adapter par projet.
@@ -26,11 +27,12 @@ stable `current` pointe vers la version active. On met à jour en **ajoutant** u
 version puis en **basculant le lien** — jamais en écrasant des fichiers.
 
 ```
-<root>/                         %LOCALAPPDATA%\Kidflix  (Win) | ~/.local/share/Kidflix (Linux)
+<root>/                         %LOCALAPPDATA%\Kidflix (Win) | ~/.local/share/Kidflix (Linux)
+                                | ~/Library/Application Support/Kidflix (macOS)
   versions/
-    1.10.1/                     contenu d'une version (exe + dll + data/, ou AppImage)
-    1.10.2/
-  current        ->  versions/1.10.2     jonction (Windows) / symlink (Linux)
+    1.10.1/                     contenu d'une version (exe + dll + data/, AppImage
+    1.10.2/                     extraite, ou kidflix.app)
+  current        ->  versions/1.10.2     jonction (Windows) / symlink (Linux, macOS)
   updater/
     kidflix-updater(.exe)       le binaire updater, relocalisé ici (cible des raccourcis)
   config.json                   { root, installedVersion, lastCheck, ignoredVersion }
@@ -39,10 +41,17 @@ version puis en **basculant le lien** — jamais en écrasant des fichiers.
   .update-status / .update-choice   fichiers d'IPC éphémères (fenêtre de MAJ)
 ```
 
-Le **raccourci** (menu Démarrer / Bureau / `.desktop`) pointe **toujours** sur
-`updater/kidflix-updater`, **jamais** sur un exe versionné → il survit à toutes
-les MAJ. La bascule de `current` est atomique sous Linux (rename de symlink),
-quasi-atomique sous Windows (jonction).
+Le **raccourci** (menu Démarrer / Bureau / `.desktop` / `~/Applications/*.app`)
+pointe **toujours** sur `updater/kidflix-updater`, **jamais** sur un exe
+versionné → il survit à toutes les MAJ. La bascule de `current` est atomique sous
+Linux et macOS (rename de symlink), quasi-atomique sous Windows (jonction).
+
+⚠️ **macOS : le binaire relocalisé n'est PAS l'exécutable principal du `.app`.**
+Signer un bundle scelle le hash de son `Info.plist` dans la signature de son
+exécutable principal ; copié hors de `Contents/MacOS/`, il devient invalide et le
+hardened runtime le tue au démarrage. Le `.app` installateur embarque donc une
+**seconde copie** du binaire dans `Contents/Resources/`, signée en autonome —
+c'est celle-là que `_relocatableBinary()` relocalise. Cf. MACOS_SETUP.md §5.6.
 
 **Pourquoi aucun fichier n'est jamais verrouillé** : l'updater est un binaire
 distinct de l'app et met à jour **avant** de lancer l'app (l'app ne tourne donc
@@ -73,7 +82,12 @@ raccourcis → lancement.
 ### Flux launch (chaque démarrage, via raccourci)
 Résout l'install → `updateIfAvailable()` → lance `current/<app>`.
 Démarrage **sans fenêtre** : sous Windows le raccourci passe par `wscript` qui
-exécute l'updater en fenêtre cachée ; sous Linux le `.desktop` a `Terminal=false`.
+exécute l'updater en fenêtre cachée ; sous Linux le `.desktop` a
+`Terminal=false` ; sous macOS le lanceur `~/Applications/Kidflix.app` est un
+bundle (LaunchServices n'ouvre pas de Terminal, contrairement à un binaire CLI
+double-cliqué). macOS lance l'app finale via `open <bundle>` et non le binaire
+interne : sinon l'app démarre sans être **activée** — animation d'ouverture, puis
+aucune fenêtre au premier plan.
 
 ### Flux update (silencieux/automatique, avec UI conditionnelle)
 1. `GET api.github.com/repos/<owner>/<repo>/releases/latest`.
@@ -122,11 +136,26 @@ builds mobiles.
 - Les builds (app + updater) sont attachés à chaque **GitHub Release** taggée
   `v*`.
 - Assets attendus par l'updater (à matcher par regex / nom) :
-  - App Windows : `kidflix-windows-<v>-<run>.zip` (contenu du dossier `Release/`).
-  - App Linux : `Kidflix-<v>-<run>-x86_64.AppImage`.
-  - Updater : `kidflix-updater-windows.exe`, `kidflix-updater-linux`.
-- Job CI `build-updater` (matrice Windows + Linux) : `dart compile exe`, upload.
-  Le job `release` attache les binaires updater à la release.
+  - App Windows : `kidflix-windows-<v>.zip` (contenu du dossier `Release/`).
+  - App macOS : `kidflix-macos-<v>.zip` (`.app` Developer ID notarisé, zippé
+    par `ditto`).
+  - App Linux : `kidflix-linux-<v>-x86_64.AppImage`.
+  - Updater Windows/Linux : `kidflix-updater-windows.exe`,
+    `kidflix-updater-linux` — noms **exacts et non versionnés** (les installs
+    existantes les cherchent ainsi pour s'auto-mettre à jour).
+  - Installateur macOS : `kidflix-installer-macos-<v>.zip`. Le préfixe
+    `kidflix-installer-macos-` est obligatoire : renommé
+    `kidflix-macos-installer-*`, il matcherait la regex de l'app.
+  Ces noms sont un **contrat** : un updater déjà installé applique les regex de
+  SA version aux releases futures (les regex historiques restent volontairement
+  larges pour absorber les anciens noms à `<run>`).
+- Job CI `build-updater` (matrice Windows + Linux + macOS) : `dart compile exe`,
+  upload. Sur macOS, étape supplémentaire d'emballage en `.app` signé Developer
+  ID + notarisé + staplé (un binaire nu ne peut pas être staplé et serait tué
+  par Gatekeeper). Le job `release` attache tout ça à la release.
+- **Ne sont PAS attachés** : l'AAB (Play Store uniquement) et l'IPA (signé App
+  Store) — non installables par un utilisateur, et déjà publiés par les jobs
+  `publish-*`. L'APK universel, lui, est attaché pour le sideload.
 - **Amorçage** : l'utilisateur télécharge l'updater **une fois**. Ensuite il se
   met à jour tout seul (app **et** updater).
 
@@ -183,11 +212,16 @@ Côté outil — `tool/updater/` (package Dart autonome) :
 - `lib/installer.dart` — flux install / update / launch, garde-fous, auto-MAJ, purge.
 - `lib/github.dart` — API releases, sélection d'asset, comparaison de versions.
 - `lib/net.dart` — HTTP via curl/PowerShell/wget (cf. §6).
-- `lib/download.dart` — download + dézip (Windows) / AppImage (Linux).
+- `lib/download.dart` — download + dézip (Windows) / AppImage extraite (Linux) /
+  `ditto` (macOS — obligatoire : le package Dart `archive` aplatirait les
+  symlinks des frameworks et invaliderait la signature).
 - `lib/links.dart` — bascule de `current` (jonction / symlink).
-- `lib/shortcuts.dart` — `.lnk` + `launch.vbs` (Windows) / `.desktop` (Linux).
+- `lib/shortcuts.dart` — `.lnk` + `launch.vbs` (Windows) / `.desktop` (Linux) /
+  bundle lanceur `~/Applications/Kidflix.app` (macOS).
 - `lib/progress.dart` — pilotage de la fenêtre (prompt + progression, IPC fichiers).
 - `lib/config.dart`, `lib/layout.dart`, `lib/log.dart`, `lib/prompt.dart`.
+- `macos/Installer.entitlements` — `allow-unsigned-executable-memory`, sans quoi
+  le binaire Dart AOT est tué au démarrage sous hardened runtime.
 
 Côté app (Flutter) :
 - `lib/main.dart` — `main(args)` bascule sur le splash si `--updating`.
@@ -205,15 +239,20 @@ CI :
 2. **Adapter `lib/layout.dart`** :
    - `repoOwner` / `repoName` (le dépôt GitHub des releases).
    - `defaultRoot()` / `pointerFile()` : remplacer « Kidflix » par le nom de l'app.
-   - `appExecutable` : nom de l'exe Windows (`<app>.exe`) et de l'AppImage Linux.
+   - `appExecutable` : nom de l'exe Windows (`<app>.exe`), de l'AppImage Linux,
+     et du bundle macOS (`<PRODUCT_NAME>.app/Contents/MacOS/<PRODUCT_NAME>`).
 3. **Adapter `lib/github.dart`** : les regex de sélection d'asset (`appAsset`,
    `updaterAsset`) selon les noms produits par ton CI.
 4. **Côté app Flutter** :
    - Copier `lib/updating_splash.dart` (adapter couleurs/textes).
    - Dans `main()`, brancher `if (args.contains('--updating')) { runUpdatingSplash(args); return; }`.
    - Copier le bloc `--updating` de `windows/runner/main.cpp`.
-5. **CI** : ajouter le job `build-updater` (matrice Win/Linux, `dart compile
-   exe`) et attacher `*-updater-windows.exe` / `*-updater-linux` à la release.
+5. **CI** : ajouter le job `build-updater` (matrice Win/Linux/macOS, `dart
+   compile exe`) et attacher les assets à la release.
+6. **macOS uniquement** : certificat Developer ID + 2 secrets, entitlements
+   non-sandbox pour l'app (`macos/Runner/DirectRelease.entitlements`) et
+   `allow-unsigned-executable-memory` pour l'installateur. Procédure complète et
+   pièges dans [MACOS_SETUP.md](MACOS_SETUP.md).
 6. **Garde-fous de version** dans `installer.dart`
    (`_minAppVersionForSplash`, `_minAppVersionForPrompt`) : mettre la **première
    version qui embarquera** chaque capacité.

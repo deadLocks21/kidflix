@@ -14,6 +14,8 @@ import 'log.dart';
 void createShortcuts(Layout layout, Log log) {
   if (Platform.isWindows) {
     _createWindowsShortcuts(layout, log);
+  } else if (Platform.isMacOS) {
+    _createMacosLauncher(layout, log);
   } else {
     _createLinuxDesktopEntry(layout, log);
   }
@@ -25,12 +27,16 @@ void createShortcuts(Layout layout, Log log) {
 /// stables (`launch.vbs`, `current\kidflix.exe`), et les réécrire ressusciterait
 /// un raccourci que l'utilisateur aurait volontairement supprimé.
 ///
-/// Sous **Linux**, l'entrée `.desktop` embarque l'icône résolue au moment de
-/// l'écriture. Sans cette réécriture, une entrée produite par un updater
-/// antérieur reste périmée à vie — c'est ce qui laissait une icône générique
-/// même une fois l'app à jour.
+/// Sous **Linux** et **macOS**, le raccourci embarque l'icône résolue au moment
+/// de l'écriture (copiée depuis `current` côté macOS). Sans cette réécriture,
+/// une entrée produite par un updater antérieur reste périmée à vie — c'est ce
+/// qui laissait une icône générique même une fois l'app à jour.
 void refreshShortcuts(Layout layout, Log log) {
   if (Platform.isWindows) return;
+  if (Platform.isMacOS) {
+    _createMacosLauncher(layout, log);
+    return;
+  }
   _createLinuxDesktopEntry(layout, log);
 }
 
@@ -81,6 +87,80 @@ foreach ($dir in @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFo
   } finally {
     if (psFile.existsSync()) psFile.deleteSync();
   }
+}
+
+// ── macOS ─────────────────────────────────────────────────────────────────
+
+/// Crée un petit bundle `.app` « lanceur » dans `~/Applications`, dont
+/// l'exécutable n'est qu'un script shell qui appelle `updater --launch`.
+///
+/// C'est l'équivalent macOS du raccourci Windows / de l'entrée `.desktop` Linux :
+///  - un binaire CLI double-cliqué ouvrirait le Terminal ; un bundle `.app`
+///    lancé par LaunchServices s'exécute SANS fenêtre de terminal ;
+///  - il délègue à l'updater relocalisé sous `<root>/updater/` — jamais à une
+///    version — donc il ne casse jamais d'une MAJ à l'autre ;
+///  - `~/Applications` (par-utilisateur) évite tout besoin de `sudo`, dans le
+///    même esprit que la jonction sans droits admin côté Windows.
+void _createMacosLauncher(Layout layout, Log log) {
+  final home = Platform.environment['HOME'] ?? '.';
+  final bundle = Directory(p.join(home, 'Applications', 'Kidflix.app'));
+  final macosDir = Directory(p.join(bundle.path, 'Contents', 'MacOS'))
+    ..createSync(recursive: true);
+  final resDir = Directory(p.join(bundle.path, 'Contents', 'Resources'))
+    ..createSync(recursive: true);
+
+  // Exécutable du bundle = script shell qui délègue à l'updater. Chemin cité :
+  // la racine par défaut contient une espace (« Application Support »).
+  final launcher = File(p.join(macosDir.path, 'Kidflix'));
+  launcher.writeAsStringSync(
+    '#!/bin/sh\n'
+    'exec "${layout.updaterExe}" --launch\n',
+  );
+  Process.runSync('chmod', ['+x', launcher.path]);
+
+  // Bundle id distinct de l'app (`fr.dtfh.kidflix`) pour ne pas se marcher
+  // dessus dans LaunchServices.
+  File(p.join(bundle.path, 'Contents', 'Info.plist')).writeAsStringSync('''
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key><string>Kidflix</string>
+	<key>CFBundleDisplayName</key><string>Kidflix</string>
+	<key>CFBundleIdentifier</key><string>fr.dtfh.kidflix.launcher</string>
+	<key>CFBundleExecutable</key><string>Kidflix</string>
+	<key>CFBundlePackageType</key><string>APPL</string>
+	<key>CFBundleIconFile</key><string>AppIcon</string>
+	<key>CFBundleShortVersionString</key><string>1.0</string>
+	<key>CFBundleVersion</key><string>1</string>
+	<key>LSMinimumSystemVersion</key><string>10.14</string>
+	<key>NSHighResolutionCapable</key><true/>
+</dict>
+</plist>
+''');
+
+  // Icône : reprend celle de l'app pointée par `current` (best-effort).
+  final icon = File(
+    p.join(
+      layout.currentLink,
+      'kidflix.app',
+      'Contents',
+      'Resources',
+      'AppIcon.icns',
+    ),
+  );
+  if (icon.existsSync()) {
+    try {
+      icon.copySync(p.join(resDir.path, 'AppIcon.icns'));
+    } catch (_) {
+      /* best-effort */
+    }
+  }
+
+  // Rafraîchit le cache d'icône / l'enregistrement LaunchServices (best-effort).
+  Process.runSync('touch', [bundle.path]);
+
+  log('Lanceur créé : ${bundle.path}');
 }
 
 // ── Linux ───────────────────────────────────────────────────────────────────

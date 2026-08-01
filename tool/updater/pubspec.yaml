@@ -1,8 +1,9 @@
 name: kidflix_updater
 description: >-
   Installateur / launcher / auto-updater silencieux de Kidflix desktop
-  (Windows & Linux). Récupère la dernière release GitHub, gère un layout
-  versionné à base de liens (jonction Windows / symlink Linux) et lance l'app.
+  (Windows, Linux & macOS). Récupère la dernière release GitHub, gère un layout
+  versionné à base de liens (jonction Windows / symlink Linux & macOS) et lance
+  l'app.
 publish_to: 'none'
 version: 1.0.0
 

@@ -25,6 +25,7 @@ Future<File> downloadAsset(ReleaseAsset asset, String tmpDir, Log log) async {
 
 /// Installe l'app contenue dans [archiveFile] dans [versionDir].
 ///  - Windows : décompresse le `.zip` (kidflix.exe + dll + data/) à la racine.
+///  - macOS   : extrait le `.app` zippé via `ditto` (préserve la signature).
 ///  - Linux   : extrait l'AppImage en `squashfs-root/`.
 void installAppArtifact(File archiveFile, String versionDir, Log log) {
   final dir = Directory(versionDir);
@@ -33,9 +34,31 @@ void installAppArtifact(File archiveFile, String versionDir, Log log) {
 
   if (Platform.isWindows) {
     _extractZip(archiveFile.path, versionDir, log);
+  } else if (Platform.isMacOS) {
+    _extractMacApp(archiveFile.path, versionDir, log);
   } else {
     _extractAppImage(archiveFile, versionDir, log);
   }
+}
+
+/// Extrait un `.app` zippé via l'outil système `ditto` (et NON le package Dart
+/// `archive`). C'est crucial : `ditto` préserve les symlinks des frameworks, les
+/// bits exécutables et les métadonnées, donc la **signature Developer ID / la
+/// notarisation survivent** à l'extraction. Le package `archive` aplatirait les
+/// symlinks internes du bundle → signature invalidée → Gatekeeper refuserait
+/// l'app. (Même philosophie que net.dart : déléguer aux outils système.)
+void _extractMacApp(String zipPath, String destDir, Log log) {
+  final args = ['-x', '-k', zipPath, destDir];
+  final r = Process.runSync('ditto', args);
+  if (r.exitCode != 0) {
+    throw ProcessException(
+      'ditto',
+      args,
+      (r.stderr as String?) ?? 'ditto a échoué',
+      r.exitCode,
+    );
+  }
+  log('Bundle .app extrait dans $destDir');
 }
 
 /// Déploie l'AppImage [archiveFile] dans [versionDir] en l'**extrayant**, au

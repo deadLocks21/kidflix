@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+	Entitlements du canal de DISTRIBUTION DIRECTE (hors App Store), utilisé par
+	l'updater `tool/updater`. Appliqués à la signature Developer ID +
+	notarisation dans le job CI `build-macos`.
+
+	Différences volontaires avec Release.entitlements (qui reste le fichier de
+	référence si un canal App Store est un jour réactivé) :
+
+	- PAS de `com.apple.security.app-sandbox`. La fenêtre de mise à jour est
+	  pilotée par des fichiers d'IPC (`.update-status` / `.update-choice`) écrits
+	  dans la racine d'installation, HORS d'un éventuel container sandbox. Un
+	  build sandboxé ne pourrait ni lire/écrire ces fichiers, ni gérer le layout
+	  `versions/ + current`.
+
+	- Pas de `com.apple.security.network.server` non plus, et ce n'est PAS un
+	  oubli : c'est un entitlement de sandbox. Hors sandbox, `HttpServer.bind`
+	  n'est soumis à aucune restriction — la télécommande LAN fonctionne donc
+	  sans lui sur ce canal. (Il reste indispensable dans Release.entitlements,
+	  où le sandbox est actif.)
+
+	- Allègements « hardened runtime » requis par le runtime Flutter/Skia sous
+	  signature Developer ID (sinon crash au lancement / échec de notarisation).
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+	<true/>
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+	<key>com.apple.security.network.client</key>
+	<true/>
+</dict>
+</plist>

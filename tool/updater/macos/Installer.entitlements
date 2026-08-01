@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+	Entitlements de « Kidflix Installer.app » (le binaire Dart AOT emballé en
+	bundle, signé Developer ID + hardened runtime + notarisé par le job CI
+	`build-updater`).
+
+	`com.apple.security.cs.allow-unsigned-executable-memory` est OBLIGATOIRE :
+	contrairement à une app Flutter (dont le snapshot AOT vit dans une dylib
+	signée, `App.framework`), un exécutable produit par `dart compile exe`
+	embarque son snapshot en données et le remappe lui-même en mémoire anonyme
+	exécutable (r-x) au démarrage. Sous hardened runtime et sans cet
+	allègement, le noyau tue le process AVANT tout code applicatif :
+
+	    SIGKILL (Code Signature Invalid) / namespace CODESIGNING, "Invalid Page"
+
+	Symptôme côté utilisateur : l'icône rebondit dans le Dock puis plus rien,
+	aucun log, aucun dossier créé.
+
+	`allow-jit` NE suffit PAS : il n'autorise que les pages MAP_JIT, pas le mmap
+	anonyme PROT_EXEC utilisé par le runtime Dart AOT.
+
+	Rien d'autre n'est nécessaire : l'installateur ne fait que du réseau
+	sortant (non restreint hors sandbox) et de l'écriture de fichiers, et il
+	n'est délibérément PAS sandboxé (cf. macos/Runner/DirectRelease.entitlements).
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+	<true/>
+</dict>
+</plist>

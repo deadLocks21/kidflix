@@ -7,8 +7,9 @@ import 'package:path/path.dart' as p;
 /// ```
 /// <root>/
 ///   versions/<v>/        contenu d'une version (kidflix.exe + dll + data/ sous
-///                        Windows, squashfs-root/ extrait sous Linux)
-///   current              jonction (Windows) / symlink (Linux) -> versions/<v>
+///                        Windows, squashfs-root/ extrait sous Linux,
+///                        kidflix.app sous macOS)
+///   current              jonction (Windows) / symlink (Linux, macOS) -> versions/<v>
 ///   updater/             le binaire updater relocalisé (emplacement stable)
 ///   config.json          { root, installedVersion, ... }
 ///   updater.log
@@ -30,6 +31,16 @@ class Layout {
           _env('LOCALAPPDATA') ??
           p.join(_env('USERPROFILE') ?? r'C:\', 'AppData', 'Local');
       return p.join(local, 'Kidflix');
+    }
+    if (Platform.isMacOS) {
+      // Équivalent macOS de %LOCALAPPDATA% / ~/.local/share : les données
+      // applicatives par-utilisateur vivent sous ~/Library/Application Support.
+      return p.join(
+        _env('HOME') ?? '.',
+        'Library',
+        'Application Support',
+        'Kidflix',
+      );
     }
     final xdg = _env('XDG_DATA_HOME');
     final base = (xdg != null && xdg.isNotEmpty)
@@ -62,6 +73,14 @@ class Layout {
   /// aurait échoué.
   String get appExecutable {
     if (Platform.isWindows) return p.join(currentLink, 'kidflix.exe');
+    if (Platform.isMacOS) {
+      // On vise le binaire INTERNE du bundle (et non `open kidflix.app`) : ça
+      // donne un vrai handle de process, indispensable à la fenêtre de MAJ
+      // (ProgressWindow détecte la fermeture via exitCode et fait kill()), et ça
+      // garde les mêmes sémantiques Process.start(...) que Windows/Linux.
+      // `kidflix.app` / `kidflix` suivent PRODUCT_NAME (macos/.../AppInfo.xcconfig).
+      return p.join(currentLink, 'kidflix.app', 'Contents', 'MacOS', 'kidflix');
+    }
     final appRun = p.join(currentLink, 'squashfs-root', 'AppRun');
     if (File(appRun).existsSync()) return appRun;
     return p.join(currentLink, 'Kidflix.AppImage');
@@ -88,6 +107,19 @@ class Layout {
           _env('APPDATA') ??
           p.join(_env('USERPROFILE') ?? r'C:\', 'AppData', 'Roaming');
       return p.join(appData, 'Kidflix', 'install.path');
+    }
+    if (Platform.isMacOS) {
+      // Emplacement FIXE (indépendant de la racine choisie) : un updater
+      // fraîchement téléchargé dans ~/Downloads y retrouve l'install existante.
+      // macOS n'ayant pas la séparation XDG data/config, on le range à côté du
+      // reste sous Application Support.
+      return p.join(
+        _env('HOME') ?? '.',
+        'Library',
+        'Application Support',
+        'Kidflix',
+        'install.path',
+      );
     }
     final xdg = _env('XDG_CONFIG_HOME');
     final base = (xdg != null && xdg.isNotEmpty)
