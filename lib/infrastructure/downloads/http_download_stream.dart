@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/domain/model/movie_download.dart';
 import 'package:kidflix/infrastructure/downloads/download_file_naming.dart';
 
@@ -22,6 +23,24 @@ import 'package:kidflix/infrastructure/downloads/download_file_naming.dart';
 /// broadcast stream wrap it in their own `StreamController.broadcast()`.
 /// The stream completes when the download reaches a terminal status
 /// (`complete`, `failed`, `cancelled`).
+///
+/// ## Observability
+///
+/// [logger] is optional so tests and the in-memory repo can skip it, but
+/// production callers should pass it: this loop is the only place that
+/// sees the `Range` request, the server's answer to it, and whether any
+/// byte ever arrived. Without those three facts a stuck download is
+/// indistinguishable from a slow one. The emitted events are, in order:
+///
+/// | Event                          | Level | Says                          |
+/// |--------------------------------|-------|-------------------------------|
+/// | `download.http.request`        | info  | what `Range` we asked for     |
+/// | `download.http.response`       | info  | how the server answered it    |
+/// | `download.http.request_failed` | warn  | headers never arrived         |
+/// | `download.http.first_byte`     | debug | time-to-first-byte            |
+/// | `download.http.stalled`        | warn  | headers OK, zero bytes, hung  |
+/// | `download.http.truncated`      | warn  | clean EOF short of the total  |
+/// | `download.http.terminal`       | info  | final status + byte counts    |
 Stream<MovieDownload> streamHttpDownload({
   required Dio dio,
   required String url,
@@ -29,6 +48,7 @@ Stream<MovieDownload> streamHttpDownload({
   required Directory downloadsDir,
   required CancelToken cancelToken,
   required bool Function() isCancelled,
+  LoggerApplicationService? logger,
 }) {
   final controller = StreamController<MovieDownload>();
   unawaited(
@@ -40,6 +60,7 @@ Stream<MovieDownload> streamHttpDownload({
       downloadsDir: downloadsDir,
       cancelToken: cancelToken,
       isCancelled: isCancelled,
+      logger: logger,
     ),
   );
   return controller.stream;
@@ -86,6 +107,18 @@ const _readyThresholdBytes = 2 * 1024 * 1024;
 const _readyThresholdFraction = 0.03;
 const _throttleInterval = Duration(milliseconds: 250);
 
+/// How long to wait for the *first* byte of the body before declaring the
+/// transfer stalled.
+///
+/// Dio's `receiveTimeout` does not cover this window. Its stream handler
+/// arms the timeout timer inside the `onData` callback
+/// (`response_stream_handler.dart`), so a server that returns headers and
+/// then never sends a byte arms nothing: `await for` blocks forever, no
+/// exception is raised, and the download sits in `downloading` until the
+/// page is closed. 20 s is well past any plausible kDrive warm-up while
+/// still being far below a user's patience for a frozen progress bar.
+const _firstByteStallTimeout = Duration(seconds: 20);
+
 Future<void> _runDownload({
   required StreamController<MovieDownload> controller,
   required Dio dio,
@@ -94,6 +127,7 @@ Future<void> _runDownload({
   required Directory downloadsDir,
   required CancelToken cancelToken,
   required bool Function() isCancelled,
+  LoggerApplicationService? logger,
 }) async {
   // Hoisted out of the `try` so every terminal path — including the
   // outermost catch — can report what was actually written and how big
@@ -135,6 +169,22 @@ Future<void> _runDownload({
         ? await existingPartial.length()
         : 0;
 
+    final rangeHeader = 'bytes=$initialBytes-';
+    unawaited(
+      logger?.info(
+        'download.http.request',
+        attrs: {
+          'content.id': movieId,
+          'download.url': url,
+          'download.range': rangeHeader,
+          'download.has_partial': existingPartial != null,
+          'download.partial_bytes': initialBytes,
+          'download.partial_ext': ?resumeExt,
+        },
+      ),
+    );
+
+    final requestStartedAt = DateTime.now();
     final Response<ResponseBody> response;
     try {
       // Always send a Range header (even `bytes=0-`): when the server replies
@@ -146,12 +196,34 @@ Future<void> _runDownload({
         url,
         options: Options(
           responseType: ResponseType.stream,
-          headers: {HttpHeaders.rangeHeader: 'bytes=$initialBytes-'},
+          headers: {HttpHeaders.rangeHeader: rangeHeader},
         ),
         cancelToken: cancelToken,
       );
     } on DioException catch (e) {
-      if (isCancelled() || CancelToken.isCancel(e)) {
+      final cancelled = isCancelled() || CancelToken.isCancel(e);
+      // A resume whose `Range` starts at (or past) the end of a already
+      // complete `.partial` is a legitimate 416 upstream, which the API
+      // proxy reports as 502 — so `status_code` alone will not tell the
+      // two apart. `download.range` above is what disambiguates them.
+      unawaited(
+        logger?.warn(
+          'download.http.request_failed',
+          attrs: {
+            'content.id': movieId,
+            'download.range': rangeHeader,
+            'download.partial_bytes': initialBytes,
+            'download.status_code': ?e.response?.statusCode,
+            'download.dio_type': e.type.name,
+            'download.cancelled': cancelled,
+            'download.elapsed_ms': DateTime.now()
+                .difference(requestStartedAt)
+                .inMilliseconds,
+          },
+          error: e,
+        ),
+      );
+      if (cancelled) {
         await _emitCancelled(
           controller,
           movieId,
@@ -206,6 +278,37 @@ Future<void> _runDownload({
 
     bytesTotal = _resolveTotalSize(response.headers, bytesReceived);
 
+    // The one line that explains a stuck resume. `range_accepted: false`
+    // with a large `partial_bytes` means we silently restarted from 0;
+    // `range_accepted: true` with `bytes_on_disk == resolved_total` means
+    // we asked for a range at EOF and will very likely receive no body.
+    unawaited(
+      logger?.info(
+        'download.http.response',
+        attrs: {
+          'content.id': movieId,
+          'download.range': rangeHeader,
+          'download.status_code': statusCode,
+          'download.content_range': ?response.headers.value('content-range'),
+          'download.content_length': ?response.headers.value(
+            Headers.contentLengthHeader,
+          ),
+          'download.content_type': ?response.headers.value(
+            Headers.contentTypeHeader,
+          ),
+          'download.accept_ranges': ?response.headers.value('accept-ranges'),
+          'download.range_accepted': serverAcceptedRange,
+          'download.range_start': ?actualRangeStart,
+          'download.bytes_on_disk': bytesReceived,
+          'download.resolved_total': bytesTotal,
+          'download.ext': ext,
+          'download.ttfb_headers_ms': DateTime.now()
+              .difference(requestStartedAt)
+              .inMilliseconds,
+        },
+      ),
+    );
+
     final sink = partialFile.openWrite(mode: FileMode.writeOnlyAppend);
 
     controller.add(
@@ -220,9 +323,50 @@ Future<void> _runDownload({
 
     var readyEmitted = false;
     var lastThrottledEmit = DateTime.now();
+    var chunkCount = 0;
+    final bodyStartedAt = DateTime.now();
+
+    // See [_firstByteStallTimeout]: nothing in dio fires when the body
+    // never starts, so this is the only signal that separates "the server
+    // is sending us nothing" from "the download is merely slow". Log-only
+    // — the stream is left alone so this stays a pure observability
+    // change.
+    final stallWatchdog = Timer(_firstByteStallTimeout, () {
+      unawaited(
+        logger?.warn(
+          'download.http.stalled',
+          attrs: {
+            'content.id': movieId,
+            'download.range': rangeHeader,
+            'download.status_code': statusCode,
+            'download.content_range': ?response.headers.value('content-range'),
+            'download.range_accepted': serverAcceptedRange,
+            'download.bytes_on_disk': bytesReceived,
+            'download.resolved_total': bytesTotal,
+            'download.waited_ms': _firstByteStallTimeout.inMilliseconds,
+          },
+        ),
+      );
+    });
 
     try {
       await for (final chunk in response.data!.stream) {
+        if (chunkCount == 0) {
+          stallWatchdog.cancel();
+          unawaited(
+            logger?.debug(
+              'download.http.first_byte',
+              attrs: {
+                'content.id': movieId,
+                'download.ttfb_body_ms': DateTime.now()
+                    .difference(bodyStartedAt)
+                    .inMilliseconds,
+                'download.chunk_bytes': chunk.length,
+              },
+            ),
+          );
+        }
+        chunkCount++;
         sink.add(chunk);
         bytesReceived += chunk.length;
 
@@ -260,9 +404,28 @@ Future<void> _runDownload({
         }
       }
     } catch (e) {
+      stallWatchdog.cancel();
       await sink.flush();
       await sink.close();
-      if (isCancelled() || (e is DioException && CancelToken.isCancel(e))) {
+      final cancelled =
+          isCancelled() || (e is DioException && CancelToken.isCancel(e));
+      unawaited(
+        logger?.warn(
+          'download.http.body_interrupted',
+          attrs: {
+            'content.id': movieId,
+            'download.cancelled': cancelled,
+            'download.chunks': chunkCount,
+            'download.bytes_received': bytesReceived,
+            'download.bytes_total': bytesTotal,
+            'download.elapsed_ms': DateTime.now()
+                .difference(bodyStartedAt)
+                .inMilliseconds,
+          },
+          error: e,
+        ),
+      );
+      if (cancelled) {
         await _emitCancelled(
           controller,
           movieId,
@@ -282,6 +445,7 @@ Future<void> _runDownload({
       return;
     }
 
+    stallWatchdog.cancel();
     await sink.flush();
     await sink.close();
 
@@ -296,6 +460,25 @@ Future<void> _runDownload({
       return;
     }
 
+    // A clean EOF short of the announced total still gets renamed and
+    // reported `complete` below — the file is then permanently truncated
+    // and plays up to the cut with no error anywhere. Nothing else in the
+    // pipeline notices, so say it here.
+    if (bytesTotal != null && bytesReceived < bytesTotal) {
+      unawaited(
+        logger?.warn(
+          'download.http.truncated',
+          attrs: {
+            'content.id': movieId,
+            'download.bytes_received': bytesReceived,
+            'download.bytes_total': bytesTotal,
+            'download.missing_bytes': bytesTotal - bytesReceived,
+            'download.chunks': chunkCount,
+          },
+        ),
+      );
+    }
+
     await partialFile.rename(finalFile.path);
 
     controller.add(
@@ -308,8 +491,38 @@ Future<void> _runDownload({
         updatedAt: DateTime.now(),
       ),
     );
+    unawaited(
+      logger?.info(
+        'download.http.terminal',
+        attrs: {
+          'content.id': movieId,
+          'download.status': DownloadStatus.complete.name,
+          'download.bytes_received': bytesReceived,
+          'download.bytes_total': bytesTotal,
+          'download.chunks': chunkCount,
+          'download.duration_ms': DateTime.now()
+              .difference(requestStartedAt)
+              .inMilliseconds,
+        },
+      ),
+    );
     await controller.close();
-  } catch (e) {
+  } catch (e, st) {
+    // Outermost net: filesystem errors (rename over a locked file, disk
+    // full on flush) land here, not in the body handler above.
+    unawaited(
+      logger?.error(
+        'download.http.terminal',
+        attrs: {
+          'content.id': movieId,
+          'download.status': DownloadStatus.failed.name,
+          'download.bytes_received': bytesReceived,
+          'download.bytes_total': bytesTotal,
+        },
+        error: e,
+        stack: st,
+      ),
+    );
     controller.add(
       MovieDownload(
         movieId: movieId,

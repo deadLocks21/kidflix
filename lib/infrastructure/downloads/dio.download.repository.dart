@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/domain/model/cached_cast_member.dart';
 import 'package:kidflix/core/domain/model/download_inventory_record.dart';
 import 'package:kidflix/core/domain/model/download_kind.dart';
@@ -40,6 +41,7 @@ class DioDownloadRepository implements DownloadRepository {
   final Dio _dio;
   final DownloadManifestStore _manifest;
   final Directory? _downloadsDirOverride;
+  final LoggerApplicationService? _logger;
   final Map<String, _ActiveMovie> _activeMovies = {};
   final Map<String, _ActiveEpisode> _activeEpisodes = {};
   Directory? _cachedRootDir;
@@ -48,9 +50,11 @@ class DioDownloadRepository implements DownloadRepository {
     required Dio dio,
     required DownloadManifestStore manifest,
     Directory? downloadsDirectory,
+    LoggerApplicationService? logger,
   }) : _dio = dio,
        _manifest = manifest,
-       _downloadsDirOverride = downloadsDirectory;
+       _downloadsDirOverride = downloadsDirectory,
+       _logger = logger;
 
   // ── Movie pipeline ────────────────────────────────────────────────
 
@@ -360,6 +364,7 @@ class DioDownloadRepository implements DownloadRepository {
         downloadsDir: dir,
         cancelToken: active.cancelToken,
         isCancelled: () => active.cancelled,
+        logger: _logger,
       );
       await for (final raw in source) {
         final event = _withKind(raw, kind);
@@ -398,6 +403,7 @@ class DioDownloadRepository implements DownloadRepository {
         downloadsDir: dir,
         cancelToken: active.cancelToken,
         isCancelled: () => active.cancelled,
+        logger: _logger,
       );
       await for (final raw in source) {
         final movieView = _withKind(raw, kind);

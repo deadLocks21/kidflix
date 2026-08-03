@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,10 +30,50 @@ void main(List<String> args) {
   final logger = container.read(loggerProvider);
 
   _installErrorHandlers(logger);
+  _lifecycleFlush = _installLifecycleFlush(logger);
   logger.info('app.started');
 
   runApp(
     UncontrolledProviderScope(container: container, child: const KidflixApp()),
+  );
+}
+
+/// Held for the process lifetime so the listener is never collected —
+/// it deregisters itself from [WidgetsBinding] on finalization.
+// ignore: unused_element
+AppLifecycleListener? _lifecycleFlush;
+
+/// Ships the logger's batch buffer every time the app leaves the
+/// foreground, and records the transition itself.
+///
+/// [SignozLoggerService] otherwise only flushes on its 10 s timer and
+/// never retries a failed batch, so the last few seconds before the
+/// process dies are lost. That window is precisely the one worth reading:
+/// the reports that matter all end with the user force-quitting an app
+/// that had stopped responding, which means the evidence of *why* it
+/// stopped is exactly what never gets shipped.
+///
+/// `detached` is best-effort — the platform may kill the process before
+/// the POST completes. `hidden` / `paused` are the ones that do the real
+/// work, because they fire when the app is merely backgrounded, well
+/// before the user gets around to swiping it away.
+///
+/// `app.lifecycle` is also the marker that says an apparent gap in the
+/// timeline was the app being away rather than the app being stuck.
+AppLifecycleListener _installLifecycleFlush(LoggerApplicationService logger) {
+  void mark(String state, {required bool flush}) {
+    unawaited(logger.info('app.lifecycle', attrs: {'app.state': state}));
+    if (flush) unawaited(logger.flush());
+  }
+
+  return AppLifecycleListener(
+    onHide: () => mark('hidden', flush: true),
+    onPause: () => mark('paused', flush: true),
+    onDetach: () => mark('detached', flush: true),
+    // No forced flush on the way back in: the periodic timer picks these
+    // up, and the process is not about to disappear.
+    onShow: () => mark('shown', flush: false),
+    onResume: () => mark('resumed', flush: false),
   );
 }
 

@@ -4,6 +4,7 @@ import 'package:kidflix/infrastructure/downloads/in_memory.download.repository.d
 import 'package:kidflix/infrastructure/providers/api_base_url.provider.dart';
 import 'package:kidflix/infrastructure/providers/dio.provider.dart';
 import 'package:kidflix/infrastructure/providers/download_manifest_store.provider.dart';
+import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'download.repository_provider.g.dart';
@@ -28,5 +29,11 @@ DownloadRepository downloadRepository(Ref ref) {
   if (isInMemoryBaseUrl(baseUrl)) {
     return InMemoryDownloadRepository(manifest: manifest);
   }
-  return DioDownloadRepository(dio: ref.watch(dioProvider), manifest: manifest);
+  return DioDownloadRepository(
+    dio: ref.watch(dioProvider),
+    manifest: manifest,
+    // `read`, not `watch`: the logger facade is keepAlive and stable, and
+    // rebuilding the repository would drop every in-flight download.
+    logger: ref.read(loggerProvider),
+  );
 }

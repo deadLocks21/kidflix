@@ -9,6 +9,7 @@ import 'package:kidflix/core/application/dtos/episode_download.dto.dart';
 import 'package:kidflix/core/application/dtos/movie_download.dto.dart';
 import 'package:kidflix/core/application/dtos/series_playback_context.dart';
 import 'package:kidflix/core/application/remote/playback_remote_controls.dart';
+import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/core/application/session_state.dart';
 import 'package:kidflix/core/application/usecases/pick_next_shuffle_episode.usecase.dart';
 import 'package:kidflix/core/application/usecases/resolve_continue_watching.usecase.dart';
@@ -60,6 +61,16 @@ const Duration _doubleTapBackwardDuration = Duration(seconds: 10);
 const Duration _doubleTapForwardDuration = Duration(seconds: 30);
 const int _resumeMinSeconds = 10;
 const double _completionThreshold = 0.9;
+
+/// How long the download gate may stay up before it is reported as stuck.
+/// Comfortably longer than the ~2 MiB the `readyToPlay` threshold needs on
+/// a slow connection, short enough to land in the same SigNoz session as
+/// the user giving up. See [_PlayerPageState._armGateWatchdog].
+const Duration _gateStallTimeout = Duration(seconds: 45);
+
+/// Ceiling on the repeated stall reports armed by
+/// [_PlayerPageState._armGateWatchdog] — 20 × 45 s ≈ 15 min.
+const int _maxGateStallTicks = 20;
 
 /// Internal projection of either [MovieDownloadDto] or
 /// [EpisodeDownloadDto], used by the player widget without caring about
@@ -211,14 +222,37 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   /// is told rather than left in front of a picture that stops.
   bool _downloadInterrupted = false;
 
+  /// Latches the `playback.download_interrupted` log independently of
+  /// [_downloadInterrupted], which only tracks the *UI* consequence and
+  /// is deliberately not set before playback starts. An interruption that
+  /// happens while the download gate is still up matters just as much —
+  /// it is the one that strands the user on a frozen progress bar — so it
+  /// must be logged even though there is no overlay to switch.
+  bool _downloadInterruptLogged = false;
+
   /// Latches once [_haltAtBoundary] has paused at that final boundary.
   bool _haltedAtBoundary = false;
+
+  /// Fires if the download gate is still up well after the download
+  /// should have handed over to the engine. See [_armGateWatchdog].
+  Timer? _gateWatchdog;
+
+  /// How many times [_gateWatchdog] has reported the gate still up, and
+  /// the byte count at the previous report. Together they answer the
+  /// question a single snapshot cannot: is this download crawling, or is
+  /// it frozen?
+  int _gateStallTicks = 0;
+  int? _bytesAtLastStallTick;
 
   /// Cached at bootstrap so dispose() can invoke it without touching
   /// [ref] (Riverpod disallows ref access after the widget is marked
   /// for unmounting).
   SaveWatchProgressUseCase? _saveUseCase;
   String? _profileId;
+
+  /// Same reason as [_saveUseCase]: `dispose` is the one place that has
+  /// to log without a live [ref].
+  late final LoggerApplicationService _logger;
 
   late final KidsLockService _kidsLock;
   late final ProfilePinService _pinService;
@@ -240,6 +274,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   void initState() {
     super.initState();
     _currentMedia = widget.media;
+    _logger = ref.read(loggerProvider);
     _kidsLock = ref.read(kidsLockServiceProvider);
     _pinService = ref.read(profilePinServiceProvider);
     _applyMobileSystemUi();
@@ -266,10 +301,49 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     _publishRemoteState();
   }
 
+  /// The exit receipt for a playback session.
+  ///
+  /// Every other player event describes something starting; nothing
+  /// described how it *ended*, so a page that was opened and abandoned
+  /// left a silent hole in the timeline between its `download.started`
+  /// and whatever the user did next. This says, in one record, how far
+  /// the film got, whether the engine was ever up, and what the download
+  /// looked like at the moment the user gave up — which is the whole
+  /// question when the report is "it stopped and I couldn't restart it".
+  ///
+  /// Emitted from `dispose`, so it is missing whenever the process is
+  /// killed outright rather than the page being closed. That asymmetry is
+  /// useful in itself: no `playback.closed` before the next `app.started`
+  /// means the app was force-quit on this page.
+  void _logPageClosed() {
+    final dl = _lastDownload;
+    unawaited(
+      _logger.info(
+        'playback.closed',
+        attrs: {
+          'content.id': _currentMediaId(),
+          'playback.engine_running': _engine != null,
+          'playback.ready_emitted': _readyEmitted,
+          'playback.position_ms': _position.inMilliseconds,
+          'playback.duration_ms': _duration?.inMilliseconds,
+          'playback.halted_at_boundary': _haltedAtBoundary,
+          'download.status': dl?.status.name,
+          'download.bytes_received': dl?.bytesReceived,
+          'download.bytes_total': dl?.bytesTotal,
+          'download.fraction': _downloadedFraction(),
+          'download.interrupted': _downloadInterrupted,
+          'playback.bootstrap_error': _bootstrapError,
+        },
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _disposed = true;
+    _logPageClosed();
     _periodicSaveTimer?.cancel();
+    _gateWatchdog?.cancel();
     _movieDownloadSub?.cancel();
     _episodeDownloadSub?.cancel();
     _positionSub?.cancel();
@@ -368,6 +442,20 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     if (_disposed) return;
 
     if (existing != null && existing.status == DownloadStatusDto.complete) {
+      // The only route to `playback.started` that never passes through
+      // `download.started` — this returns before [_observeDownload]. Log
+      // it, or the timeline reads as a playback that materialised out of
+      // nowhere, and "played straight off a finished file" becomes
+      // indistinguishable from "records were dropped in transit".
+      unawaited(
+        _logger.info(
+          'playback.local_file_hit',
+          attrs: {
+            'content.id': _currentMediaId(),
+            'download.bytes_total': existing.bytesTotal,
+          },
+        ),
+      );
       setState(() => _lastDownload = existing);
       await _onReadyToPlay(existing.localPath!);
       return;
@@ -565,6 +653,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   }
 
   void _observeDownload() {
+    _armGateWatchdog();
     switch (_currentMedia) {
       case PlayerMovieRef(:final movieId):
         final useCase = ref.read(startMovieDownloadUseCaseProvider);
@@ -620,30 +709,109 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   /// switches the overlay badge and tells the seek guard to halt at that
   /// boundary rather than snap back to it forever.
   ///
-  /// No-op before playback starts: the full-surface [PlayerErrorState]
-  /// already owns that case.
+  /// The UI half is a no-op before playback starts: the full-surface
+  /// [PlayerErrorState] already owns that case. The log half is not —
+  /// `playback.started` tells whether the engine was ever running, so
+  /// emitting in both cases is what distinguishes "died mid-film" from
+  /// "died before the first frame".
   void _flagDownloadInterrupted(_DownloadView dl) {
+    if (!_downloadInterruptLogged) {
+      _downloadInterruptLogged = true;
+      unawaited(
+        ref.read(loggerProvider).warn(
+          'playback.download_interrupted',
+          attrs: {
+            'content.id': _currentMediaId(),
+            'download.status': dl.status.name,
+            'download.bytes_received': dl.bytesReceived,
+            'download.bytes_total': dl.bytesTotal,
+            'download.error': dl.errorMessage,
+            'playback.engine_running': _engine != null,
+            'playback.position_ms': _position.inMilliseconds,
+          },
+        ),
+      );
+    }
     if (_engine == null || _downloadInterrupted) return;
     setState(() => _downloadInterrupted = true);
     _publishRemoteState();
-    unawaited(
-      ref.read(loggerProvider).warn(
-        'playback.download_interrupted',
-        attrs: {
-          'content.id': _currentMediaId(),
-          'download.status': dl.status.name,
-          'download.bytes_received': dl.bytesReceived,
-          'download.bytes_total': dl.bytesTotal,
-          'download.error': dl.errorMessage,
-          'playback.position_ms': _position.inMilliseconds,
-        },
-      ),
-    );
+  }
+
+  /// Watchdog for the symptom the user actually reports: "the download
+  /// says 100 % and it never starts playing".
+  ///
+  /// Nothing else notices that state. A download pinned in `downloading`
+  /// emits no terminal event, so [_onDownloadEvent] never fires again and
+  /// [PlayerDownloadGate] renders the last snapshot forever. This logs
+  /// that snapshot once, with enough of the download's own numbers to say
+  /// whether the bytes were already on disk (a resume that never received
+  /// a body) or genuinely missing.
+  void _armGateWatchdog() {
+    _gateWatchdog?.cancel();
+    _gateStallTicks = 0;
+    _bytesAtLastStallTick = null;
+    // Periodic rather than one-shot: a single snapshot proves the gate is
+    // up but not whether anything is still moving behind it, and those
+    // are different bugs. `bytes_delta == 0` across consecutive ticks is
+    // the signature of a resume that was answered but never sent a body;
+    // a small non-zero delta is just a slow line.
+    _gateWatchdog = Timer.periodic(_gateStallTimeout, (timer) {
+      if (_disposed || _readyEmitted || _engine != null) {
+        timer.cancel();
+        return;
+      }
+      _gateStallTicks++;
+      final dl = _lastDownload;
+      final previousBytes = _bytesAtLastStallTick;
+      _bytesAtLastStallTick = dl?.bytesReceived;
+      unawaited(
+        _logger.warn(
+          'playback.gate_stalled',
+          attrs: {
+            'content.id': _currentMediaId(),
+            'download.status': dl?.status.name,
+            'download.bytes_received': dl?.bytesReceived,
+            'download.bytes_total': dl?.bytesTotal,
+            'download.fraction': _downloadedFraction(),
+            'download.has_local_path': dl?.localPath != null,
+            'download.error': dl?.errorMessage,
+            'download.bytes_delta': (previousBytes == null || dl == null)
+                ? null
+                : dl.bytesReceived - previousBytes,
+            'playback.stall_tick': _gateStallTicks,
+            'playback.waited_ms':
+                _gateStallTimeout.inMilliseconds * _gateStallTicks,
+          },
+        ),
+      );
+      // A gate nobody is watching any more is not worth a record every
+      // 45 s forever; fifteen minutes of evidence is plenty.
+      if (_gateStallTicks >= _maxGateStallTicks) timer.cancel();
+    });
   }
 
   Future<void> _onReadyToPlay(String localPath) async {
+    _gateWatchdog?.cancel();
+    // Deliberately not folded into the watchdog cancel above: everything
+    // from here to `engine.open` can block (progress lookup over the
+    // network, the resume dialog waiting on the user), and a hang in that
+    // window looks exactly like a stuck download from the outside.
+    final handoverStartedAt = DateTime.now();
     final initialPosition = await _resolveInitialPosition();
     if (_disposed) return;
+    unawaited(
+      ref.read(loggerProvider).debug(
+        'playback.handover',
+        attrs: {
+          'content.id': _currentMediaId(),
+          'playback.resume_prompt_ms': DateTime.now()
+              .difference(handoverStartedAt)
+              .inMilliseconds,
+          'playback.initial_position_ms': initialPosition.inMilliseconds,
+          'download.status': _lastDownload?.status.name,
+        },
+      ),
+    );
 
     final engine = widget.engineFactory();
     _engine = engine;
@@ -996,6 +1164,26 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   void _haltAtBoundary() {
     if (_haltedAtBoundary) return;
     _haltedAtBoundary = true;
+    // "The film just stopped" as the viewer experiences it: the picture
+    // freezes partway in and nothing on screen says why. Until now this
+    // pause was completely silent, so the single most-reported symptom
+    // produced no log line at all. The position/duration pair against the
+    // byte counters is what shows the halt landed exactly where the bytes
+    // ran out, rather than the engine dying on its own.
+    unawaited(
+      _logger.warn(
+        'playback.halted_at_boundary',
+        attrs: {
+          'content.id': _currentMediaId(),
+          'playback.position_ms': _position.inMilliseconds,
+          'playback.duration_ms': _duration?.inMilliseconds,
+          'download.status': _lastDownload?.status.name,
+          'download.bytes_received': _lastDownload?.bytesReceived,
+          'download.bytes_total': _lastDownload?.bytesTotal,
+          'download.interrupted': _downloadInterrupted,
+        },
+      ),
+    );
     unawaited(_engine?.pause());
   }
 
@@ -1192,6 +1380,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
         _autoAdvanceFired = false;
         _initialTracksApplied = false;
         _downloadInterrupted = false;
+        _downloadInterruptLogged = false;
         _haltedAtBoundary = false;
       });
       _audioTracksNotifier.value = const [];
@@ -1376,6 +1565,7 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       _lastDownload = null;
       _readyEmitted = false;
       _downloadInterrupted = false;
+      _downloadInterruptLogged = false;
       _haltedAtBoundary = false;
     });
     _movieDownloadSub?.cancel();
