@@ -53,6 +53,7 @@ dependencies:
   youtube_explode_dart: ^3.0.5
   flutter_cache_manager: ^3.4.1
   connectivity_plus: ^6.1.0
+  package_info_plus: ^10.1.0
   # Biometric auth: depend on the platform implementations directly (not the
   # `local_auth` umbrella) so `local_auth_windows` is never pulled in. It only
   # ships <experimental/coroutine> (a hard error on recent MSVC) and we use a

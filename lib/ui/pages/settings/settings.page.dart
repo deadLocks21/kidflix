@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kidflix/core/application/session_state.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
+import 'package:kidflix/infrastructure/providers/app_version.provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/ui/router/app_router.dart';
+import 'package:kidflix/ui/theme/kidflix_palette.dart';
 
 /// Page Paramètres accessible depuis le menu profil de la home.
 ///
@@ -85,10 +87,34 @@ class SettingsPage extends ConsumerWidget {
                     ),
                   ),
                 ],
+                const SizedBox(height: 24),
+                const _AppVersionLabel(),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Numéro de version discret en pied de page. Rendu vide tant que la lecture
+/// des métadonnées du bundle est en vol, et en cas d'échec : la version est
+/// une information de confort, jamais un message d'erreur à afficher.
+class _AppVersionLabel extends ConsumerWidget {
+  const _AppVersionLabel();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final version = ref.watch(appVersionProvider).value;
+    if (version == null) return const SizedBox.shrink();
+
+    return Center(
+      child: Text(
+        'v$version',
+        style: Theme.of(
+          context,
+        ).textTheme.labelSmall?.copyWith(color: KidflixPalette.white),
       ),
     );
   }
