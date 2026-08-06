@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:kidflix/core/application/dtos/wishlist_entry.dto.dart';
 import 'package:kidflix/core/domain/model/wishlist_entry.dart';
 import 'package:kidflix/infrastructure/providers/wishlist.controller_provider.dart';
+import 'package:kidflix/ui/focus/kidflix_focusable.widget.dart';
 import 'package:kidflix/ui/pages/wishlist/widgets/wishlist_entry_actions_sheet.widget.dart';
 import 'package:kidflix/ui/pages/remote/cast_playback.dart';
 import 'package:kidflix/ui/router/app_router.dart';
@@ -42,7 +43,11 @@ class WishlistCard extends ConsumerWidget {
     return Card(
       clipBehavior: Clip.antiAlias,
       margin: const EdgeInsets.symmetric(vertical: 4),
-      child: InkWell(
+      // No zoom on a full-width list row — it would shove the whole line
+      // sideways. The ring alone carries the focus here.
+      child: KidflixFocusable(
+        scale: 1,
+        borderRadius: BorderRadius.circular(12),
         onTap: canPlay ? () => _openPlayer(context, ref) : null,
         onLongPress: () => showWishlistEntryActionsSheet(context, entry: entry),
         child: Padding(

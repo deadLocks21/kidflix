@@ -52,11 +52,16 @@ class _ActionsSheet extends ConsumerWidget {
           ),
           if (!isAlreadyFinished)
             ListTile(
+              autofocus: true,
               leading: const Icon(Icons.check_circle_outline),
               title: const Text('Marquer comme vu'),
               onTap: () => _markAsWatched(context, ref),
             ),
           ListTile(
+            // Only the entry point when "Marquer comme vu" is absent —
+            // the keyboard should never land on a destructive action
+            // that has a harmless neighbour above it.
+            autofocus: isAlreadyFinished,
             leading: const Icon(Icons.delete_outline),
             title: const Text('Retirer de la liste'),
             onTap: () => _remove(context, ref),

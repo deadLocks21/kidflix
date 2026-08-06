@@ -80,6 +80,8 @@ class ManagementListPage extends ConsumerWidget {
         ),
         actions: [
           TextButton(
+            // Destructive dialog: the keyboard lands on the harmless option.
+            autofocus: true,
             onPressed: () => Navigator.of(dialogContext).pop(false),
             child: const Text('Annuler'),
           ),

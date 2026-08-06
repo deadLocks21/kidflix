@@ -160,6 +160,16 @@ class _TrailerHeaderState extends State<TrailerHeader> {
 
   @override
   Widget build(BuildContext context) {
+    // media_kit's controls mount a `Focus(autofocus: true)` and bind the
+    // arrow keys to seek / volume through a `CallbackShortcuts`. Left
+    // alone, opening a detail modal drops focus into the trailer, the
+    // arrows stop moving it, and "Lire" becomes unreachable without a
+    // mouse. Nothing in this header needs the keyboard, so the whole
+    // subtree stays out of traversal.
+    return ExcludeFocus(child: _buildHero(context));
+  }
+
+  Widget _buildHero(BuildContext context) {
     final controller = _controller;
     final Widget hero;
     if (_isLoading || _showFallback || controller == null) {

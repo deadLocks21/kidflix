@@ -1,6 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/infrastructure/providers/search.controller_provider.dart';
+
+/// Move the focus out of the query field and into the results list.
+class _EnterResultsIntent extends Intent {
+  const _EnterResultsIntent();
+}
+
+class _EnterResultsAction extends Action<_EnterResultsIntent> {
+  @override
+  void invoke(_EnterResultsIntent intent) {
+    // Directional traversal, not a hard-wired node: the results live in a
+    // different subtree, and "the focusable below the field" is exactly
+    // the first result row — the inactive catalog branch of the
+    // [IndexedStack] is excluded from focus while searching.
+    FocusManager.instance.primaryFocus?.focusInDirection(
+      TraversalDirection.down,
+    );
+  }
+}
 
 /// AppBar shown while the home page is in search mode.
 ///
@@ -48,6 +67,29 @@ class _SearchAppBarState extends ConsumerState<SearchAppBar> {
       );
     }
 
+    // Scoped to the app bar, so it only ever fires while the caret is in
+    // the field. It has to sit here rather than on the page: further up,
+    // `DefaultTextEditingShortcuts` claims the vertical arrows for caret
+    // movement and the key would never reach us.
+    return Shortcuts(
+      shortcuts: const <ShortcutActivator, Intent>{
+        SingleActivator(LogicalKeyboardKey.arrowDown): _EnterResultsIntent(),
+      },
+      child: Actions(
+        actions: <Type, Action<Intent>>{
+          _EnterResultsIntent: _EnterResultsAction(),
+        },
+        child: _buildAppBar(context, theme, state, controller),
+      ),
+    );
+  }
+
+  Widget _buildAppBar(
+    BuildContext context,
+    ThemeData theme,
+    SearchUiState state,
+    SearchUiController controller,
+  ) {
     return AppBar(
       leading: IconButton(
         tooltip: 'Fermer la recherche',

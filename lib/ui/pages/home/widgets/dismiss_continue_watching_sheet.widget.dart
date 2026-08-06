@@ -49,6 +49,7 @@ class _DismissSheet extends ConsumerWidget {
             ),
           ),
           ListTile(
+            autofocus: true,
             leading: const Icon(Icons.remove_circle_outline),
             title: const Text('Retirer de Continuer à regarder'),
             onTap: () => _onDismiss(context, ref),

@@ -4,6 +4,7 @@ import 'package:kidflix/core/application/dtos/catalog_row.dto.dart';
 import 'package:kidflix/core/application/dtos/continue_watching_card.dto.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/core/application/dtos/series.dto.dart';
+import 'package:kidflix/ui/focus/catalog_focus.dart';
 import 'package:kidflix/ui/pages/home/widgets/dismiss_continue_watching_sheet.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/movie_card.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/series_card.widget.dart';
@@ -19,19 +20,29 @@ import 'package:kidflix/ui/pages/home/widgets/series_card.widget.dart';
 /// Long-press on a [ContinueWatchingCardDto] opens the "Retirer de
 /// Continuer à regarder" bottom sheet. Cards from other rows ignore
 /// long-press.
+///
+/// Registers itself with the ambient [CatalogFocusScope] under [index] so
+/// keyboard traversal can address its cards by column.
 class CatalogRowWidget extends StatelessWidget {
+  final int index;
   final CatalogRowDto row;
   final void Function(MovieDto movie) onMovieTap;
   final void Function(SeriesDto series)? onSeriesTap;
 
   const CatalogRowWidget({
     super.key,
+    required this.index,
     required this.row,
     required this.onMovieTap,
     this.onSeriesTap,
   });
 
-  static const double _rowHeight = 300;
+  /// Tall enough to hold a card *and* the room its focus zoom grows into —
+  /// the row's [ListView] clips, so without the slack the top of a focused
+  /// poster would be shaved off.
+  static const double _rowHeight = 320;
+  static const double _separator = 12;
+  static const double _horizontalInset = 16;
 
   @override
   Widget build(BuildContext context) {
@@ -47,12 +58,35 @@ class CatalogRowWidget extends StatelessWidget {
           ),
           SizedBox(
             height: _rowHeight,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: CatalogFocusRow(
+              index: index,
               itemCount: row.items.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 12),
-              itemBuilder: (context, i) => _buildCard(context, row.items[i]),
+              stride: MovieCard.width + _separator,
+              leadingInset: _horizontalInset,
+              itemExtent: MovieCard.width,
+              builder: (context, controller) => ListView.separated(
+                controller: controller,
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: _horizontalInset,
+                ),
+                itemCount: row.items.length,
+                separatorBuilder: (_, _) => const SizedBox(width: _separator),
+                itemBuilder: (context, i) => CatalogFocusItem(
+                  row: index,
+                  column: i,
+                  // Centred so the zoom grows symmetrically into the
+                  // slack baked into [_rowHeight].
+                  builder: (context, node, autofocus) => Center(
+                    child: _buildCard(
+                      context,
+                      row.items[i],
+                      node: node,
+                      autofocus: autofocus,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ],
@@ -60,20 +94,29 @@ class CatalogRowWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildCard(BuildContext context, CatalogItemDto item) {
+  Widget _buildCard(
+    BuildContext context,
+    CatalogItemDto item, {
+    required FocusNode node,
+    required bool autofocus,
+  }) {
     if (item is ContinueWatchingCardDto) {
       return _buildLeaf(
         item.inner,
+        node: node,
+        autofocus: autofocus,
         progress: item.progress,
         onLongPress: () =>
             showDismissContinueWatchingSheet(context, card: item),
       );
     }
-    return _buildLeaf(item);
+    return _buildLeaf(item, node: node, autofocus: autofocus);
   }
 
   Widget _buildLeaf(
     CatalogItemDto item, {
+    required FocusNode node,
+    required bool autofocus,
     double? progress,
     VoidCallback? onLongPress,
   }) {
@@ -83,6 +126,8 @@ class CatalogRowWidget extends StatelessWidget {
         onTap: () => onMovieTap(item),
         progress: progress,
         onLongPress: onLongPress,
+        focusNode: node,
+        autofocus: autofocus,
       );
     }
     if (item is SeriesDto) {
@@ -91,6 +136,8 @@ class CatalogRowWidget extends StatelessWidget {
         onTap: onSeriesTap == null ? null : () => onSeriesTap!(item),
         progress: progress,
         onLongPress: onLongPress,
+        focusNode: node,
+        autofocus: autofocus,
       );
     }
     // Unknown subtype: empty placeholder.

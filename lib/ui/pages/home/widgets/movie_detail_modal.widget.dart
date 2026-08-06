@@ -228,6 +228,9 @@ class _PlayButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final castTarget = castTargetName(ref);
     return FilledButton.icon(
+      // Entry point for the keyboard: the modal opens with "Lire" ready
+      // to be validated, and Tab / arrows walk to the other actions.
+      autofocus: true,
       icon: Icon(castTarget == null ? Icons.play_arrow : Icons.cast_connected),
       label: Text(
         castTarget == null ? 'Lire' : 'Lire sur $castTarget',

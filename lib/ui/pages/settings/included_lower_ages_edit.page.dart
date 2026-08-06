@@ -144,8 +144,10 @@ class _Body extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
-                for (final c in lowerCategories)
+                for (final (index, c) in lowerCategories.indexed)
                   CheckboxListTile(
+                    // Keyboard entry point for the page.
+                    autofocus: index == 0,
                     title: Text(AgeCategoryPicker.labelFor(c)),
                     value: selected.contains(c),
                     onChanged: submitting

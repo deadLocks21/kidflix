@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/core/application/services/logger_application.service.dart';
 import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
+import 'package:kidflix/ui/focus/escape_to_pop.dart';
+import 'package:kidflix/ui/focus/keyboard_mode.dart';
 import 'package:kidflix/ui/router/app_router.dart';
 import 'package:kidflix/ui/theme/app_theme_data.dart';
 import 'package:kidflix/updating_splash.dart';
@@ -134,6 +136,13 @@ class KidflixApp extends ConsumerWidget {
         title: 'Kidflix',
         theme: theme,
         routerConfig: ref.watch(appRouterProvider),
+        // Keyboard navigation plumbing. `builder` puts these below
+        // WidgetsApp's own Shortcuts/Actions — which is what lets them
+        // shadow the framework defaults — and above every route, so a
+        // page never has to install them itself.
+        builder: (context, child) => KeyboardModeScope(
+          child: EscapeToPop(child: child ?? const SizedBox.shrink()),
+        ),
       ),
       loading: () => MaterialApp(
         title: 'Kidflix',

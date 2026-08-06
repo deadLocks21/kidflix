@@ -5,6 +5,7 @@ import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/core/application/dtos/series.dto.dart';
 import 'package:kidflix/shared/duration_format.dart';
 import 'package:kidflix/shared/tmdb_image.dart';
+import 'package:kidflix/ui/focus/kidflix_focusable.widget.dart';
 
 /// Single-line result row rendered inside the search results list.
 ///
@@ -17,56 +18,70 @@ class SearchResultTile extends StatelessWidget {
 
   final CatalogItemDto item;
   final VoidCallback onTap;
+  final bool autofocus;
 
-  const SearchResultTile({super.key, required this.item, required this.onTap});
+  const SearchResultTile({
+    super.key,
+    required this.item,
+    required this.onTap,
+    this.autofocus = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: SizedBox(
-                width: SearchResultTile.posterWidth,
-                height: SearchResultTile.posterHeight,
-                child: _Poster(posterUrl: item.posterUrl, item: item),
+    // Half the horizontal padding moved out of the tappable area so the
+    // focus ring is inset from the screen edge instead of bleeding into
+    // it. No zoom: same reasoning as the wishlist rows.
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: KidflixFocusable(
+        scale: 1,
+        onTap: onTap,
+        autofocus: autofocus,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: SizedBox(
+                  width: SearchResultTile.posterWidth,
+                  height: SearchResultTile.posterHeight,
+                  child: _Poster(posterUrl: item.posterUrl, item: item),
+                ),
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    item.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _caption(item),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium,
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      _caption(item),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.chevron_right,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ],
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
         ),
       ),
     );

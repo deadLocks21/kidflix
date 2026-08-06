@@ -130,8 +130,13 @@ class _Grid extends ConsumerWidget {
             mainAxisSpacing: 12,
           ),
           itemCount: options.length,
-          itemBuilder: (context, i) =>
-              _Cell(option: options[i], selected: options[i].id == currentId),
+          itemBuilder: (context, i) => _Cell(
+            option: options[i],
+            selected: options[i].id == currentId,
+            // Keyboard entry point for the sheet; the grid's own
+            // directional traversal takes over from there.
+            autofocus: i == 0,
+          ),
         );
       },
     );
@@ -141,14 +146,20 @@ class _Grid extends ConsumerWidget {
 class _Cell extends StatelessWidget {
   final AvatarOptionDto option;
   final bool selected;
+  final bool autofocus;
 
-  const _Cell({required this.option, required this.selected});
+  const _Cell({
+    required this.option,
+    required this.selected,
+    this.autofocus = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return InkResponse(
       onTap: () => Navigator.of(context).pop(option.id),
+      autofocus: autofocus,
       radius: 60,
       child: Stack(
         alignment: Alignment.center,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/core/application/dtos/catalog_row.dto.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
@@ -12,6 +13,7 @@ import 'package:kidflix/infrastructure/providers/offline_catalog.service_provide
 import 'package:kidflix/infrastructure/providers/search.controller_provider.dart';
 import 'package:kidflix/infrastructure/providers/remote_catalog.provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
+import 'package:kidflix/ui/focus/catalog_focus.dart';
 import 'package:kidflix/ui/pages/home/widgets/catalog_row.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/catalog_skeleton.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/home_profile_menu.widget.dart';
@@ -48,6 +50,28 @@ class HomePage extends ConsumerWidget {
     final online = ref
         .watch(connectivityProvider)
         .maybeWhen(data: (v) => v, orElse: () => true);
+    return _SearchShortcuts(
+      isSearching: isSearching,
+      controller: ref.read(searchUiControllerProvider.notifier),
+      child: _buildScaffold(
+        context,
+        ref,
+        drivingHost: drivingHost,
+        isSearching: isSearching,
+        online: online,
+        rows: rows,
+      ),
+    );
+  }
+
+  Widget _buildScaffold(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool drivingHost,
+    required bool isSearching,
+    required bool online,
+    required AsyncValue<List<CatalogRowDto>> rows,
+  }) {
     return Scaffold(
       appBar: isSearching
           ? const SearchAppBar()
@@ -69,19 +93,31 @@ class HomePage extends ConsumerWidget {
         children: [
           if (!online) const _OfflineBanner(),
           Expanded(
+            // [IndexedStack] keeps both branches mounted to preserve
+            // scroll position, and an unpainted branch is still
+            // focusable — without [ExcludeFocus] the keyboard would walk
+            // into invisible search results, and back into the catalog
+            // while searching.
             child: IndexedStack(
               index: isSearching ? 1 : 0,
               children: [
-                _HomeBody(
-                  rows: rows,
-                  onMovieTap: (movie) => drivingHost
-                      ? _openRemoteMovieDetail(context, ref, movie)
-                      : _openDetail(context, ref, movie),
-                  onSeriesTap: (series) => drivingHost
-                      ? _castSeriesUnsupported(context)
-                      : _openSeriesDetail(context, ref, series),
+                ExcludeFocus(
+                  excluding: isSearching,
+                  child: _HomeBody(
+                    focusEnabled: !isSearching,
+                    rows: rows,
+                    onMovieTap: (movie) => drivingHost
+                        ? _openRemoteMovieDetail(context, ref, movie)
+                        : _openDetail(context, ref, movie),
+                    onSeriesTap: (series) => drivingHost
+                        ? _castSeriesUnsupported(context)
+                        : _openSeriesDetail(context, ref, series),
+                  ),
                 ),
-                const SearchResults(),
+                ExcludeFocus(
+                  excluding: !isSearching,
+                  child: const SearchResults(),
+                ),
               ],
             ),
           ),
@@ -180,6 +216,75 @@ class HomePage extends ConsumerWidget {
   }
 }
 
+/// Keyboard access to search mode.
+///
+/// `/` goes through a [CharacterActivator] rather than a key activator so
+/// it fires on any layout — on AZERTY the slash needs a modifier, and a
+/// [SingleActivator] would never match.
+///
+/// `Escape` is bound here too, deeper than the app-wide "go back" mapping,
+/// so closing the search takes precedence. Both actions report themselves
+/// disabled when they have nothing to do, which hands the key back to the
+/// layers above instead of swallowing it — that is how `/` still types a
+/// slash inside the search field, and how `Escape` keeps doing nothing at
+/// all on the home page.
+class _SearchShortcuts extends StatelessWidget {
+  final bool isSearching;
+  final SearchUiController controller;
+  final Widget child;
+
+  const _SearchShortcuts({
+    required this.isSearching,
+    required this.controller,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Shortcuts(
+      shortcuts: const <ShortcutActivator, Intent>{
+        CharacterActivator('/'): _ToggleSearchIntent(open: true),
+        SingleActivator(LogicalKeyboardKey.keyF, meta: true):
+            _ToggleSearchIntent(open: true),
+        SingleActivator(LogicalKeyboardKey.keyF, control: true):
+            _ToggleSearchIntent(open: true),
+        SingleActivator(LogicalKeyboardKey.escape): _ToggleSearchIntent(
+          open: false,
+        ),
+      },
+      child: Actions(
+        actions: <Type, Action<Intent>>{
+          _ToggleSearchIntent: _ToggleSearchAction(
+            controller: controller,
+            isSearching: isSearching,
+          ),
+        },
+        child: child,
+      ),
+    );
+  }
+}
+
+class _ToggleSearchIntent extends Intent {
+  final bool open;
+
+  const _ToggleSearchIntent({required this.open});
+}
+
+class _ToggleSearchAction extends Action<_ToggleSearchIntent> {
+  final SearchUiController controller;
+  final bool isSearching;
+
+  _ToggleSearchAction({required this.controller, required this.isSearching});
+
+  @override
+  bool isEnabled(_ToggleSearchIntent intent) => intent.open != isSearching;
+
+  @override
+  void invoke(_ToggleSearchIntent intent) =>
+      intent.open ? controller.activate() : controller.deactivate();
+}
+
 class _OfflineBanner extends StatelessWidget {
   const _OfflineBanner();
 
@@ -221,10 +326,14 @@ class _HomeBody extends StatelessWidget {
   final void Function(MovieDto movie) onMovieTap;
   final void Function(SeriesDto series) onSeriesTap;
 
+  /// `false` while search mode owns the keyboard.
+  final bool focusEnabled;
+
   const _HomeBody({
     required this.rows,
     required this.onMovieTap,
     required this.onSeriesTap,
+    required this.focusEnabled,
   });
 
   @override
@@ -241,6 +350,7 @@ class _HomeBody extends StatelessWidget {
               rows: list,
               onMovieTap: onMovieTap,
               onSeriesTap: onSeriesTap,
+              focusEnabled: focusEnabled,
             );
     }
     if (rows.hasError) return const _ErrorState();
@@ -252,28 +362,39 @@ class _CatalogList extends StatelessWidget {
   final List<CatalogRowDto> rows;
   final void Function(MovieDto movie) onMovieTap;
   final void Function(SeriesDto series) onSeriesTap;
+  final bool focusEnabled;
 
   const _CatalogList({
     required this.rows,
     required this.onMovieTap,
     required this.onSeriesTap,
+    required this.focusEnabled,
   });
 
   @override
   Widget build(BuildContext context) {
-    return CustomScrollView(
-      slivers: [
-        const SliverToBoxAdapter(child: SizedBox(height: 16)),
-        SliverList.builder(
-          itemCount: rows.length,
-          itemBuilder: (_, i) => CatalogRowWidget(
-            row: rows[i],
-            onMovieTap: onMovieTap,
-            onSeriesTap: onSeriesTap,
+    return CatalogFocusScope(
+      enabled: focusEnabled,
+      child: CustomScrollView(
+        // One full row (320 dp of cards + label + spacing) beyond the
+        // viewport, so a vertical keyboard move always finds the next row
+        // already built — the focus coordinator can scroll *within* a row
+        // to reach an unbuilt card, but it cannot conjure an unbuilt row.
+        cacheExtent: 400,
+        slivers: [
+          const SliverToBoxAdapter(child: SizedBox(height: 16)),
+          SliverList.builder(
+            itemCount: rows.length,
+            itemBuilder: (_, i) => CatalogRowWidget(
+              index: i,
+              row: rows[i],
+              onMovieTap: onMovieTap,
+              onSeriesTap: onSeriesTap,
+            ),
           ),
-        ),
-        const SliverToBoxAdapter(child: SizedBox(height: 24)),
-      ],
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+        ],
+      ),
     );
   }
 }

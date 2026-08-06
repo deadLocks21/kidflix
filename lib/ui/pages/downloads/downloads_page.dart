@@ -217,6 +217,8 @@ class _ClearAllSectionState extends ConsumerState<_ClearAllSection> {
         ),
         actions: [
           TextButton(
+            // Destructive dialog: the keyboard lands on the harmless option.
+            autofocus: true,
             onPressed: () => Navigator.of(dCtx).pop(false),
             child: const Text('Annuler'),
           ),

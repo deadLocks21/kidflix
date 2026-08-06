@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/shared/duration_format.dart';
 import 'package:kidflix/shared/tmdb_image.dart';
+import 'package:kidflix/ui/focus/kidflix_focusable.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/resume_progress_bar.widget.dart';
 
 /// Compact movie tile rendered inside a horizontal [ListView].
@@ -25,12 +26,20 @@ class MovieCard extends StatelessWidget {
   /// open the "Retirer" action sheet ; other rows leave it null.
   final VoidCallback? onLongPress;
 
+  /// Supplied by the catalog focus coordinator, which owns one node per
+  /// (row, column) so it can move focus by index rather than by geometry.
+  final FocusNode? focusNode;
+
+  final bool autofocus;
+
   const MovieCard({
     super.key,
     required this.movie,
     required this.onTap,
     this.progress,
     this.onLongPress,
+    this.focusNode,
+    this.autofocus = false,
   });
 
   @override
@@ -38,55 +47,52 @@ class MovieCard extends StatelessWidget {
     final theme = Theme.of(context);
     return SizedBox(
       width: width,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          onLongPress: onLongPress,
-          borderRadius: BorderRadius.circular(8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox(
-                  width: width,
-                  height: posterHeight,
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        child: _Poster(posterUrl: movie.posterUrl),
+      child: KidflixFocusable(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        focusNode: focusNode,
+        autofocus: autofocus,
+        borderRadius: BorderRadius.circular(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: SizedBox(
+                width: width,
+                height: posterHeight,
+                child: Stack(
+                  children: [
+                    Positioned.fill(child: _Poster(posterUrl: movie.posterUrl)),
+                    if (progress != null && progress! > 0)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: ResumeProgressBar(progress: progress!),
                       ),
-                      if (progress != null && progress! > 0)
-                        Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          child: ResumeProgressBar(progress: progress!),
-                        ),
-                    ],
-                  ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                movie.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              movie.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleSmall,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              _caption(movie),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
-              const SizedBox(height: 2),
-              Text(
-                _caption(movie),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

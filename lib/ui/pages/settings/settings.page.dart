@@ -38,6 +38,8 @@ class SettingsPage extends ConsumerWidget {
               children: [
                 Card(
                   child: ListTile(
+                    // Keyboard entry point for the page.
+                    autofocus: true,
                     leading: const Icon(Icons.person_outline),
                     title: const Text('Mon profil'),
                     subtitle: const Text(

@@ -325,6 +325,8 @@ class _PlayButton extends ConsumerWidget {
       children: [
         Expanded(
           child: FilledButton.icon(
+            // Entry point for the keyboard, as in the movie modal.
+            autofocus: true,
             icon: Icon(
               castTargetName(ref) == null
                   ? Icons.play_arrow_rounded

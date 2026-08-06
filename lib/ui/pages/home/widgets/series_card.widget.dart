@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:kidflix/core/application/dtos/series.dto.dart';
 import 'package:kidflix/shared/tmdb_image.dart';
+import 'package:kidflix/ui/focus/kidflix_focusable.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/resume_progress_bar.widget.dart';
 
 /// Compact series tile rendered inside a horizontal [ListView].
@@ -24,12 +25,20 @@ class SeriesCard extends StatelessWidget {
   /// open the "Retirer" action sheet ; other rows leave it null.
   final VoidCallback? onLongPress;
 
+  /// Supplied by the catalog focus coordinator, which owns one node per
+  /// (row, column) so it can move focus by index rather than by geometry.
+  final FocusNode? focusNode;
+
+  final bool autofocus;
+
   const SeriesCard({
     super.key,
     required this.series,
     this.onTap,
     this.progress,
     this.onLongPress,
+    this.focusNode,
+    this.autofocus = false,
   });
 
   @override
@@ -37,55 +46,54 @@ class SeriesCard extends StatelessWidget {
     final theme = Theme.of(context);
     return SizedBox(
       width: width,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          onLongPress: onLongPress,
-          borderRadius: BorderRadius.circular(8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox(
-                  width: width,
-                  height: posterHeight,
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        child: _Poster(posterUrl: series.posterUrl),
+      child: KidflixFocusable(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        focusNode: focusNode,
+        autofocus: autofocus,
+        borderRadius: BorderRadius.circular(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: SizedBox(
+                width: width,
+                height: posterHeight,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: _Poster(posterUrl: series.posterUrl),
+                    ),
+                    if (progress != null && progress! > 0)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: ResumeProgressBar(progress: progress!),
                       ),
-                      if (progress != null && progress! > 0)
-                        Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          child: ResumeProgressBar(progress: progress!),
-                        ),
-                    ],
-                  ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                series.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              series.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleSmall,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              _caption(series),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
-              const SizedBox(height: 2),
-              Text(
-                _caption(series),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

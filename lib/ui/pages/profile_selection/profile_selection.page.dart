@@ -77,11 +77,15 @@ class _ProfileSelectionPageState extends ConsumerState<ProfileSelectionPage> {
                     alignment: WrapAlignment.center,
                     runAlignment: WrapAlignment.center,
                     children: [
-                      for (final dto in profiles)
+                      for (final (index, dto) in profiles.indexed)
                         SizedBox(
                           width: 140,
                           child: ProfileAvatar(
                             profile: dto,
+                            // Keyboard entry point: the app opens on this
+                            // screen, so the first avatar is where every
+                            // keyboard session starts.
+                            autofocus: index == 0,
                             onTap: () => ref
                                 .read(sessionControllerProvider.notifier)
                                 .selectProfile(dto.id),
