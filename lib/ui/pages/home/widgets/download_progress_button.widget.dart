@@ -30,11 +30,16 @@ class DownloadProgressButton extends StatelessWidget {
   final int? bytesTotal;
   final VoidCallback? onCancel;
 
+  /// Icon-only rendering: a determinate ring around a stop glyph, the
+  /// size of any other icon button. The readout moves to the tooltip.
+  final bool compact;
+
   const DownloadProgressButton({
     super.key,
     required this.bytesReceived,
     this.bytesTotal,
     this.onCancel,
+    this.compact = false,
   });
 
   @override
@@ -47,6 +52,31 @@ class DownloadProgressButton extends StatelessWidget {
         ? '${(progress * 100).round()} %'
         : _formatMo(bytesReceived);
     final cancellable = onCancel != null;
+    if (compact) {
+      return KidflixFocusZoom(
+        child: IconButton(
+          tooltip: cancellable
+              ? 'Annuler le téléchargement ($label)'
+              : 'Téléchargement en cours ($label)',
+          onPressed: onCancel,
+          icon: Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox.square(
+                dimension: 22,
+                // An indeterminate ring while the size is unknown — the
+                // same reason the wide variant falls back to megabytes.
+                child: CircularProgressIndicator(
+                  value: progress,
+                  strokeWidth: 2,
+                ),
+              ),
+              Icon(cancellable ? Icons.close : Icons.download, size: 12),
+            ],
+          ),
+        ),
+      );
+    }
     final button = KidflixFocusZoom(
       child: OutlinedButton(
         onPressed: onCancel,

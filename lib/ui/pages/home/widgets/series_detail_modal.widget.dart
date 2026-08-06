@@ -16,7 +16,6 @@ import 'package:kidflix/shared/duration_format.dart';
 import 'package:kidflix/shared/tmdb_image.dart';
 import 'package:kidflix/ui/focus/horizontal_focus_fence.widget.dart';
 import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
-import 'package:kidflix/ui/theme/button_styles.dart';
 import 'package:kidflix/ui/pages/home/widgets/download_intent_button.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/favorite_button.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/resume_progress_bar.widget.dart';
@@ -654,17 +653,17 @@ class _EpisodeTileState extends ConsumerState<_EpisodeTile> {
             mainAxisSize: MainAxisSize.min,
             children: [
               KidflixFocusZoom(
-                child: FilledButton.icon(
-                  style: KidflixButtonStyles.primarySmall,
-                  icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                  label: const Text('Lire'),
+                child: IconButton.filled(
+                  tooltip: 'Lire',
+                  icon: const Icon(Icons.play_arrow_rounded),
                   onPressed: _play,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 4),
               DownloadIntentButton(
                 mediaId: episode.id,
                 isEpisode: true,
+                compact: true,
                 title: '$_epRef · ${episode.title}',
                 posterUrl: episode.thumbUrl,
                 parentSeriesTitle: widget.parentSeriesTitle,

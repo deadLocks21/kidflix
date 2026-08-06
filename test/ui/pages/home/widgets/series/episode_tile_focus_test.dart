@@ -59,12 +59,15 @@ Future<void> _press(WidgetTester tester, LogicalKeyboardKey key) async {
   await _settle(tester);
 }
 
-/// The episode rows' own buttons. The header's play button reads
-/// "Lire S1E1", so an exact "Lire" only ever matches an episode row.
-Finder _play(int index) => find.widgetWithText(FilledButton, 'Lire').at(index);
+/// The episode rows' own buttons, matched on their tooltip: both are
+/// icon-only, and the header's play button carries a label instead.
+Finder _play(int index) => find
+    .byWidgetPredicate((w) => w is IconButton && w.tooltip == 'Lire')
+    .at(index);
 
-Finder _download(int index) =>
-    find.widgetWithText(OutlinedButton, 'Télécharger').at(index);
+Finder _download(int index) => find
+    .byWidgetPredicate((w) => w is IconButton && w.tooltip == 'Télécharger')
+    .at(index);
 
 /// Whether the primary focus sits *inside* [button] — the button's node
 /// lives below it, so looking upwards from the button would find the
@@ -119,6 +122,11 @@ void main() {
         ),
         findsWidgets,
         reason: 'clicking anywhere on the row must still play the episode',
+      );
+      expect(
+        _play(0),
+        findsOneWidget,
+        reason: 'icon-only, so the tooltip carries the meaning',
       );
 
       await _tabUntil(tester, _play(0));
@@ -189,6 +197,7 @@ void main() {
                 child: DownloadProgressButton(
                   bytesReceived: 5 * 1024 * 1024,
                   bytesTotal: 20 * 1024 * 1024,
+                  compact: true,
                 ),
               ),
             ),
@@ -196,7 +205,7 @@ void main() {
         ),
       );
       await _settle(tester);
-      final inFlight = tester.getSize(find.byType(OutlinedButton)).width;
+      final inFlight = tester.getSize(find.byType(IconButton)).width;
 
       expect(
         inFlight,

@@ -35,6 +35,12 @@ class DownloadIntentButton extends ConsumerStatefulWidget {
   final String mediaId;
   final bool isEpisode;
 
+  /// Drops the labels for a 40 dp icon button, tooltip only. Used where
+  /// the control repeats on every line — the episode list — and a label
+  /// per row would crowd them out. A side benefit: all three states are
+  /// then the same size by construction.
+  final bool compact;
+
   /// Optional metadata pre-known by the caller (movie/series modale).
   /// When provided, the manifest is enriched with these so the manager
   /// can resolve the title even if the parent's `/catalog` view does
@@ -62,6 +68,7 @@ class DownloadIntentButton extends ConsumerStatefulWidget {
     super.key,
     required this.mediaId,
     required this.isEpisode,
+    this.compact = false,
     this.title,
     this.posterUrl,
     this.parentSeriesTitle,
@@ -125,22 +132,42 @@ class _DownloadIntentButtonState extends ConsumerState<DownloadIntentButton> {
       _ButtonState.inFlight => _InFlightButton(
         mediaId: widget.mediaId,
         isEpisode: widget.isEpisode,
+        compact: widget.compact,
       ),
-      _ButtonState.kept => KidflixFocusZoom(
-        child: OutlinedButton.icon(
-          icon: const Icon(Icons.check_circle_outline),
-          label: _label('Téléchargé'),
-          onPressed: _busy ? null : () => _showDownloadedActions(context),
-        ),
+      _ButtonState.kept => _action(
+        icon: Icons.check_circle_outline,
+        label: 'Téléchargé',
+        onPressed: _busy ? null : () => _showDownloadedActions(context),
       ),
-      _ButtonState.cacheOrAbsent => KidflixFocusZoom(
-        child: OutlinedButton.icon(
-          icon: const Icon(Icons.file_download_outlined),
-          label: _label('Télécharger'),
-          onPressed: _busy ? null : () => _onPromote(context),
-        ),
+      _ButtonState.cacheOrAbsent => _action(
+        icon: Icons.file_download_outlined,
+        label: 'Télécharger',
+        onPressed: _busy ? null : () => _onPromote(context),
       ),
     };
+  }
+
+  Widget _action({
+    required IconData icon,
+    required String label,
+    required VoidCallback? onPressed,
+  }) {
+    if (widget.compact) {
+      return KidflixFocusZoom(
+        child: IconButton(
+          tooltip: label,
+          icon: Icon(icon),
+          onPressed: onPressed,
+        ),
+      );
+    }
+    return KidflixFocusZoom(
+      child: OutlinedButton.icon(
+        icon: Icon(icon),
+        label: _label(label),
+        onPressed: onPressed,
+      ),
+    );
   }
 
   /// Pins the label to the width the in-flight state occupies, so the
@@ -359,8 +386,13 @@ enum _ButtonState { cacheOrAbsent, inFlight, kept }
 class _InFlightButton extends ConsumerStatefulWidget {
   final String mediaId;
   final bool isEpisode;
+  final bool compact;
 
-  const _InFlightButton({required this.mediaId, required this.isEpisode});
+  const _InFlightButton({
+    required this.mediaId,
+    required this.isEpisode,
+    required this.compact,
+  });
 
   @override
   ConsumerState<_InFlightButton> createState() => _InFlightButtonState();
@@ -434,6 +466,7 @@ class _InFlightButtonState extends ConsumerState<_InFlightButton> {
       bytesReceived: _bytesReceived,
       bytesTotal: _bytesTotal,
       onCancel: _cancelling ? null : _onCancel,
+      compact: widget.compact,
     );
   }
 }
