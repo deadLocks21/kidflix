@@ -471,7 +471,16 @@ class _SeasonList extends StatelessWidget {
   }
 }
 
-class _SeasonSection extends StatelessWidget {
+/// One season: a header that folds the episode list, and the season's
+/// own download action.
+///
+/// Not an [ExpansionTile]. That widget builds its header as a single
+/// tappable tile, and anything placed inside it — the download button —
+/// becomes a focusable nested in a focusable, which directional traversal
+/// cannot reach: only Tab could. Splitting the header into two sibling
+/// buttons gives the season row the same grammar as an episode row,
+/// sideways between the two actions, vertically to the next line.
+class _SeasonSection extends StatefulWidget {
   final Season season;
   final String seriesTitle;
   final Map<String, EpisodeProgress> progressByEpisodeId;
@@ -485,55 +494,115 @@ class _SeasonSection extends StatelessWidget {
   });
 
   @override
+  State<_SeasonSection> createState() => _SeasonSectionState();
+}
+
+class _SeasonSectionState extends State<_SeasonSection> {
+  static const Duration _foldDuration = Duration(milliseconds: 200);
+
+  late bool _expanded = widget.initiallyExpanded;
+
+  void _toggle() => setState(() => _expanded = !_expanded);
+
+  @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final season = widget.season;
     final label = season.isSpecials
         ? 'Specials'
         : 'Saison ${season.seasonNumber}';
-    return ExpansionTile(
-      initiallyExpanded: initiallyExpanded,
-      title: Row(
-        children: [
-          Expanded(child: Text(label)),
-          if (season.episodes.isNotEmpty)
-            SeasonDownloadButton(
-              seriesId: season.episodes.first.seriesId,
-              seasonNumber: season.seasonNumber,
-              episodeIds: season.episodes
-                  .map((e) => e.id)
-                  .toList(growable: false),
-            ),
-        ],
-      ),
-      subtitle: Text(
-        season.episodes.length <= 1
-            ? '${season.episodes.length} épisode'
-            : '${season.episodes.length} épisodes',
-      ),
+    final count = season.episodes.length <= 1
+        ? '${season.episodes.length} épisode'
+        : '${season.episodes.length} épisodes';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final ep in season.episodes)
-          _EpisodeTile(
-            episode: ep,
-            parentSeriesTitle: seriesTitle,
-            progress: progressByEpisodeId[ep.id],
+        HorizontalFocusFence(
+          child: Row(
+            children: [
+              Expanded(
+                child: Semantics(
+                  expanded: _expanded,
+                  child: TextButton(
+                    onPressed: _toggle,
+                    style: TextButton.styleFrom(
+                      alignment: Alignment.centerLeft,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      foregroundColor: theme.colorScheme.onSurface,
+                    ),
+                    child: Row(
+                      children: [
+                        AnimatedRotation(
+                          turns: _expanded ? 0.5 : 0,
+                          duration: _foldDuration,
+                          child: const Icon(Icons.expand_more),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: label,
+                                  style: theme.textTheme.titleMedium,
+                                ),
+                                TextSpan(
+                                  text: ' · $count',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              if (season.episodes.isNotEmpty)
+                SeasonDownloadButton(
+                  seriesId: season.episodes.first.seriesId,
+                  seasonNumber: season.seasonNumber,
+                  episodeIds: season.episodes
+                      .map((e) => e.id)
+                      .toList(growable: false),
+                ),
+              const SizedBox(width: 8),
+            ],
           ),
+        ),
+        // Collapsed means not built, so a folded season contributes no
+        // focus stops — same as the tile this replaces.
+        AnimatedSize(
+          duration: _foldDuration,
+          curve: Curves.easeInOut,
+          alignment: Alignment.topCenter,
+          child: _expanded
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final ep in season.episodes)
+                      _EpisodeTile(
+                        episode: ep,
+                        parentSeriesTitle: widget.seriesTitle,
+                        progress: widget.progressByEpisodeId[ep.id],
+                      ),
+                  ],
+                )
+              : const SizedBox(width: double.infinity),
+        ),
       ],
     );
   }
 }
 
-/// One episode of a season.
-///
-/// Clicking anywhere on the row still plays the episode, but the row is
-/// deliberately *not* a keyboard stop — its two buttons are.
-///
-/// A focusable row wrapping a focusable button is what kept the right
-/// arrow from ever reaching "Télécharger": directional traversal only
-/// considers candidates whose centre lies beyond the current node's edge,
-/// and a trailing button sits well inside the row that contains it. Only
-/// Tab, which walks reading order instead of geometry, could get there.
-/// Two sibling buttons have no such problem, and they also make "play
-/// this episode" something you can see rather than something you have to
-/// guess.
 class _EpisodeTile extends ConsumerStatefulWidget {
   final Episode episode;
   final String parentSeriesTitle;

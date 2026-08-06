@@ -74,6 +74,17 @@ Finder _download(int index) => find
     .byWidgetPredicate((w) => w is IconButton && w.tooltip == 'Télécharger')
     .at(index);
 
+/// The season header's two stops. The label is a [Text.rich], which
+/// `widgetWithText` does not see — `textContaining` reads the spans.
+final Finder _seasonToggle = find.ancestor(
+  of: find.textContaining('Saison 1'),
+  matching: find.byType(TextButton),
+);
+
+final Finder _seasonDownload = find.byWidgetPredicate(
+  (w) => w is IconButton && w.tooltip == 'Télécharger la saison',
+);
+
 /// Whether the primary focus sits *inside* [button] — the button's node
 /// lives below it, so looking upwards from the button would find the
 /// wrong one.
@@ -102,6 +113,59 @@ Future<void> _tabUntil(WidgetTester tester, Finder button) async {
 
 void main() {
   group('episode row focus', () {
+    testWidgets('right reaches the season download button, no Tab needed', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_harness());
+      await _settle(tester);
+      await _tabUntil(tester, _seasonToggle);
+
+      await _press(tester, LogicalKeyboardKey.arrowRight);
+      expect(
+        _holdsFocus(tester, _seasonDownload),
+        isTrue,
+        reason:
+            'nested inside an ExpansionTile header, this button could '
+            'only ever be reached by Tab',
+      );
+
+      await _press(tester, LogicalKeyboardKey.arrowLeft);
+      expect(_holdsFocus(tester, _seasonToggle), isTrue);
+    });
+
+    testWidgets('right of the season download stays in the header', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_harness());
+      await _settle(tester);
+      await _tabUntil(tester, _seasonDownload);
+
+      await _press(tester, LogicalKeyboardKey.arrowRight);
+
+      expect(_holdsFocus(tester, _seasonDownload), isTrue);
+    });
+
+    testWidgets('the season header folds and unfolds from the keyboard', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_harness());
+      await _settle(tester);
+      expect(_play(0), findsOneWidget);
+      await _tabUntil(tester, _seasonToggle);
+
+      await _press(tester, LogicalKeyboardKey.enter);
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(
+        find.text('E1 · Épisode 1'),
+        findsNothing,
+        reason: 'a folded season must contribute no focus stops either',
+      );
+
+      await _press(tester, LogicalKeyboardKey.enter);
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('E1 · Épisode 1'), findsOneWidget);
+    });
+
     testWidgets('the row is clickable but never a keyboard stop', (
       tester,
     ) async {
