@@ -21,8 +21,11 @@ Episode _ep(int n) => Episode(
 );
 
 /// Seasons are supplied inline so the modal never reaches for the network.
-Series _series() {
-  final season = Season(seasonNumber: 1, episodes: [_ep(1), _ep(2)]);
+Series _series({int episodes = 2}) {
+  final season = Season(
+    seasonNumber: 1,
+    episodes: [for (var i = 1; i <= episodes; i++) _ep(i)],
+  );
   return Series(
     id: 'pingu',
     title: 'Pingu',
@@ -38,12 +41,14 @@ Series _series() {
   );
 }
 
-Widget _harness() => ProviderScope(
+Widget _harness({int episodes = 2}) => ProviderScope(
   child: MaterialApp(
     theme: AppThemeData.buildDarkTheme(),
     builder: (context, child) =>
         KeyboardModeScope(child: child ?? const SizedBox.shrink()),
-    home: Scaffold(body: SeriesDetailContent(catalogSeries: _series())),
+    home: Scaffold(
+      body: SeriesDetailContent(catalogSeries: _series(episodes: episodes)),
+    ),
   ),
 );
 
@@ -214,6 +219,35 @@ void main() {
             'a button that resizes as a download starts shoves its '
             'neighbour sideways mid-row',
       );
+    });
+
+    testWidgets('every arrow press moves exactly one row, in both '
+        'directions', (tester) async {
+      // Regression: one traversal policy per row fragmented the direction
+      // history the framework keeps to walk a reversal back. Each copy
+      // only ever recorded "I left this row going down", so pressing up
+      // on that row popped the entry, re-focused the node already
+      // focused, and ate the press. Reversing direction cost two.
+      await tester.pumpWidget(_harness(episodes: 4));
+      await _settle(tester);
+      await _tabUntil(tester, _play(0));
+
+      Future<void> step(LogicalKeyboardKey key, int expected) async {
+        await _press(tester, key);
+        expect(
+          _holdsFocus(tester, _play(expected)),
+          isTrue,
+          reason: 'expected row $expected after a single press',
+        );
+      }
+
+      await step(LogicalKeyboardKey.arrowDown, 1);
+      await step(LogicalKeyboardKey.arrowDown, 2);
+      await step(LogicalKeyboardKey.arrowUp, 1);
+      await step(LogicalKeyboardKey.arrowUp, 0);
+      await step(LogicalKeyboardKey.arrowDown, 1);
+      await step(LogicalKeyboardKey.arrowDown, 2);
+      await step(LogicalKeyboardKey.arrowUp, 1);
     });
 
     testWidgets('down stays in the same column of buttons', (tester) async {

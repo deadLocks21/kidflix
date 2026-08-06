@@ -178,119 +178,127 @@ class _SeriesDetailContentState extends ConsumerState<SeriesDetailContent> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final catalogSeries = widget.catalogSeries;
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Stack(
-            children: [
-              TrailerHeader(
-                trailerUrl: catalogSeries.trailerUrl,
-                fallbackImageUrl: catalogSeries.backdropUrl,
-                logoUrl: catalogSeries.logoUrl,
-              ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: KidflixFocusZoom(
-                  child: IconButton.filled(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    // One scope for the whole modal, so every episode row's fence shares
+    // a single traversal policy — and therefore a single, coherent
+    // direction history.
+    return HorizontalFocusFenceScope(
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
               children: [
-                Text(catalogSeries.title, style: theme.textTheme.headlineSmall),
-                if (catalogSeries.originalTitle != null &&
-                    catalogSeries.originalTitle != catalogSeries.title) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    catalogSeries.originalTitle!,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontStyle: FontStyle.italic,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-                if (catalogSeries.tagline != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    catalogSeries.tagline!,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontStyle: FontStyle.italic,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(child: _MetaLine(series: catalogSeries)),
-                    FavoriteButton(
-                      target: SeriesFavoriteTarget(catalogSeries.id),
-                    ),
-                  ],
+                TrailerHeader(
+                  trailerUrl: catalogSeries.trailerUrl,
+                  fallbackImageUrl: catalogSeries.backdropUrl,
+                  logoUrl: catalogSeries.logoUrl,
                 ),
-                const SizedBox(height: 16),
-                if (catalogSeries.synopsis.isNotEmpty)
-                  Text(
-                    catalogSeries.synopsis,
-                    style: theme.textTheme.bodyMedium,
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: KidflixFocusZoom(
+                    child: IconButton.filled(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close),
+                    ),
                   ),
-                if (catalogSeries.genres.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final g in catalogSeries.genres)
-                        Chip(label: Text(g)),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 24),
-                FutureBuilder<_SeriesContext>(
-                  future: _detailFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState != ConnectionState.done) {
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 24),
-                        child: Center(child: CircularProgressIndicator()),
-                      );
-                    }
-                    if (snapshot.hasError) {
-                      return _SeasonsErrorState(onRetry: _retry);
-                    }
-                    final ctx = snapshot.data!;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _PlayButton(
-                          series: ctx.series,
-                          latestProgress: ctx.latestProgress,
-                        ),
-                        const SizedBox(height: 16),
-                        Text('Saisons', style: theme.textTheme.titleMedium),
-                        const SizedBox(height: 8),
-                        _SeasonList(
-                          series: ctx.series,
-                          latestProgress: ctx.latestProgress,
-                          progressByEpisodeId: ctx.progressByEpisodeId,
-                        ),
-                      ],
-                    );
-                  },
                 ),
               ],
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    catalogSeries.title,
+                    style: theme.textTheme.headlineSmall,
+                  ),
+                  if (catalogSeries.originalTitle != null &&
+                      catalogSeries.originalTitle != catalogSeries.title) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      catalogSeries.originalTitle!,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontStyle: FontStyle.italic,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                  if (catalogSeries.tagline != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      catalogSeries.tagline!,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontStyle: FontStyle.italic,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(child: _MetaLine(series: catalogSeries)),
+                      FavoriteButton(
+                        target: SeriesFavoriteTarget(catalogSeries.id),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  if (catalogSeries.synopsis.isNotEmpty)
+                    Text(
+                      catalogSeries.synopsis,
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  if (catalogSeries.genres.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final g in catalogSeries.genres)
+                          Chip(label: Text(g)),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  FutureBuilder<_SeriesContext>(
+                    future: _detailFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState != ConnectionState.done) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+                      if (snapshot.hasError) {
+                        return _SeasonsErrorState(onRetry: _retry);
+                      }
+                      final ctx = snapshot.data!;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _PlayButton(
+                            series: ctx.series,
+                            latestProgress: ctx.latestProgress,
+                          ),
+                          const SizedBox(height: 16),
+                          Text('Saisons', style: theme.textTheme.titleMedium),
+                          const SizedBox(height: 8),
+                          _SeasonList(
+                            series: ctx.series,
+                            latestProgress: ctx.latestProgress,
+                            progressByEpisodeId: ctx.progressByEpisodeId,
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
