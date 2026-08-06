@@ -153,22 +153,12 @@ class CatalogFocusCoordinator {
     final origin = _slots[FocusManager.instance.primaryFocus];
     if (origin == null) return false;
     return switch (direction) {
-      // Horizontal moves stay inside their row and do not clamp: running
-      // off either end hands the key back to the default traversal, which
-      // is what lets the leftmost poster reach whatever sits beside the
-      // catalog.
-      TraversalDirection.left => _focusAt(
-        origin.row,
-        origin.column - 1,
-        forward: false,
-      ),
-      TraversalDirection.right => _focusAt(
-        origin.row,
-        origin.column + 1,
-        forward: true,
-      ),
+      TraversalDirection.left => _step(origin, -1),
+      TraversalDirection.right => _step(origin, 1),
       // Vertical moves carry the column over, clamped: a short row still
-      // catches a move coming from deep inside a long one.
+      // catches a move coming from deep inside a long one. Off the top or
+      // the bottom of the catalog they fall through, which is what lets
+      // the first row reach the app bar.
       TraversalDirection.up => _focusAt(
         origin.row - 1,
         origin.column,
@@ -182,6 +172,23 @@ class CatalogFocusCoordinator {
         clamp: true,
       ),
     };
+  }
+
+  /// Moves [delta] posters along the row, and stops at its ends.
+  ///
+  /// The key is swallowed there rather than handed back to the framework.
+  /// A catalog row spans the full width, so there is nothing legitimate to
+  /// reach sideways — but the default traversal does not know that, and
+  /// would gladly jump to a poster of the row *above or below* that
+  /// happens to sit further right on screen. Leaving the last poster of a
+  /// short row then looked like the selection carrying on into another
+  /// row.
+  bool _step(({int row, int column}) origin, int delta) {
+    final slot = _rows[origin.row];
+    if (slot == null || slot.itemCount == 0) return false;
+    final target = (origin.column + delta).clamp(0, slot.itemCount - 1);
+    if (target == origin.column) return true;
+    return _focusAt(origin.row, target, forward: delta > 0);
   }
 
   bool _focusAt(

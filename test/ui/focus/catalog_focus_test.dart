@@ -198,24 +198,38 @@ void main() {
       );
     });
 
-    testWidgets('running off the end of a row leaves focus alone', (
-      tester,
-    ) async {
-      await tester.pumpWidget(_harness([_row('A', 3)]));
+    testWidgets('the end of a short row holds focus, it does not spill into '
+        'the longer row below', (tester) async {
+      // Row 0 ends at column 1 ; row 1 keeps going. Everything from
+      // (1, 2) onwards sits to the *right* of (0, 1) on screen, so the
+      // framework's own directional traversal would happily jump there.
+      await tester.pumpWidget(_harness([_row('A', 2), _row('B', 8)]));
       await tester.pumpAndSettle();
       await _enterKeyboardMode(tester);
 
-      await _press(tester, LogicalKeyboardKey.arrowLeft);
+      await _press(tester, LogicalKeyboardKey.arrowRight);
+      expect(_focused(), 'catalog(0, 1)');
+
+      await _press(tester, LogicalKeyboardKey.arrowRight, times: 3);
       expect(
         _focused(),
-        'catalog(0, 0)',
+        'catalog(0, 1)',
         reason:
-            'nothing sits to the left of the catalog in this harness, so '
-            'the fallback traversal has nowhere to go',
+            'past the last poster of a row the key is absorbed — focus '
+            'must not walk sideways into another row',
       );
+    });
 
-      await _press(tester, LogicalKeyboardKey.arrowRight, times: 5);
-      expect(_focused(), 'catalog(0, 2)');
+    testWidgets('the start of a row holds focus too', (tester) async {
+      await tester.pumpWidget(_harness([_row('A', 8), _row('B', 3)]));
+      await tester.pumpAndSettle();
+      await _enterKeyboardMode(tester);
+
+      await _press(tester, LogicalKeyboardKey.arrowDown);
+      expect(_focused(), 'catalog(1, 0)');
+
+      await _press(tester, LogicalKeyboardKey.arrowLeft, times: 3);
+      expect(_focused(), 'catalog(1, 0)');
     });
   });
 }
