@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/infrastructure/providers/api_base_url.provider.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 
 /// Modal dialog exposed by the ⚙ icon on [PhoneEntryPage]. Lets the user
 /// type, validate and persist the API base URL so they can pick a backend
@@ -98,19 +99,23 @@ class _BackendUrlDialogState extends ConsumerState<BackendUrlDialog> {
         ],
       ),
       actions: [
-        TextButton(
-          onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Annuler'),
+        KidflixFocusZoom(
+          child: TextButton(
+            onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
+            child: const Text('Annuler'),
+          ),
         ),
-        FilledButton(
-          onPressed: _canSave ? _save : null,
-          child: _isSaving
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Enregistrer'),
+        KidflixFocusZoom(
+          child: FilledButton(
+            onPressed: _canSave ? _save : null,
+            child: _isSaving
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Enregistrer'),
+          ),
         ),
       ],
     );

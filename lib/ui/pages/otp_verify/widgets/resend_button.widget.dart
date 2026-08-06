@@ -1,6 +1,6 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 
 /// Bouton "Renvoyer le code" avec cooldown de 60s. Pendant le cooldown,
 /// le bouton est désactivé et affiche le temps restant.
@@ -48,10 +48,12 @@ class _ResendButtonState extends State<ResendButton> {
   @override
   Widget build(BuildContext context) {
     final disabled = _remaining > 0;
-    return TextButton(
-      onPressed: disabled ? null : _handleTap,
-      child: Text(
-        disabled ? 'Renvoyer le code (${_remaining}s)' : 'Renvoyer le code',
+    return KidflixFocusZoom(
+      child: TextButton(
+        onPressed: disabled ? null : _handleTap,
+        child: Text(
+          disabled ? 'Renvoyer le code (${_remaining}s)' : 'Renvoyer le code',
+        ),
       ),
     );
   }

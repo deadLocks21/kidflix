@@ -1,10 +1,10 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/core/application/dtos/wishlist_search_result.dto.dart';
 import 'package:kidflix/core/application/usecases/search_addable_wishlist_content.usecase.dart';
 import 'package:kidflix/infrastructure/providers/wishlist.usecases_provider.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/pages/wishlist/widgets/wishlist_search_result_tile.widget.dart';
 
 /// Full-screen search page for adding new entries to the foyer's
@@ -88,12 +88,14 @@ class _WishlistSearchPageState extends ConsumerState<WishlistSearchPage> {
                       prefixIcon: const Icon(Icons.search),
                       suffixIcon: _controller.text.isEmpty
                           ? null
-                          : IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                _controller.clear();
-                                _onChanged('');
-                              },
+                          : KidflixFocusZoom(
+                              child: IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  _controller.clear();
+                                  _onChanged('');
+                                },
+                              ),
                             ),
                       border: const OutlineInputBorder(),
                     ),

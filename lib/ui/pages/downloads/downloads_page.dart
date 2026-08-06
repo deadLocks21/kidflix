@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/core/application/usecases/list_downloads.usecase.dart';
 import 'package:kidflix/core/application/usecases/run_startup_cache_cleanup.usecase.dart';
 import 'package:kidflix/infrastructure/providers/download_management.usecases_provider.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/pages/downloads/widgets/cache_section.widget.dart';
 import 'package:kidflix/ui/pages/downloads/widgets/download_entry_tile.widget.dart';
 import 'package:kidflix/ui/pages/downloads/widgets/storage_summary_header.widget.dart';
@@ -184,19 +185,21 @@ class _ClearAllSectionState extends ConsumerState<_ClearAllSection> {
     }
 
     return Center(
-      child: TextButton.icon(
-        onPressed: _busy
-            ? null
-            : () => _confirmAndClearAll(context, items.length, totalBytes),
-        icon: _busy
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.delete_forever_outlined),
-        label: const Text('Tout effacer (cache + téléchargements)'),
-        style: TextButton.styleFrom(foregroundColor: theme.colorScheme.error),
+      child: KidflixFocusZoom(
+        child: TextButton.icon(
+          onPressed: _busy
+              ? null
+              : () => _confirmAndClearAll(context, items.length, totalBytes),
+          icon: _busy
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.delete_forever_outlined),
+          label: const Text('Tout effacer (cache + téléchargements)'),
+          style: TextButton.styleFrom(foregroundColor: theme.colorScheme.error),
+        ),
       ),
     );
   }
@@ -216,15 +219,19 @@ class _ClearAllSectionState extends ConsumerState<_ClearAllSection> {
           'Cette action est irréversible.',
         ),
         actions: [
-          TextButton(
-            // Destructive dialog: the keyboard lands on the harmless option.
-            autofocus: true,
-            onPressed: () => Navigator.of(dCtx).pop(false),
-            child: const Text('Annuler'),
+          KidflixFocusZoom(
+            child: TextButton(
+              // Destructive dialog: the keyboard lands on the harmless option.
+              autofocus: true,
+              onPressed: () => Navigator.of(dCtx).pop(false),
+              child: const Text('Annuler'),
+            ),
           ),
-          TextButton(
-            onPressed: () => Navigator.of(dCtx).pop(true),
-            child: const Text('Tout effacer'),
+          KidflixFocusZoom(
+            child: TextButton(
+              onPressed: () => Navigator.of(dCtx).pop(true),
+              child: const Text('Tout effacer'),
+            ),
           ),
         ],
       ),

@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:kidflix/core/application/remote/remote_protocol.dart';
 import 'package:kidflix/core/domain/model/remote_device.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/theme/kidflix_palette.dart';
 
 /// Escape hatch for networks where mDNS does not survive.
@@ -134,19 +134,23 @@ class _ManualDeviceDialogState extends State<_ManualDeviceDialog> {
         ],
       ),
       actions: [
-        TextButton(
-          onPressed: _probing ? null : () => Navigator.of(context).pop(),
-          child: const Text('Annuler'),
+        KidflixFocusZoom(
+          child: TextButton(
+            onPressed: _probing ? null : () => Navigator.of(context).pop(),
+            child: const Text('Annuler'),
+          ),
         ),
-        FilledButton(
-          onPressed: _probing ? null : _submit,
-          child: _probing
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Connecter'),
+        KidflixFocusZoom(
+          child: FilledButton(
+            onPressed: _probing ? null : _submit,
+            child: _probing
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Connecter'),
+          ),
         ),
       ],
     );

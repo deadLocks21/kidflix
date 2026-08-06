@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kidflix/core/domain/model/media.dart';
@@ -428,15 +429,17 @@ class _SaveBar extends StatelessWidget {
                 ),
               ),
             ),
-            FilledButton(
-              onPressed: enabled ? onSave : null,
-              child: saving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Enregistrer'),
+            KidflixFocusZoom(
+              child: FilledButton(
+                onPressed: enabled ? onSave : null,
+                child: saving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Enregistrer'),
+              ),
             ),
           ],
         ),

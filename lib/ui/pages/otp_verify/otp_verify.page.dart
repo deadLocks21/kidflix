@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/core/application/session_state.dart';
 import 'package:kidflix/core/application/usecases/verify_otp.usecase.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/pages/otp_verify/widgets/otp_digit_field.widget.dart';
 import 'package:kidflix/ui/pages/otp_verify/widgets/resend_button.widget.dart';
 
@@ -148,11 +149,13 @@ class _OtpVerifyPageState extends ConsumerState<OtpVerifyPage> {
         title: const Text('Vérification'),
         leading: expired
             ? null
-            : IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => ref
-                    .read(sessionControllerProvider.notifier)
-                    .backToPhoneEntry(),
+            : KidflixFocusZoom(
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => ref
+                      .read(sessionControllerProvider.notifier)
+                      .backToPhoneEntry(),
+                ),
               ),
       ),
       body: Center(

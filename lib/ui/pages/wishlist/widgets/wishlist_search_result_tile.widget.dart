@@ -5,6 +5,7 @@ import 'package:kidflix/core/application/dtos/wishlist_search_result.dto.dart';
 import 'package:kidflix/core/domain/exceptions/wishlist_entry_already_exists.exception.dart';
 import 'package:kidflix/core/domain/model/wishlist_entry.dart';
 import 'package:kidflix/infrastructure/providers/wishlist.controller_provider.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 
 /// One row of the wishlist search results.
 ///
@@ -220,17 +221,21 @@ class _AddButton extends StatelessWidget {
       );
     }
     if (added) {
-      return IconButton(
-        icon: const Icon(Icons.check_circle),
-        color: Theme.of(context).colorScheme.primary,
-        onPressed: null,
-        tooltip: 'Dans la liste',
+      return KidflixFocusZoom(
+        child: IconButton(
+          icon: const Icon(Icons.check_circle),
+          color: Theme.of(context).colorScheme.primary,
+          onPressed: null,
+          tooltip: 'Dans la liste',
+        ),
       );
     }
-    return IconButton(
-      icon: const Icon(Icons.add_circle_outline),
-      onPressed: onPressed,
-      tooltip: 'Ajouter',
+    return KidflixFocusZoom(
+      child: IconButton(
+        icon: const Icon(Icons.add_circle_outline),
+        onPressed: onPressed,
+        tooltip: 'Ajouter',
+      ),
     );
   }
 }

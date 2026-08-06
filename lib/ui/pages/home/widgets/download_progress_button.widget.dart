@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 
 /// `OutlinedButton` displaying a download-in-progress state.
 /// Shows a thin linear bar plus a textual progress indicator:
@@ -33,27 +34,29 @@ class DownloadProgressButton extends StatelessWidget {
         ? '${(progress * 100).round()} %'
         : _formatMo(bytesReceived);
     final cancellable = onCancel != null;
-    final button = OutlinedButton(
-      onPressed: onCancel,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(cancellable ? Icons.close : Icons.download, size: 18),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 80,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(2),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 4,
-                backgroundColor: Colors.white,
+    final button = KidflixFocusZoom(
+      child: OutlinedButton(
+        onPressed: onCancel,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(cancellable ? Icons.close : Icons.download, size: 18),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 80,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 4,
+                  backgroundColor: Colors.white,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          SizedBox(width: 56, child: Text(label, textAlign: TextAlign.end)),
-        ],
+            const SizedBox(width: 8),
+            SizedBox(width: 56, child: Text(label, textAlign: TextAlign.end)),
+          ],
+        ),
       ),
     );
     if (!cancellable) return button;

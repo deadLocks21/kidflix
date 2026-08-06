@@ -5,6 +5,7 @@ import 'package:kidflix/core/application/dtos/profile.dto.dart';
 import 'package:kidflix/core/application/session_state.dart';
 import 'package:kidflix/core/application/usecases/delete_profile.usecase.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/pages/profile_management/widgets/profile_management_tile.widget.dart';
 import 'package:kidflix/ui/router/app_router.dart';
 
@@ -26,11 +27,13 @@ class ManagementListPage extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Gérer les profils'),
         actions: [
-          TextButton(
-            onPressed: () => ref
-                .read(sessionControllerProvider.notifier)
-                .exitManagementMode(),
-            child: const Text('Terminer'),
+          KidflixFocusZoom(
+            child: TextButton(
+              onPressed: () => ref
+                  .read(sessionControllerProvider.notifier)
+                  .exitManagementMode(),
+              child: const Text('Terminer'),
+            ),
           ),
         ],
       ),
@@ -79,15 +82,19 @@ class ManagementListPage extends ConsumerWidget {
           'de ce profil sera perdue.',
         ),
         actions: [
-          TextButton(
-            // Destructive dialog: the keyboard lands on the harmless option.
-            autofocus: true,
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Annuler'),
+          KidflixFocusZoom(
+            child: TextButton(
+              // Destructive dialog: the keyboard lands on the harmless option.
+              autofocus: true,
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Annuler'),
+            ),
           ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Supprimer'),
+          KidflixFocusZoom(
+            child: FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Supprimer'),
+            ),
           ),
         ],
       ),

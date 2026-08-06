@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +6,7 @@ import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/core/domain/model/cached_cast_member.dart';
 import 'package:kidflix/infrastructure/providers/download.repository_provider.dart';
 import 'package:kidflix/shared/duration_format.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/download_intent_button.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/favorite_button.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/seen_button.widget.dart';
@@ -80,9 +80,11 @@ class MovieDetailContent extends StatelessWidget {
               Positioned(
                 top: 8,
                 right: 8,
-                child: IconButton.filled(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close),
+                child: KidflixFocusZoom(
+                  child: IconButton.filled(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
                 ),
               ),
             ],
@@ -227,57 +229,61 @@ class _PlayButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final castTarget = castTargetName(ref);
-    return FilledButton.icon(
-      // Entry point for the keyboard: the modal opens with "Lire" ready
-      // to be validated, and Tab / arrows walk to the other actions.
-      autofocus: true,
-      icon: Icon(castTarget == null ? Icons.play_arrow : Icons.cast_connected),
-      label: Text(
-        castTarget == null ? 'Lire' : 'Lire sur $castTarget',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+    return KidflixFocusZoom(
+      child: FilledButton.icon(
+        // Entry point for the keyboard: the modal opens with "Lire" ready
+        // to be validated, and Tab / arrows walk to the other actions.
+        autofocus: true,
+        icon: Icon(
+          castTarget == null ? Icons.play_arrow : Icons.cast_connected,
+        ),
+        label: Text(
+          castTarget == null ? 'Lire' : 'Lire sur $castTarget',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        onPressed: () async {
+          // Pre-cache the full display snapshot so the manager can resolve
+          // this movie even if the parent profile cannot see it via
+          // /catalog, and so the offline home can render rows + the detail
+          // modal from disk only. Best-effort, fire-and-forget.
+          unawaited(
+            ref
+                .read(downloadRepositoryProvider)
+                .cacheMediaMetadata(
+                  mediaId: movie.id,
+                  isEpisode: false,
+                  title: movie.title,
+                  posterUrl: movie.posterUrl,
+                  originalTitle: movie.originalTitle,
+                  year: movie.year,
+                  durationSeconds: movie.duration.inSeconds,
+                  ageCategory: movie.ageCategory,
+                  synopsis: movie.synopsis,
+                  tagline: movie.tagline,
+                  backdropUrl: movie.backdropUrl,
+                  logoUrl: movie.logoUrl,
+                  genres: movie.genres,
+                  director: movie.director,
+                  topCast: [
+                    for (final c in movie.topCast)
+                      CachedCastMember(
+                        name: c.name,
+                        role: c.role,
+                        photoUrl: c.photoUrl,
+                      ),
+                  ],
+                ),
+          );
+          final cast = await castIfRemoting(context, ref, mediaId: movie.id);
+          if (!context.mounted) return;
+          Navigator.of(context).pop();
+          // Casting already started the film elsewhere — opening the local
+          // player too would download and play the same title twice.
+          if (cast) return;
+          context.go('/player/${movie.id}');
+        },
       ),
-      onPressed: () async {
-        // Pre-cache the full display snapshot so the manager can resolve
-        // this movie even if the parent profile cannot see it via
-        // /catalog, and so the offline home can render rows + the detail
-        // modal from disk only. Best-effort, fire-and-forget.
-        unawaited(
-          ref
-              .read(downloadRepositoryProvider)
-              .cacheMediaMetadata(
-                mediaId: movie.id,
-                isEpisode: false,
-                title: movie.title,
-                posterUrl: movie.posterUrl,
-                originalTitle: movie.originalTitle,
-                year: movie.year,
-                durationSeconds: movie.duration.inSeconds,
-                ageCategory: movie.ageCategory,
-                synopsis: movie.synopsis,
-                tagline: movie.tagline,
-                backdropUrl: movie.backdropUrl,
-                logoUrl: movie.logoUrl,
-                genres: movie.genres,
-                director: movie.director,
-                topCast: [
-                  for (final c in movie.topCast)
-                    CachedCastMember(
-                      name: c.name,
-                      role: c.role,
-                      photoUrl: c.photoUrl,
-                    ),
-                ],
-              ),
-        );
-        final cast = await castIfRemoting(context, ref, mediaId: movie.id);
-        if (!context.mounted) return;
-        Navigator.of(context).pop();
-        // Casting already started the film elsewhere — opening the local
-        // player too would download and play the same title twice.
-        if (cast) return;
-        context.go('/player/${movie.id}');
-      },
     );
   }
 }

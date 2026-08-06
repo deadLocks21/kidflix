@@ -1,11 +1,11 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/core/application/dtos/profile.dto.dart';
 import 'package:kidflix/core/application/session_state.dart';
 import 'package:kidflix/core/application/usecases/enter_management_mode.usecase.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/pages/profile_selection/widgets/profile_avatar.widget.dart';
 
 class ProfileSelectionPage extends ConsumerStatefulWidget {
@@ -56,11 +56,13 @@ class _ProfileSelectionPageState extends ConsumerState<ProfileSelectionPage> {
       appBar: AppBar(
         title: const Text('Qui regarde ?'),
         actions: [
-          IconButton(
-            tooltip: 'Se déconnecter',
-            icon: const Icon(Icons.logout),
-            onPressed: () =>
-                ref.read(sessionControllerProvider.notifier).logout(),
+          KidflixFocusZoom(
+            child: IconButton(
+              tooltip: 'Se déconnecter',
+              icon: const Icon(Icons.logout),
+              onPressed: () =>
+                  ref.read(sessionControllerProvider.notifier).logout(),
+            ),
           ),
         ],
       ),
@@ -98,10 +100,12 @@ class _ProfileSelectionPageState extends ConsumerState<ProfileSelectionPage> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.manage_accounts),
-                label: const Text('Gérer les profils'),
-                onPressed: () => _enterManagement(context, ref),
+              child: KidflixFocusZoom(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.manage_accounts),
+                  label: const Text('Gérer les profils'),
+                  onPressed: () => _enterManagement(context, ref),
+                ),
               ),
             ),
           ],

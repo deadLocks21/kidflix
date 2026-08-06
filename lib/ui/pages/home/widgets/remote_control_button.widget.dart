@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/infrastructure/providers/remote_control.providers.dart';
 import 'package:kidflix/infrastructure/providers/remote_playback_host.controller.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/pages/remote/remote_control_sheet.dart';
 import 'package:kidflix/ui/theme/kidflix_palette.dart';
 
@@ -19,27 +20,29 @@ class RemoteControlButton extends ConsumerWidget {
     final isCasting = ref.watch(isRemotingToDeviceProvider);
     final isHosting = ref.watch(remoteHostControllerProvider);
 
-    return IconButton(
-      tooltip: isCasting ? 'Télécommande — connectée' : 'Télécommande',
-      icon: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Icon(
-            isCasting ? Icons.cast_connected : Icons.cast,
-            color: isCasting ? KidflixPalette.green : null,
-          ),
-          if (isHosting && !isCasting)
-            const Positioned(
-              right: -1,
-              top: -1,
-              child: CircleAvatar(
-                radius: 3.5,
-                backgroundColor: KidflixPalette.green,
-              ),
+    return KidflixFocusZoom(
+      child: IconButton(
+        tooltip: isCasting ? 'Télécommande — connectée' : 'Télécommande',
+        icon: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Icon(
+              isCasting ? Icons.cast_connected : Icons.cast,
+              color: isCasting ? KidflixPalette.green : null,
             ),
-        ],
+            if (isHosting && !isCasting)
+              const Positioned(
+                right: -1,
+                top: -1,
+                child: CircleAvatar(
+                  radius: 3.5,
+                  backgroundColor: KidflixPalette.green,
+                ),
+              ),
+          ],
+        ),
+        onPressed: () => showRemoteControlSheet(context),
       ),
-      onPressed: () => showRemoteControlSheet(context),
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/infrastructure/providers/seen.controller_provider.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 
 /// Toggle button on the movie detail modal for the active profile's
 /// "Déjà vu" mark on [movieId].
@@ -28,13 +29,15 @@ class SeenButton extends ConsumerWidget {
       orElse: () => false,
     );
     final loading = asyncSeen.isLoading && !asyncSeen.hasValue;
-    return IconButton(
-      tooltip: seen ? 'Pas encore vu' : 'Marquer comme déjà vu',
-      icon: Icon(
-        seen ? Icons.visibility : Icons.visibility_outlined,
-        color: seen ? theme.colorScheme.primary : null,
+    return KidflixFocusZoom(
+      child: IconButton(
+        tooltip: seen ? 'Pas encore vu' : 'Marquer comme déjà vu',
+        icon: Icon(
+          seen ? Icons.visibility : Icons.visibility_outlined,
+          color: seen ? theme.colorScheme.primary : null,
+        ),
+        onPressed: loading ? null : () => _onTap(context, ref, seen),
       ),
-      onPressed: loading ? null : () => _onTap(context, ref, seen),
     );
   }
 

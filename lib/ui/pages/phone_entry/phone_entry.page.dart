@@ -4,6 +4,7 @@ import 'package:kidflix/core/application/usecases/request_otp.usecase.dart';
 import 'package:kidflix/core/domain/exceptions/invalid_phone_number.exception.dart';
 import 'package:kidflix/core/domain/model/phone_number.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/pages/phone_entry/widgets/backend_url_dialog.widget.dart';
 import 'package:kidflix/ui/pages/phone_entry/widgets/phone_number_field.widget.dart';
 
@@ -76,10 +77,12 @@ class _PhoneEntryPageState extends ConsumerState<PhoneEntryPage> {
       appBar: AppBar(
         title: const Text('Connexion'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: 'URL du backend',
-            onPressed: () => BackendUrlDialog.show(context),
+          KidflixFocusZoom(
+            child: IconButton(
+              icon: const Icon(Icons.settings),
+              tooltip: 'URL du backend',
+              onPressed: () => BackendUrlDialog.show(context),
+            ),
           ),
         ],
       ),

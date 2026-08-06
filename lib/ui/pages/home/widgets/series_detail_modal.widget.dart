@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +14,7 @@ import 'package:kidflix/infrastructure/providers/session.controller_provider.dar
 import 'package:kidflix/infrastructure/providers/watch_progress.repository_provider.dart';
 import 'package:kidflix/shared/duration_format.dart';
 import 'package:kidflix/shared/tmdb_image.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/download_intent_button.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/favorite_button.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/resume_progress_bar.widget.dart';
@@ -191,9 +191,11 @@ class _SeriesDetailContentState extends ConsumerState<SeriesDetailContent> {
               Positioned(
                 top: 8,
                 right: 8,
-                child: IconButton.filled(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close),
+                child: KidflixFocusZoom(
+                  child: IconButton.filled(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
                 ),
               ),
             ],
@@ -352,26 +354,28 @@ class _PlayButton extends ConsumerWidget {
         ),
         if (shufflePick != null) ...[
           const SizedBox(width: 12),
-          OutlinedButton.icon(
-            icon: const Icon(Icons.shuffle_rounded),
-            label: const Text('Aléatoire'),
-            onPressed: () async {
-              final cast = await castIfRemoting(
-                context,
-                ref,
-                mediaId: shufflePick.id,
-                isEpisode: true,
-                seriesId: series.id,
-                shuffle: true,
-              );
-              if (!context.mounted) return;
-              Navigator.of(context).pop();
-              if (cast) return;
-              context.go(
-                '/player/episode/${shufflePick.id}'
-                '?series=${series.id}&mode=shuffle',
-              );
-            },
+          KidflixFocusZoom(
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.shuffle_rounded),
+              label: const Text('Aléatoire'),
+              onPressed: () async {
+                final cast = await castIfRemoting(
+                  context,
+                  ref,
+                  mediaId: shufflePick.id,
+                  isEpisode: true,
+                  seriesId: series.id,
+                  shuffle: true,
+                );
+                if (!context.mounted) return;
+                Navigator.of(context).pop();
+                if (cast) return;
+                context.go(
+                  '/player/episode/${shufflePick.id}'
+                  '?series=${series.id}&mode=shuffle',
+                );
+              },
+            ),
           ),
         ],
       ],

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:kidflix/core/application/dtos/wishlist_entry.dto.dart';
 import 'package:kidflix/core/domain/exceptions/wishlist_not_configured.exception.dart';
 import 'package:kidflix/infrastructure/providers/wishlist.controller_provider.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/pages/wishlist/widgets/wishlist_card.widget.dart';
 import 'package:kidflix/ui/router/app_router.dart';
 
@@ -214,11 +215,13 @@ class _ErrorView extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Center(
-          child: FilledButton.tonalIcon(
-            onPressed: () =>
-                ref.read(wishlistControllerProvider.notifier).refresh(),
-            icon: const Icon(Icons.refresh),
-            label: const Text('Réessayer'),
+          child: KidflixFocusZoom(
+            child: FilledButton.tonalIcon(
+              onPressed: () =>
+                  ref.read(wishlistControllerProvider.notifier).refresh(),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Réessayer'),
+            ),
           ),
         ),
       ],

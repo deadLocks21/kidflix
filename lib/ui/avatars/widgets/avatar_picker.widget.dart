@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/core/application/dtos/avatar_option.dto.dart';
 import 'package:kidflix/infrastructure/providers/avatars.usecases_provider.dart';
 import 'package:kidflix/ui/avatars/widgets/avatar_image.widget.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 
 /// Opens the avatar picker modal sheet. Returns the chosen avatar id, or
 /// `null` if the user dismissed without picking.
@@ -67,15 +68,19 @@ class _Header extends ConsumerWidget {
             ),
           ),
           if (kDebugMode)
-            IconButton(
-              tooltip: '[dev] Vider le cache images',
-              icon: const Icon(Icons.delete_sweep_outlined),
-              onPressed: () => _clearCache(context, ref),
+            KidflixFocusZoom(
+              child: IconButton(
+                tooltip: '[dev] Vider le cache images',
+                icon: const Icon(Icons.delete_sweep_outlined),
+                onPressed: () => _clearCache(context, ref),
+              ),
             ),
-          IconButton(
-            tooltip: 'Fermer',
-            icon: const Icon(Icons.close),
-            onPressed: () => Navigator.of(context).pop(),
+          KidflixFocusZoom(
+            child: IconButton(
+              tooltip: 'Fermer',
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
           ),
         ],
       ),
@@ -205,10 +210,12 @@ class _ErrorState extends StatelessWidget {
           children: [
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 12),
-            FilledButton.tonalIcon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Réessayer'),
+            KidflixFocusZoom(
+              child: FilledButton.tonalIcon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Réessayer'),
+              ),
             ),
           ],
         ),

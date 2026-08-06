@@ -7,6 +7,7 @@ import 'package:kidflix/infrastructure/providers/download.repository_provider.da
 import 'package:kidflix/infrastructure/providers/download_management.usecases_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/shared/tmdb_image.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/pages/downloads/widgets/storage_summary_header.widget.dart';
 
 /// One row in the manager's downloads or cache section.
@@ -91,24 +92,30 @@ class _DownloadEntryTileState extends ConsumerState<DownloadEntryTile> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton.icon(
-                    onPressed: _busy ? null : () => _toggleKind(context),
-                    icon: Icon(
-                      widget.isInDownloadsSection
-                          ? Icons.bookmark_remove_outlined
-                          : Icons.bookmark_add_outlined,
-                    ),
-                    label: Text(
-                      widget.isInDownloadsSection ? 'Ne plus garder' : 'Garder',
+                  KidflixFocusZoom(
+                    child: TextButton.icon(
+                      onPressed: _busy ? null : () => _toggleKind(context),
+                      icon: Icon(
+                        widget.isInDownloadsSection
+                            ? Icons.bookmark_remove_outlined
+                            : Icons.bookmark_add_outlined,
+                      ),
+                      label: Text(
+                        widget.isInDownloadsSection
+                            ? 'Ne plus garder'
+                            : 'Garder',
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  TextButton.icon(
-                    onPressed: _busy ? null : () => _delete(context),
-                    icon: const Icon(Icons.delete_outline),
-                    label: const Text('Supprimer'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: theme.colorScheme.error,
+                  KidflixFocusZoom(
+                    child: TextButton.icon(
+                      onPressed: _busy ? null : () => _delete(context),
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('Supprimer'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: theme.colorScheme.error,
+                      ),
                     ),
                   ),
                 ],
@@ -192,15 +199,19 @@ class _DownloadEntryTileState extends ConsumerState<DownloadEntryTile> {
           'Cette action ne peut pas être annulée.',
         ),
         actions: [
-          TextButton(
-            // Destructive dialog: the keyboard lands on the harmless option.
-            autofocus: true,
-            onPressed: () => Navigator.of(dCtx).pop(false),
-            child: const Text('Annuler'),
+          KidflixFocusZoom(
+            child: TextButton(
+              // Destructive dialog: the keyboard lands on the harmless option.
+              autofocus: true,
+              onPressed: () => Navigator.of(dCtx).pop(false),
+              child: const Text('Annuler'),
+            ),
           ),
-          TextButton(
-            onPressed: () => Navigator.of(dCtx).pop(true),
-            child: const Text('Supprimer'),
+          KidflixFocusZoom(
+            child: TextButton(
+              onPressed: () => Navigator.of(dCtx).pop(true),
+              child: const Text('Supprimer'),
+            ),
           ),
         ],
       ),

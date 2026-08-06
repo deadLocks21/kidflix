@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/core/domain/model/favorite.dart';
 import 'package:kidflix/infrastructure/providers/favorites.controller_provider.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 
 /// Discriminated target for a "Ma liste" toggle. Sealed so the button
 /// can switch exhaustively without a default branch — mirrors the
@@ -49,13 +50,15 @@ class FavoriteButton extends ConsumerWidget {
       orElse: () => false,
     );
     final loading = asyncFavorites.isLoading && !asyncFavorites.hasValue;
-    return IconButton(
-      tooltip: favorited ? 'Retirer de Ma liste' : 'Ajouter à Ma liste',
-      icon: Icon(
-        favorited ? Icons.favorite : Icons.favorite_border,
-        color: favorited ? theme.colorScheme.primary : null,
+    return KidflixFocusZoom(
+      child: IconButton(
+        tooltip: favorited ? 'Retirer de Ma liste' : 'Ajouter à Ma liste',
+        icon: Icon(
+          favorited ? Icons.favorite : Icons.favorite_border,
+          color: favorited ? theme.colorScheme.primary : null,
+        ),
+        onPressed: loading ? null : () => _onTap(context, ref, favorited),
       ),
-      onPressed: loading ? null : () => _onTap(context, ref, favorited),
     );
   }
 

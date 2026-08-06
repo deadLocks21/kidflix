@@ -5,9 +5,10 @@ import 'package:go_router/go_router.dart';
 import 'package:kidflix/core/application/dtos/wishlist_entry.dto.dart';
 import 'package:kidflix/core/domain/model/wishlist_entry.dart';
 import 'package:kidflix/infrastructure/providers/wishlist.controller_provider.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/focus/kidflix_focusable.widget.dart';
-import 'package:kidflix/ui/pages/wishlist/widgets/wishlist_entry_actions_sheet.widget.dart';
 import 'package:kidflix/ui/pages/remote/cast_playback.dart';
+import 'package:kidflix/ui/pages/wishlist/widgets/wishlist_entry_actions_sheet.widget.dart';
 import 'package:kidflix/ui/router/app_router.dart';
 
 /// One row of the wishlist list view.
@@ -86,15 +87,19 @@ class WishlistCard extends ConsumerWidget {
                 ),
               ),
               if (canPlay)
-                IconButton(
-                  icon: const Icon(Icons.play_arrow),
-                  tooltip: 'Lire',
-                  onPressed: () => _openPlayer(context, ref),
+                KidflixFocusZoom(
+                  child: IconButton(
+                    icon: const Icon(Icons.play_arrow),
+                    tooltip: 'Lire',
+                    onPressed: () => _openPlayer(context, ref),
+                  ),
                 ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline),
-                tooltip: 'Supprimer de la liste',
-                onPressed: () => _onDelete(context, ref),
+              KidflixFocusZoom(
+                child: IconButton(
+                  icon: const Icon(Icons.delete_outline),
+                  tooltip: 'Supprimer de la liste',
+                  onPressed: () => _onDelete(context, ref),
+                ),
               ),
             ],
           ),

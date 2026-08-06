@@ -10,10 +10,11 @@ import 'package:kidflix/infrastructure/providers/catalog.repository_provider.dar
 import 'package:kidflix/infrastructure/providers/catalog.usecases_provider.dart';
 import 'package:kidflix/infrastructure/providers/connectivity.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/offline_catalog.service_provider.dart';
-import 'package:kidflix/infrastructure/providers/search.controller_provider.dart';
 import 'package:kidflix/infrastructure/providers/remote_catalog.provider.dart';
+import 'package:kidflix/infrastructure/providers/search.controller_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/ui/focus/catalog_focus.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/catalog_row.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/catalog_skeleton.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/home_profile_menu.widget.dart';
@@ -78,11 +79,14 @@ class HomePage extends ConsumerWidget {
           : AppBar(
               title: Text(drivingHost ? 'Sur l’autre appareil' : 'Kidflix'),
               actions: [
-                IconButton(
-                  tooltip: 'Chercher un film',
-                  icon: const Icon(Icons.search),
-                  onPressed: () =>
-                      ref.read(searchUiControllerProvider.notifier).activate(),
+                KidflixFocusZoom(
+                  child: IconButton(
+                    tooltip: 'Chercher un film',
+                    icon: const Icon(Icons.search),
+                    onPressed: () => ref
+                        .read(searchUiControllerProvider.notifier)
+                        .activate(),
+                  ),
                 ),
                 const RemoteControlButton(),
                 const HomeProfileMenu(),
@@ -434,9 +438,11 @@ class _ErrorState extends ConsumerWidget {
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: 16),
-            OutlinedButton(
-              onPressed: () => ref.invalidate(homeCatalogRowsProvider),
-              child: const Text('Réessayer'),
+            KidflixFocusZoom(
+              child: OutlinedButton(
+                onPressed: () => ref.invalidate(homeCatalogRowsProvider),
+                child: const Text('Réessayer'),
+              ),
             ),
           ],
         ),

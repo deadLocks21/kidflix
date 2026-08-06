@@ -10,6 +10,7 @@ import 'package:kidflix/infrastructure/providers/search.controller_provider.dart
 import 'package:kidflix/infrastructure/providers/search.usecase_provider.dart';
 import 'package:kidflix/infrastructure/providers/series.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/movie_detail_modal.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/search_result_tile.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/series_detail_modal.widget.dart';
@@ -133,7 +134,12 @@ class _ErrorState extends StatelessWidget {
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: 16),
-            OutlinedButton(onPressed: onRetry, child: const Text('Réessayer')),
+            KidflixFocusZoom(
+              child: OutlinedButton(
+                onPressed: onRetry,
+                child: const Text('Réessayer'),
+              ),
+            ),
           ],
         ),
       ),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/core/application/session_state.dart';
 import 'package:kidflix/core/application/usecases/verify_profile_pin.usecase.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/widgets/pin_pad.widget.dart';
 
 class ProfilePinPage extends ConsumerStatefulWidget {
@@ -62,10 +63,12 @@ class _ProfilePinPageState extends ConsumerState<ProfilePinPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text('PIN de $name'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () =>
-              ref.read(sessionControllerProvider.notifier).cancelPinEntry(),
+        leading: KidflixFocusZoom(
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () =>
+                ref.read(sessionControllerProvider.notifier).cancelPinEntry(),
+          ),
         ),
       ),
       body: SafeArea(
@@ -74,11 +77,13 @@ class _ProfilePinPageState extends ConsumerState<ProfilePinPage> {
           pinLength: _pinLength,
           onSubmit: _verify,
           footer: _biometricOffered
-              ? IconButton.filledTonal(
-                  onPressed: _promptBiometric,
-                  icon: const Icon(Icons.fingerprint),
-                  iconSize: 40,
-                  tooltip: 'Utiliser la biométrie',
+              ? KidflixFocusZoom(
+                  child: IconButton.filledTonal(
+                    onPressed: _promptBiometric,
+                    icon: const Icon(Icons.fingerprint),
+                    iconSize: 40,
+                    tooltip: 'Utiliser la biométrie',
+                  ),
                 )
               : null,
         ),

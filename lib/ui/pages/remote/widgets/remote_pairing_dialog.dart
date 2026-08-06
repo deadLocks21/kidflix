@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/core/domain/model/remote_device.dart';
 import 'package:kidflix/infrastructure/providers/remote_control.providers.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/theme/kidflix_palette.dart';
 
 /// Asks for the six digits shown on [device] and exchanges them for a
@@ -105,19 +106,23 @@ class _RemotePairingDialogState extends ConsumerState<_RemotePairingDialog> {
         ],
       ),
       actions: [
-        TextButton(
-          onPressed: _submitting ? null : () => Navigator.of(context).pop(),
-          child: const Text('Annuler'),
+        KidflixFocusZoom(
+          child: TextButton(
+            onPressed: _submitting ? null : () => Navigator.of(context).pop(),
+            child: const Text('Annuler'),
+          ),
         ),
-        FilledButton(
-          onPressed: _submitting ? null : _submit,
-          child: _submitting
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Associer'),
+        KidflixFocusZoom(
+          child: FilledButton(
+            onPressed: _submitting ? null : _submit,
+            child: _submitting
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Associer'),
+          ),
         ),
       ],
     );

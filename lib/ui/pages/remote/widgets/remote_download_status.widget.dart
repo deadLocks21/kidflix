@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kidflix/core/domain/model/remote_download.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/theme/kidflix_palette.dart';
 
 /// Formats a byte count for a progress line.
@@ -66,14 +67,16 @@ class RemoteDownloadStatusCard extends StatelessWidget {
                 ),
               ),
               if (download.canRetry)
-                TextButton(
-                  onPressed: onRetry,
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                KidflixFocusZoom(
+                  child: TextButton(
+                    onPressed: onRetry,
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('Réessayer'),
                   ),
-                  child: const Text('Réessayer'),
                 ),
             ],
           ),

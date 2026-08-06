@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:kidflix/core/application/dtos/profile.dto.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/ui/avatars/widgets/avatar_image.widget.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/pages/profile_management/widgets/age_category_picker.widget.dart';
 
 /// Tile d'un profil dans la liste de gestion. Affiche nom, catégorie d'âge,
@@ -100,29 +101,35 @@ class ProfileManagementTile extends StatelessWidget {
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            IconButton(
-              tooltip: profile.canManage
-                  ? 'Modifier nom et catégorie'
-                  : 'Profil partagé en lecture seule',
-              icon: const Icon(Icons.edit),
-              onPressed: profile.canManage ? onEdit : null,
+            KidflixFocusZoom(
+              child: IconButton(
+                tooltip: profile.canManage
+                    ? 'Modifier nom et catégorie'
+                    : 'Profil partagé en lecture seule',
+                icon: const Icon(Icons.edit),
+                onPressed: profile.canManage ? onEdit : null,
+              ),
             ),
             if (profile.isMain)
-              IconButton(
-                tooltip: 'Changer le code principal',
-                icon: const Icon(Icons.key),
-                onPressed: onChangeMainPin,
+              KidflixFocusZoom(
+                child: IconButton(
+                  tooltip: 'Changer le code principal',
+                  icon: const Icon(Icons.key),
+                  onPressed: onChangeMainPin,
+                ),
               ),
-            IconButton(
-              tooltip: switch (profile) {
-                ProfileDto(isMain: true) =>
-                  'Le profil principal ne peut pas être supprimé',
-                ProfileDto(shared: true) =>
-                  'Profil partagé : seul son propriétaire peut le supprimer',
-                _ => 'Supprimer',
-              },
-              icon: const Icon(Icons.delete_outline),
-              onPressed: profile.canDelete ? onDelete : null,
+            KidflixFocusZoom(
+              child: IconButton(
+                tooltip: switch (profile) {
+                  ProfileDto(isMain: true) =>
+                    'Le profil principal ne peut pas être supprimé',
+                  ProfileDto(shared: true) =>
+                    'Profil partagé : seul son propriétaire peut le supprimer',
+                  _ => 'Supprimer',
+                },
+                icon: const Icon(Icons.delete_outline),
+                onPressed: profile.canDelete ? onDelete : null,
+              ),
             ),
           ],
         ),

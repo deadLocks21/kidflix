@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/core/domain/services/remote_control_host.service.dart';
 import 'package:kidflix/infrastructure/providers/remote_control.providers.dart';
 import 'package:kidflix/infrastructure/providers/remote_playback_host.controller.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/theme/kidflix_palette.dart';
 
 /// The "this device" half of the sheet: turn the server on, show the
@@ -72,16 +73,20 @@ class RemoteHostPanel extends ConsumerWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              TextButton.icon(
-                onPressed: () => _rename(context, ref, deviceName),
-                icon: const Icon(Icons.edit, size: 18),
-                label: const Text('Renommer'),
+              KidflixFocusZoom(
+                child: TextButton.icon(
+                  onPressed: () => _rename(context, ref, deviceName),
+                  icon: const Icon(Icons.edit, size: 18),
+                  label: const Text('Renommer'),
+                ),
               ),
               const Spacer(),
-              TextButton.icon(
-                onPressed: () => _forgetAll(context, ref),
-                icon: const Icon(Icons.link_off, size: 18),
-                label: const Text('Oublier les télécommandes'),
+              KidflixFocusZoom(
+                child: TextButton.icon(
+                  onPressed: () => _forgetAll(context, ref),
+                  icon: const Icon(Icons.link_off, size: 18),
+                  label: const Text('Oublier les télécommandes'),
+                ),
               ),
             ],
           ),
@@ -111,13 +116,17 @@ class RemoteHostPanel extends ConsumerWidget {
           onSubmitted: (value) => Navigator.of(dialogContext).pop(value),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Annuler'),
+          KidflixFocusZoom(
+            child: TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Annuler'),
+            ),
           ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(controller.text),
-            child: const Text('Enregistrer'),
+          KidflixFocusZoom(
+            child: FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+              child: const Text('Enregistrer'),
+            ),
           ),
         ],
       ),
@@ -203,16 +212,18 @@ class _AddressHint extends StatelessWidget {
             ).textTheme.bodySmall?.copyWith(color: KidflixPalette.grey100),
           ),
         ),
-        IconButton(
-          tooltip: 'Copier l’adresse',
-          icon: const Icon(Icons.copy, size: 18),
-          onPressed: () async {
-            await Clipboard.setData(ClipboardData(text: primary));
-            if (!context.mounted) return;
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text('Adresse copiée.')));
-          },
+        KidflixFocusZoom(
+          child: IconButton(
+            tooltip: 'Copier l’adresse',
+            icon: const Icon(Icons.copy, size: 18),
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: primary));
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Adresse copiée.')));
+            },
+          ),
         ),
       ],
     );

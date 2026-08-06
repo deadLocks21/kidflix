@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/core/application/usecases/verify_management_pin.usecase.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/widgets/pin_pad.widget.dart';
 
 /// PIN d'entrée du mode gestion : le code du profil principal. La saisie
@@ -57,11 +58,13 @@ class _ManagementPinPageState extends ConsumerState<ManagementPinPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Code principal'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => ref
-              .read(sessionControllerProvider.notifier)
-              .cancelManagementPinEntry(),
+        leading: KidflixFocusZoom(
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => ref
+                .read(sessionControllerProvider.notifier)
+                .cancelManagementPinEntry(),
+          ),
         ),
       ),
       body: SafeArea(
@@ -69,11 +72,13 @@ class _ManagementPinPageState extends ConsumerState<ManagementPinPage> {
           title: 'Saisis le code du profil principal\npour gérer les profils',
           onSubmit: _verify,
           footer: _biometricOffered
-              ? IconButton.filledTonal(
-                  onPressed: _promptBiometric,
-                  icon: const Icon(Icons.fingerprint),
-                  iconSize: 40,
-                  tooltip: 'Utiliser la biométrie',
+              ? KidflixFocusZoom(
+                  child: IconButton.filledTonal(
+                    onPressed: _promptBiometric,
+                    icon: const Icon(Icons.fingerprint),
+                    iconSize: 40,
+                    tooltip: 'Utiliser la biométrie',
+                  ),
                 )
               : null,
         ),

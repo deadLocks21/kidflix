@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/infrastructure/providers/remote_catalog.provider.dart';
 import 'package:kidflix/shared/duration_format.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/pages/remote/cast_playback.dart';
 import 'package:kidflix/ui/theme/kidflix_palette.dart';
 
@@ -95,26 +96,32 @@ class _Content extends ConsumerWidget {
           ).textTheme.bodyMedium?.copyWith(color: KidflixPalette.grey100),
         ),
         const SizedBox(height: 16),
-        FilledButton.icon(
-          icon: const Icon(Icons.cast_connected),
-          label: Text(
-            deviceName == null ? 'Lire' : 'Lire sur $deviceName',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          onPressed: () async {
-            final cast = await castIfRemoting(context, ref, mediaId: movie.id);
-            if (!context.mounted) return;
-            // Casting always applies here (the sheet only exists while
-            // driving a host), so close either way.
-            Navigator.of(context).pop();
-            if (!cast) {
-              // Connection dropped between opening the sheet and tapping.
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Appareil déconnecté.')),
+        KidflixFocusZoom(
+          child: FilledButton.icon(
+            icon: const Icon(Icons.cast_connected),
+            label: Text(
+              deviceName == null ? 'Lire' : 'Lire sur $deviceName',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            onPressed: () async {
+              final cast = await castIfRemoting(
+                context,
+                ref,
+                mediaId: movie.id,
               );
-            }
-          },
+              if (!context.mounted) return;
+              // Casting always applies here (the sheet only exists while
+              // driving a host), so close either way.
+              Navigator.of(context).pop();
+              if (!cast) {
+                // Connection dropped between opening the sheet and tapping.
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Appareil déconnecté.')),
+                );
+              }
+            },
+          ),
         ),
         const SizedBox(height: 20),
         Text(movie.synopsis, style: Theme.of(context).textTheme.bodyMedium),
@@ -151,7 +158,12 @@ class _ErrorState extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
-          OutlinedButton(onPressed: onRetry, child: const Text('Réessayer')),
+          KidflixFocusZoom(
+            child: OutlinedButton(
+              onPressed: onRetry,
+              child: const Text('Réessayer'),
+            ),
+          ),
         ],
       ),
     );

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:kidflix/core/application/usecases/change_main_profile_pin.usecase.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/pages/profile_management/widgets/pin_confirm_field.widget.dart';
 
 /// Changement du code du profil principal, double saisie obligatoire.
@@ -63,9 +64,11 @@ class _ChangeMainPinPageState extends ConsumerState<ChangeMainPinPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Changer le code principal'),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => context.pop(),
+        leading: KidflixFocusZoom(
+          child: IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () => context.pop(),
+          ),
         ),
       ),
       body: SafeArea(

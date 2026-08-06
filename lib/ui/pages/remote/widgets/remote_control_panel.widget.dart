@@ -5,6 +5,7 @@ import 'package:kidflix/core/domain/model/remote_playback_state.dart';
 import 'package:kidflix/core/domain/services/remote_control_client.service.dart';
 import 'package:kidflix/infrastructure/providers/remote_control.providers.dart';
 import 'package:kidflix/shared/duration_format.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/pages/remote/widgets/remote_download_status.widget.dart';
 import 'package:kidflix/ui/pages/remote/widgets/remote_profile_gate.widget.dart';
 import 'package:kidflix/ui/pages/remote/widgets/remote_track_sheet.dart';
@@ -192,9 +193,11 @@ class _Header extends ConsumerWidget {
             ],
           ),
         ),
-        TextButton(
-          onPressed: () => ref.read(remoteControlClientProvider).disconnect(),
-          child: const Text('Déconnecter'),
+        KidflixFocusZoom(
+          child: TextButton(
+            onPressed: () => ref.read(remoteControlClientProvider).disconnect(),
+            child: const Text('Déconnecter'),
+          ),
         ),
       ],
     );
@@ -338,41 +341,51 @@ class _TransportRow extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        IconButton(
-          tooltip: 'Épisode précédent',
-          iconSize: 28,
-          onPressed: playback.canGoPrevious ? onPrevious : null,
-          icon: const Icon(Icons.skip_previous),
+        KidflixFocusZoom(
+          child: IconButton(
+            tooltip: 'Épisode précédent',
+            iconSize: 28,
+            onPressed: playback.canGoPrevious ? onPrevious : null,
+            icon: const Icon(Icons.skip_previous),
+          ),
         ),
-        IconButton(
-          tooltip: 'Reculer de 10 s',
-          iconSize: 32,
-          onPressed: onBackward,
-          icon: const Icon(Icons.replay_10),
+        KidflixFocusZoom(
+          child: IconButton(
+            tooltip: 'Reculer de 10 s',
+            iconSize: 32,
+            onPressed: onBackward,
+            icon: const Icon(Icons.replay_10),
+          ),
         ),
-        IconButton.filled(
-          tooltip: playback.isPlaying ? 'Pause' : 'Lire',
-          iconSize: 40,
-          onPressed: preparing || stalled ? null : onTogglePlay,
-          icon: preparing
-              ? const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Icon(playback.isPlaying ? Icons.pause : Icons.play_arrow),
+        KidflixFocusZoom(
+          child: IconButton.filled(
+            tooltip: playback.isPlaying ? 'Pause' : 'Lire',
+            iconSize: 40,
+            onPressed: preparing || stalled ? null : onTogglePlay,
+            icon: preparing
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(playback.isPlaying ? Icons.pause : Icons.play_arrow),
+          ),
         ),
-        IconButton(
-          tooltip: 'Avancer de 30 s',
-          iconSize: 32,
-          onPressed: onForward,
-          icon: const Icon(Icons.forward_30),
+        KidflixFocusZoom(
+          child: IconButton(
+            tooltip: 'Avancer de 30 s',
+            iconSize: 32,
+            onPressed: onForward,
+            icon: const Icon(Icons.forward_30),
+          ),
         ),
-        IconButton(
-          tooltip: 'Épisode suivant',
-          iconSize: 28,
-          onPressed: playback.canGoNext ? onNext : null,
-          icon: const Icon(Icons.skip_next),
+        KidflixFocusZoom(
+          child: IconButton(
+            tooltip: 'Épisode suivant',
+            iconSize: 28,
+            onPressed: playback.canGoNext ? onNext : null,
+            icon: const Icon(Icons.skip_next),
+          ),
         ),
       ],
     );

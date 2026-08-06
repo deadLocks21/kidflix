@@ -5,6 +5,7 @@ import 'package:kidflix/core/domain/model/download_entry.dart';
 import 'package:kidflix/infrastructure/providers/cache_cleanup_preferences.provider.dart';
 import 'package:kidflix/infrastructure/providers/download.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/download_management.usecases_provider.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/pages/downloads/widgets/download_entry_tile.widget.dart';
 import 'package:kidflix/ui/pages/downloads/widgets/storage_summary_header.widget.dart';
 
@@ -99,16 +100,18 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Align(
                 alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: () => _confirmAndPurgeCache(
-                    context,
-                    cacheItems.length,
-                    totalCacheBytes,
-                  ),
-                  icon: const Icon(Icons.delete_sweep_outlined),
-                  label: const Text('Vider le cache'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: theme.colorScheme.error,
+                child: KidflixFocusZoom(
+                  child: TextButton.icon(
+                    onPressed: () => _confirmAndPurgeCache(
+                      context,
+                      cacheItems.length,
+                      totalCacheBytes,
+                    ),
+                    icon: const Icon(Icons.delete_sweep_outlined),
+                    label: const Text('Vider le cache'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: theme.colorScheme.error,
+                    ),
                   ),
                 ),
               ),
@@ -132,15 +135,19 @@ class _CacheSectionState extends ConsumerState<CacheSection> {
           'Vos vidéos téléchargées (épinglées) ne sont pas concernées.',
         ),
         actions: [
-          TextButton(
-            // Destructive dialog: the keyboard lands on the harmless option.
-            autofocus: true,
-            onPressed: () => Navigator.of(dCtx).pop(false),
-            child: const Text('Annuler'),
+          KidflixFocusZoom(
+            child: TextButton(
+              // Destructive dialog: the keyboard lands on the harmless option.
+              autofocus: true,
+              onPressed: () => Navigator.of(dCtx).pop(false),
+              child: const Text('Annuler'),
+            ),
           ),
-          TextButton(
-            onPressed: () => Navigator.of(dCtx).pop(true),
-            child: const Text('Vider'),
+          KidflixFocusZoom(
+            child: TextButton(
+              onPressed: () => Navigator.of(dCtx).pop(true),
+              child: const Text('Vider'),
+            ),
           ),
         ],
       ),

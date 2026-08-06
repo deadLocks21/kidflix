@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/infrastructure/providers/search.controller_provider.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 
 /// Move the focus out of the query field and into the results list.
 class _EnterResultsIntent extends Intent {
@@ -91,10 +92,12 @@ class _SearchAppBarState extends ConsumerState<SearchAppBar> {
     SearchUiController controller,
   ) {
     return AppBar(
-      leading: IconButton(
-        tooltip: 'Fermer la recherche',
-        icon: const Icon(Icons.close),
-        onPressed: controller.deactivate,
+      leading: KidflixFocusZoom(
+        child: IconButton(
+          tooltip: 'Fermer la recherche',
+          icon: const Icon(Icons.close),
+          onPressed: controller.deactivate,
+        ),
       ),
       title: TextField(
         controller: _controller,
@@ -109,10 +112,12 @@ class _SearchAppBarState extends ConsumerState<SearchAppBar> {
       ),
       actions: [
         if (state.rawQuery.isNotEmpty)
-          IconButton(
-            tooltip: 'Effacer',
-            icon: const Icon(Icons.clear),
-            onPressed: controller.clearQuery,
+          KidflixFocusZoom(
+            child: IconButton(
+              tooltip: 'Effacer',
+              icon: const Icon(Icons.clear),
+              onPressed: controller.clearQuery,
+            ),
           ),
       ],
     );

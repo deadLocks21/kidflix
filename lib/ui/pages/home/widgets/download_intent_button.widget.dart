@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/core/application/session_state.dart';
@@ -12,6 +11,7 @@ import 'package:kidflix/infrastructure/providers/download_management.usecases_pr
 import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/profile_pin.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/download_progress_button.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/unlock_pin_dialog.widget.dart';
 
@@ -126,15 +126,19 @@ class _DownloadIntentButtonState extends ConsumerState<DownloadIntentButton> {
         mediaId: widget.mediaId,
         isEpisode: widget.isEpisode,
       ),
-      _ButtonState.kept => OutlinedButton.icon(
-        icon: const Icon(Icons.check_circle_outline),
-        label: const Text('Téléchargé'),
-        onPressed: _busy ? null : () => _showDownloadedActions(context),
+      _ButtonState.kept => KidflixFocusZoom(
+        child: OutlinedButton.icon(
+          icon: const Icon(Icons.check_circle_outline),
+          label: const Text('Téléchargé'),
+          onPressed: _busy ? null : () => _showDownloadedActions(context),
+        ),
       ),
-      _ButtonState.cacheOrAbsent => OutlinedButton.icon(
-        icon: const Icon(Icons.file_download_outlined),
-        label: const Text('Télécharger'),
-        onPressed: _busy ? null : () => _onPromote(context),
+      _ButtonState.cacheOrAbsent => KidflixFocusZoom(
+        child: OutlinedButton.icon(
+          icon: const Icon(Icons.file_download_outlined),
+          label: const Text('Télécharger'),
+          onPressed: _busy ? null : () => _onPromote(context),
+        ),
       ),
     };
   }

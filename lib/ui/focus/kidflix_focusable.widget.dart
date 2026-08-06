@@ -43,15 +43,20 @@ class KidflixFocusable extends StatefulWidget {
     this.autofocus = false,
     this.focusNode,
     this.borderRadius = const BorderRadius.all(Radius.circular(8)),
-    this.scale = 1.06,
+    this.scale = defaultScale,
   });
 
   /// Extra room a host must reserve around an item of [extent] so the zoom
   /// is not clipped by a surrounding viewport.
-  static double slackFor(double extent, {double scale = 1.06}) =>
+  static double slackFor(double extent, {double scale = defaultScale}) =>
       extent * (scale - 1) / 2;
 
-  static const Duration _duration = Duration(milliseconds: 140);
+  /// Shared with [KidflixFocusZoom] so a focused poster and a focused
+  /// button grow by the same amount, at the same pace.
+  static const double defaultScale = 1.06;
+  static const Duration duration = Duration(milliseconds: 140);
+  static const Curve curve = Curves.easeOut;
+
   static const double _ringWidth = 3;
 
   @override
@@ -96,11 +101,11 @@ class _KidflixFocusableState extends State<KidflixFocusable> {
     final scheme = Theme.of(context).colorScheme;
     return AnimatedScale(
       scale: on ? widget.scale : 1,
-      duration: KidflixFocusable._duration,
-      curve: Curves.easeOut,
+      duration: KidflixFocusable.duration,
+      curve: KidflixFocusable.curve,
       child: AnimatedContainer(
-        duration: KidflixFocusable._duration,
-        curve: Curves.easeOut,
+        duration: KidflixFocusable.duration,
+        curve: KidflixFocusable.curve,
         // `decoration` would inset the child by the border width and make
         // the card twitch as focus arrives; `foregroundDecoration` paints
         // the ring over the poster edge and leaves layout alone.

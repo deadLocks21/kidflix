@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/core/application/session_state.dart';
@@ -9,6 +8,7 @@ import 'package:kidflix/infrastructure/providers/download_management.usecases_pr
 import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/profile_pin.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/unlock_pin_dialog.widget.dart';
 
 /// Header-level "Télécharger la saison" affordance. Single PIN gate
@@ -64,35 +64,39 @@ class _SeasonDownloadButtonState extends ConsumerState<SeasonDownloadButton> {
       final pctLabel = progress != null
           ? '${(progress * 100).round()} %'
           : _formatMo(received);
-      return TextButton(
-        onPressed: () => _cancel(),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.download, size: 18),
-            const SizedBox(width: 8),
-            Text('$_done / ${widget.episodeIds.length}'),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 60,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(2),
-                child: LinearProgressIndicator(value: progress, minHeight: 4),
+      return KidflixFocusZoom(
+        child: TextButton(
+          onPressed: () => _cancel(),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.download, size: 18),
+              const SizedBox(width: 8),
+              Text('$_done / ${widget.episodeIds.length}'),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 60,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: LinearProgressIndicator(value: progress, minHeight: 4),
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 44,
-              child: Text(pctLabel, textAlign: TextAlign.end),
-            ),
-          ],
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 44,
+                child: Text(pctLabel, textAlign: TextAlign.end),
+              ),
+            ],
+          ),
         ),
       );
     }
-    return IconButton(
-      icon: const Icon(Icons.file_download_outlined),
-      tooltip: 'Télécharger la saison',
-      onPressed: _busy ? null : () => _start(context),
+    return KidflixFocusZoom(
+      child: IconButton(
+        icon: const Icon(Icons.file_download_outlined),
+        tooltip: 'Télécharger la saison',
+        onPressed: _busy ? null : () => _start(context),
+      ),
     );
   }
 
