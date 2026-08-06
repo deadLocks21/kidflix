@@ -51,6 +51,39 @@ class CatalogFocusScope extends StatefulWidget {
 class _CatalogFocusScopeState extends State<CatalogFocusScope> {
   final CatalogFocusCoordinator _coordinator = CatalogFocusCoordinator();
 
+  /// The framework's own policy, with one veto bolted on: it still picks
+  /// where a move lands, we only refuse the landings that would drop
+  /// sideways out of the app bar and into the grid.
+  late final FocusTraversalPolicy _policy = ReadingOrderTraversalPolicy(
+    requestFocusCallback: _requestFocus,
+  );
+
+  void _requestFocus(
+    FocusNode node, {
+    ScrollPositionAlignmentPolicy? alignmentPolicy,
+    double? alignment,
+    Duration? duration,
+    Curve? curve,
+  }) {
+    if (_coordinator._refusesEntry(node)) {
+      // The policy records the move in its direction history *before*
+      // asking us where to land. Left behind, that entry makes the next
+      // press in the opposite direction spend itself undoing a move that
+      // never happened — bump the left end of the bar, and the first
+      // press back to the right does nothing at all.
+      final scope = FocusManager.instance.primaryFocus?.nearestScope;
+      if (scope != null) _policy.invalidateScopeData(scope);
+      return;
+    }
+    FocusTraversalPolicy.defaultTraversalRequestFocusCallback(
+      node,
+      alignmentPolicy: alignmentPolicy,
+      alignment: alignment,
+      duration: duration,
+      curve: curve,
+    );
+  }
+
   @override
   void didUpdateWidget(CatalogFocusScope oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -66,11 +99,14 @@ class _CatalogFocusScopeState extends State<CatalogFocusScope> {
   Widget build(BuildContext context) {
     return _CatalogFocusMarker(
       coordinator: _coordinator,
-      child: Actions(
-        actions: <Type, Action<Intent>>{
-          DirectionalFocusIntent: _CatalogDirectionalFocusAction(this),
-        },
-        child: widget.child,
+      child: FocusTraversalGroup(
+        policy: _policy,
+        child: Actions(
+          actions: <Type, Action<Intent>>{
+            DirectionalFocusIntent: _CatalogDirectionalFocusAction(this),
+          },
+          child: widget.child,
+        ),
       ),
     );
   }
@@ -97,13 +133,33 @@ class _CatalogDirectionalFocusAction extends DirectionalFocusAction {
     // root, so the "first press only reveals the ring" rule has to be
     // honoured here too.
     if (KeyboardModeScope.revealOnly(_scope.context)) return;
+    final coordinator = _scope._coordinator;
     // While search mode owns the screen the grid is hidden behind an
     // [ExcludeFocus] ; letting the coordinator answer would drag focus
     // into posters the user cannot see.
-    if (_scope.widget.enabled && _scope._coordinator._move(intent.direction)) {
+    if (_scope.widget.enabled && coordinator._move(intent.direction)) return;
+
+    final sideways =
+        intent.direction == TraversalDirection.left ||
+        intent.direction == TraversalDirection.right;
+    final outsideGrid = coordinator._isOutsideGrid(
+      FocusManager.instance.primaryFocus,
+    );
+    if (!_scope.widget.enabled || !sideways || !outsideGrid) {
+      super.invoke(intent);
       return;
     }
-    super.invoke(intent);
+    // Sideways from the app bar. The framework still decides where to go —
+    // that is how the search, cast and profile buttons reach each other —
+    // but at either end of the bar its nearest candidate is a poster,
+    // several rows down and off to one side. Refusing that landing leaves
+    // the bar closed at both ends, so the way back to the films is down.
+    coordinator._sidewaysFromOutside = true;
+    try {
+      super.invoke(intent);
+    } finally {
+      coordinator._sidewaysFromOutside = false;
+    }
   }
 }
 
@@ -120,6 +176,16 @@ class CatalogFocusCoordinator {
 
   /// Where the keyboard left off, for [_restoreFocus].
   FocusNode? _lastFocused;
+
+  /// Raised for the duration of a sideways move that started outside the
+  /// grid, so [_refusesEntry] can turn the grid's posters down.
+  bool _sidewaysFromOutside = false;
+
+  bool _isOutsideGrid(FocusNode? node) =>
+      node == null || !_slots.containsKey(node);
+
+  bool _refusesEntry(FocusNode node) =>
+      _sidewaysFromOutside && _slots.containsKey(node);
 
   void _attachRow(int index, _RowSlot slot) => _rows[index] = slot;
 

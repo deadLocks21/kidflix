@@ -24,6 +24,8 @@ CatalogRowDto _row(String label, int count) => CatalogRowDto(
   ],
 );
 
+final _appBarSearch = FocusNode(debugLabel: 'appbar:recherche');
+final _appBarCast = FocusNode(debugLabel: 'appbar:telecommande');
 final _appBarAction = FocusNode(debugLabel: 'appbar:profil');
 
 /// Mirrors the home page: the scope sits *above* the [Scaffold] so it
@@ -44,6 +46,16 @@ Widget _harness(
           ? AppBar(
               title: const Text('Kidflix'),
               actions: [
+                IconButton(
+                  focusNode: _appBarSearch,
+                  icon: const Icon(Icons.search),
+                  onPressed: () {},
+                ),
+                IconButton(
+                  focusNode: _appBarCast,
+                  icon: const Icon(Icons.cast),
+                  onPressed: () {},
+                ),
                 IconButton(
                   focusNode: _appBarAction,
                   icon: const Icon(Icons.person),
@@ -282,6 +294,74 @@ void main() {
       await _press(tester, LogicalKeyboardKey.arrowDown);
 
       expect(_focused(), 'catalog(0, 3)');
+    });
+
+    testWidgets('the app bar is closed at both ends — sideways never drops '
+        'into the grid', (tester) async {
+      await tester.pumpWidget(
+        _harness([_row('A', 3), _row('B', 12)], withAppBar: true),
+      );
+      await tester.pumpAndSettle();
+      await _enterKeyboardMode(tester);
+
+      _appBarSearch.requestFocus();
+      await tester.pumpAndSettle();
+      await _press(tester, LogicalKeyboardKey.arrowLeft, times: 2);
+      expect(
+        _focused(),
+        'appbar:recherche',
+        reason:
+            'nothing sits left of the first action, so the key is spent '
+            'there rather than falling to the end of a row',
+      );
+
+      _appBarAction.requestFocus();
+      await tester.pumpAndSettle();
+      await _press(tester, LogicalKeyboardKey.arrowRight, times: 2);
+      expect(_focused(), 'appbar:profil');
+    });
+
+    testWidgets('bumping one end of the app bar does not cost the next '
+        'press in the other direction', (tester) async {
+      await tester.pumpWidget(
+        _harness([_row('A', 3), _row('B', 12)], withAppBar: true),
+      );
+      await tester.pumpAndSettle();
+      await _enterKeyboardMode(tester);
+
+      _appBarSearch.requestFocus();
+      await tester.pumpAndSettle();
+      await _press(tester, LogicalKeyboardKey.arrowLeft);
+      expect(_focused(), 'appbar:recherche');
+
+      await _press(tester, LogicalKeyboardKey.arrowRight);
+      expect(
+        _focused(),
+        'appbar:telecommande',
+        reason:
+            'a refused landing must not linger in the policy history, '
+            'or turning back would first undo a move that never happened',
+      );
+    });
+
+    testWidgets('the app bar actions still reach each other sideways', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _harness([_row('A', 3), _row('B', 12)], withAppBar: true),
+      );
+      await tester.pumpAndSettle();
+      await _enterKeyboardMode(tester);
+
+      _appBarSearch.requestFocus();
+      await tester.pumpAndSettle();
+
+      await _press(tester, LogicalKeyboardKey.arrowRight);
+      expect(_focused(), 'appbar:telecommande');
+      await _press(tester, LogicalKeyboardKey.arrowRight);
+      expect(_focused(), 'appbar:profil');
+      await _press(tester, LogicalKeyboardKey.arrowLeft);
+      expect(_focused(), 'appbar:telecommande');
     });
 
     testWidgets('the start of a row holds focus too', (tester) async {
