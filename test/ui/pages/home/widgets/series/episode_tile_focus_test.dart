@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/ui/focus/keyboard_mode.dart';
+import 'package:kidflix/ui/pages/home/widgets/download_progress_button.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/series_detail_modal.widget.dart';
 import 'package:kidflix/ui/theme/app_theme_data.dart';
 
@@ -150,6 +151,60 @@ void main() {
 
       await _press(tester, LogicalKeyboardKey.arrowLeft);
       expect(_holdsFocus(tester, _play(0)), isTrue);
+    });
+
+    testWidgets('right of Télécharger stays put instead of escaping to the '
+        'close button', (tester) async {
+      await tester.pumpWidget(_harness());
+      await _settle(tester);
+      await _tabUntil(tester, _play(0));
+      await _press(tester, LogicalKeyboardKey.arrowRight);
+      expect(_holdsFocus(tester, _download(0)), isTrue);
+
+      await _press(tester, LogicalKeyboardKey.arrowRight);
+
+      expect(
+        _holdsFocus(tester, _download(0)),
+        isTrue,
+        reason:
+            'the sheet close button sticks out further right and is '
+            'scrolled off the top by then — landing there reads as losing '
+            'the focus altogether',
+      );
+    });
+
+    testWidgets('the download button keeps one width across its states', (
+      tester,
+    ) async {
+      await tester.pumpWidget(_harness());
+      await _settle(tester);
+      final idle = tester.getSize(_download(0)).width;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            theme: AppThemeData.buildDarkTheme(),
+            home: const Scaffold(
+              body: Center(
+                child: DownloadProgressButton(
+                  bytesReceived: 5 * 1024 * 1024,
+                  bytesTotal: 20 * 1024 * 1024,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await _settle(tester);
+      final inFlight = tester.getSize(find.byType(OutlinedButton)).width;
+
+      expect(
+        inFlight,
+        idle,
+        reason:
+            'a button that resizes as a download starts shoves its '
+            'neighbour sideways mid-row',
+      );
     });
 
     testWidgets('down stays in the same column of buttons', (tester) async {

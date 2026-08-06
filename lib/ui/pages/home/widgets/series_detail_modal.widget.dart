@@ -14,6 +14,7 @@ import 'package:kidflix/infrastructure/providers/session.controller_provider.dar
 import 'package:kidflix/infrastructure/providers/watch_progress.repository_provider.dart';
 import 'package:kidflix/shared/duration_format.dart';
 import 'package:kidflix/shared/tmdb_image.dart';
+import 'package:kidflix/ui/focus/horizontal_focus_fence.widget.dart';
 import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 import 'package:kidflix/ui/theme/button_styles.dart';
 import 'package:kidflix/ui/pages/home/widgets/download_intent_button.widget.dart';
@@ -645,33 +646,38 @@ class _EpisodeTileState extends ConsumerState<_EpisodeTile> {
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            KidflixFocusZoom(
-              child: FilledButton.icon(
-                style: KidflixButtonStyles.primarySmall,
-                icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                label: const Text('Lire'),
-                onPressed: _play,
+        // Fenced: sideways stays between these two buttons. Without it,
+        // right of "Télécharger" is the modal's close button, which by
+        // then is scrolled off the top of the sheet.
+        trailing: HorizontalFocusFence(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              KidflixFocusZoom(
+                child: FilledButton.icon(
+                  style: KidflixButtonStyles.primarySmall,
+                  icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                  label: const Text('Lire'),
+                  onPressed: _play,
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            DownloadIntentButton(
-              mediaId: episode.id,
-              isEpisode: true,
-              title: '$_epRef · ${episode.title}',
-              posterUrl: episode.thumbUrl,
-              parentSeriesTitle: widget.parentSeriesTitle,
-              originalTitle: episode.originalTitle,
-              durationSeconds: episode.duration.inSeconds,
-              ageCategory: episode.ageCategory.name,
-              synopsis: episode.synopsis,
-              seriesId: episode.seriesId,
-              seasonNumber: episode.seasonNumber,
-              episodeNumber: episode.episodeNumber,
-            ),
-          ],
+              const SizedBox(width: 8),
+              DownloadIntentButton(
+                mediaId: episode.id,
+                isEpisode: true,
+                title: '$_epRef · ${episode.title}',
+                posterUrl: episode.thumbUrl,
+                parentSeriesTitle: widget.parentSeriesTitle,
+                originalTitle: episode.originalTitle,
+                durationSeconds: episode.duration.inSeconds,
+                ageCategory: episode.ageCategory.name,
+                synopsis: episode.synopsis,
+                seriesId: episode.seriesId,
+                seasonNumber: episode.seasonNumber,
+                episodeNumber: episode.episodeNumber,
+              ),
+            ],
+          ),
         ),
       ),
     );

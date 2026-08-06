@@ -129,19 +129,27 @@ class _DownloadIntentButtonState extends ConsumerState<DownloadIntentButton> {
       _ButtonState.kept => KidflixFocusZoom(
         child: OutlinedButton.icon(
           icon: const Icon(Icons.check_circle_outline),
-          label: const Text('Téléchargé'),
+          label: _label('Téléchargé'),
           onPressed: _busy ? null : () => _showDownloadedActions(context),
         ),
       ),
       _ButtonState.cacheOrAbsent => KidflixFocusZoom(
         child: OutlinedButton.icon(
           icon: const Icon(Icons.file_download_outlined),
-          label: const Text('Télécharger'),
+          label: _label('Télécharger'),
           onPressed: _busy ? null : () => _onPromote(context),
         ),
       ),
     };
   }
+
+  /// Pins the label to the width the in-flight state occupies, so the
+  /// three states are interchangeable without the button resizing under
+  /// the pointer.
+  Widget _label(String text) => SizedBox(
+    width: DownloadProgressButton.contentWidth,
+    child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis),
+  );
 
   Future<_ButtonState> _resolveState() async {
     final repo = ref.read(downloadRepositoryProvider);

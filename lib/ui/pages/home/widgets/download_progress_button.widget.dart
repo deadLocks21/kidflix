@@ -13,6 +13,19 @@ import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
 /// the leading icon to a close glyph — tapping cancels the in-flight
 /// download.
 class DownloadProgressButton extends StatelessWidget {
+  /// Width of everything to the right of the icon.
+  ///
+  /// The other two download states adopt it for their label, so the
+  /// button keeps one width from "Télécharger" through the progress bar
+  /// to "Téléchargé". It used to resize under the pointer at each
+  /// transition, which on an episode row shoved the neighbouring button
+  /// sideways.
+  static const double contentWidth = _barWidth + _gap + _readoutWidth;
+
+  static const double _barWidth = 80;
+  static const double _gap = 8;
+  static const double _readoutWidth = 56;
+
   final int bytesReceived;
   final int? bytesTotal;
   final VoidCallback? onCancel;
@@ -41,9 +54,9 @@ class DownloadProgressButton extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(cancellable ? Icons.close : Icons.download, size: 18),
-            const SizedBox(width: 8),
+            const SizedBox(width: _gap),
             SizedBox(
-              width: 80,
+              width: _barWidth,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(2),
                 child: LinearProgressIndicator(
@@ -53,8 +66,11 @@ class DownloadProgressButton extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            SizedBox(width: 56, child: Text(label, textAlign: TextAlign.end)),
+            const SizedBox(width: _gap),
+            SizedBox(
+              width: _readoutWidth,
+              child: Text(label, textAlign: TextAlign.end),
+            ),
           ],
         ),
       ),
