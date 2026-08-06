@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kidflix/ui/focus/keyboard_mode.dart';
+import 'package:kidflix/ui/focus/kidflix_focusable.widget.dart';
 
 /// Gives every Material button and tile a focus state you can actually see,
 /// while the user is on the keyboard.
@@ -29,10 +30,6 @@ class KeyboardFocusTheme extends StatelessWidget {
 
   const KeyboardFocusTheme({super.key, required this.child});
 
-  /// Thinner than the posters' ring: the same 3 dp around a 40 dp icon button
-  /// reads as a border, not as a highlight.
-  static const double ringWidth = 2;
-
   @override
   Widget build(BuildContext context) {
     final mode = KeyboardModeScope.maybeOf(context);
@@ -48,9 +45,11 @@ class KeyboardFocusTheme extends StatelessWidget {
 }
 
 ThemeData _focusVisibleTheme(ThemeData base) {
-  final ring = base.colorScheme.primary;
+  final ring = KidflixFocusable.ringColor(base.colorScheme);
   return base.copyWith(
-    focusColor: ring.withValues(alpha: 0.3),
+    // Tiles get a wash rather than a ring — Material has no ring for a
+    // [ListTile] — but the same tone, so the two read as one system.
+    focusColor: ring.withValues(alpha: 0.24),
     iconButtonTheme: IconButtonThemeData(
       style: _withFocusRing(base.iconButtonTheme.style, ring),
     ),
@@ -74,7 +73,7 @@ ButtonStyle _withFocusRing(ButtonStyle? base, Color color) {
   return (base ?? const ButtonStyle()).copyWith(
     side: WidgetStateProperty.resolveWith<BorderSide?>((states) {
       if (states.contains(WidgetState.focused)) {
-        return BorderSide(color: color, width: KeyboardFocusTheme.ringWidth);
+        return BorderSide(color: color, width: KidflixFocusable.ringWidth);
       }
       return original?.resolve(states);
     }),

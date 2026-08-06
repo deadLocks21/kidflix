@@ -57,7 +57,16 @@ class KidflixFocusable extends StatefulWidget {
   static const Duration duration = Duration(milliseconds: 140);
   static const Curve curve = Curves.easeOut;
 
-  static const double _ringWidth = 3;
+  /// One ring for the whole app, buttons included — see
+  /// [KeyboardFocusTheme], which reads these two.
+  ///
+  /// White rather than the brand red: the red *is* the fill of every
+  /// primary button, so a red ring on one was red on red — present,
+  /// perfectly invisible. White is the only tone that holds against the
+  /// black surface, the red buttons and an arbitrary film poster alike.
+  static const double ringWidth = 3;
+
+  static Color ringColor(ColorScheme scheme) => scheme.onSurface;
 
   @override
   State<KidflixFocusable> createState() => _KidflixFocusableState();
@@ -124,8 +133,8 @@ class _KidflixFocusableState extends State<KidflixFocusable> {
         foregroundDecoration: BoxDecoration(
           borderRadius: widget.borderRadius,
           border: Border.all(
-            color: on ? scheme.primary : Colors.transparent,
-            width: KidflixFocusable._ringWidth,
+            color: on ? KidflixFocusable.ringColor(scheme) : Colors.transparent,
+            width: KidflixFocusable.ringWidth,
           ),
         ),
         child: child,

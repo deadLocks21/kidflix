@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kidflix/ui/focus/keyboard_focus_theme.dart';
 import 'package:kidflix/ui/focus/keyboard_mode.dart';
+import 'package:kidflix/ui/focus/kidflix_focusable.widget.dart';
 import 'package:kidflix/ui/theme/app_theme_data.dart';
 
 late ThemeData _ambientTheme;
@@ -53,10 +54,41 @@ BorderSide? _paintedSide(WidgetTester tester) {
   return shape is OutlinedBorder ? shape.side : null;
 }
 
+/// The fill the button paints under that side.
+Color? _paintedFill(WidgetTester tester) {
+  final material = tester.widget<Material>(
+    find
+        .descendant(
+          of: find.byType(IconButton),
+          matching: find.byType(Material),
+        )
+        .first,
+  );
+  return material.color;
+}
+
 bool _ringPainted(WidgetTester tester) {
   final side = _paintedSide(tester);
   return side != null && side.style == BorderStyle.solid && side.width > 0;
 }
+
+/// An app bar action is flat ; the filled variant is the one whose fill
+/// used to match the ring exactly.
+Widget _filledHarness() => MaterialApp(
+  theme: AppThemeData.buildDarkTheme(),
+  builder: (context, child) => KeyboardModeScope(
+    child: KeyboardFocusTheme(child: child ?? const SizedBox.shrink()),
+  ),
+  home: Scaffold(
+    body: Center(
+      child: IconButton.filled(
+        autofocus: true,
+        icon: const Icon(Icons.play_arrow_rounded),
+        onPressed: () {},
+      ),
+    ),
+  ),
+);
 
 void main() {
   group('KeyboardFocusTheme', () {
@@ -74,10 +106,18 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
       await tester.pumpAndSettle();
 
+      final scheme = AppThemeData.buildDarkTheme().colorScheme;
       final side = _paintedSide(tester);
       expect(side, isNotNull);
-      expect(side!.color, AppThemeData.buildDarkTheme().colorScheme.primary);
-      expect(side.width, KeyboardFocusTheme.ringWidth);
+      expect(side!.color, KidflixFocusable.ringColor(scheme));
+      expect(side.width, KidflixFocusable.ringWidth);
+      expect(
+        side.color,
+        isNot(scheme.primary),
+        reason:
+            'the brand red is the fill of every primary button — a red '
+            'ring on one is red on red',
+      );
     });
 
     testWidgets('the focus wash for tiles becomes visible on the black '
@@ -94,7 +134,31 @@ void main() {
       expect(_ambientTheme.focusColor.a, greaterThan(beforeAlpha));
       expect(
         _ambientTheme.focusColor.withValues(alpha: 1),
-        AppThemeData.buildDarkTheme().colorScheme.primary,
+        KidflixFocusable.ringColor(AppThemeData.buildDarkTheme().colorScheme),
+      );
+    });
+
+    testWidgets('the ring contrasts with the fill it is drawn on', (
+      tester,
+    ) async {
+      // The regression this guards: the ring was `colorScheme.primary`,
+      // which is also the fill of every primary button. Present, and
+      // perfectly invisible.
+      await tester.pumpWidget(_filledHarness());
+      await tester.pumpAndSettle();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+      await tester.pumpAndSettle();
+
+      final side = _paintedSide(tester);
+      final fill = _paintedFill(tester);
+      expect(side, isNotNull);
+      expect(fill, isNotNull);
+      final contrast =
+          (side!.color.computeLuminance() - fill!.computeLuminance()).abs();
+      expect(
+        contrast,
+        greaterThan(0.3),
+        reason: 'ring ${side.color} on fill $fill is not a focus indicator',
       );
     });
 
