@@ -26,6 +26,14 @@ import 'package:kidflix/ui/pages/remote/cast_playback.dart';
 
 const double _adaptiveBreakpointDp = 600;
 
+/// Room between the series play button and "Aléatoire".
+///
+/// Wide enough to swallow the play button's focus zoom: at 6 % of a
+/// button that stretches to fill the row, that is a good dozen points on
+/// each side, and a 12 pt gap had it painting over its neighbour. Guarded
+/// by a test, since the number only makes sense next to the scale.
+const double _playRowGap = 28;
+
 /// Opens the series detail modal for [series], choosing adaptive
 /// presentation:
 ///
@@ -335,34 +343,41 @@ class _PlayButton extends ConsumerWidget {
     return Row(
       children: [
         Expanded(
-          child: FilledButton.icon(
-            // Entry point for the keyboard, as in the movie modal.
-            autofocus: true,
-            icon: Icon(
-              castTargetName(ref) == null
-                  ? Icons.play_arrow_rounded
-                  : Icons.cast_connected,
+          // Stretched, and zoomed all the same: [_playRowGap] is sized so
+          // the growth lands in the gap rather than over its neighbour.
+          // That is the whole rule for a wide button — the form submit
+          // buttons keep the ring alone because a stretch column leaves
+          // them nothing to grow into.
+          child: KidflixFocusZoom(
+            child: FilledButton.icon(
+              // Entry point for the keyboard, as in the movie modal.
+              autofocus: true,
+              icon: Icon(
+                castTargetName(ref) == null
+                    ? Icons.play_arrow_rounded
+                    : Icons.cast_connected,
+              ),
+              label: Text(label.label),
+              onPressed: () async {
+                final cast = await castIfRemoting(
+                  context,
+                  ref,
+                  mediaId: label.target.id,
+                  isEpisode: true,
+                  seriesId: series.id,
+                );
+                if (!context.mounted) return;
+                Navigator.of(context).pop();
+                if (cast) return;
+                context.go(
+                  '/player/episode/${label.target.id}?series=${series.id}',
+                );
+              },
             ),
-            label: Text(label.label),
-            onPressed: () async {
-              final cast = await castIfRemoting(
-                context,
-                ref,
-                mediaId: label.target.id,
-                isEpisode: true,
-                seriesId: series.id,
-              );
-              if (!context.mounted) return;
-              Navigator.of(context).pop();
-              if (cast) return;
-              context.go(
-                '/player/episode/${label.target.id}?series=${series.id}',
-              );
-            },
           ),
         ),
         if (shufflePick != null) ...[
-          const SizedBox(width: 12),
+          const SizedBox(width: _playRowGap),
           KidflixFocusZoom(
             child: OutlinedButton.icon(
               icon: const Icon(Icons.shuffle_rounded),

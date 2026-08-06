@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kidflix/core/domain/model/media.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/ui/focus/keyboard_mode.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
+import 'package:kidflix/ui/focus/kidflix_focusable.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/download_progress_button.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/series_detail_modal.widget.dart';
 import 'package:kidflix/ui/theme/app_theme_data.dart';
@@ -46,8 +48,18 @@ Widget _harness({int episodes = 2}) => ProviderScope(
     theme: AppThemeData.buildDarkTheme(),
     builder: (context, child) =>
         KeyboardModeScope(child: child ?? const SizedBox.shrink()),
+    // Same envelope as the real dialog. It matters: the play button
+    // stretches, so its focus zoom grows with whatever width it is given,
+    // and the gap it grows into is fixed.
     home: Scaffold(
-      body: SeriesDetailContent(catalogSeries: _series(episodes: episodes)),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720, maxHeight: 720),
+          child: SeriesDetailContent(
+            catalogSeries: _series(episodes: episodes),
+          ),
+        ),
+      ),
     ),
   ),
 );
@@ -113,6 +125,37 @@ Future<void> _tabUntil(WidgetTester tester, Finder button) async {
 
 void main() {
   group('episode row focus', () {
+    testWidgets('the series play button zooms without painting over '
+        'Aléatoire', (tester) async {
+      tester.view.physicalSize = const Size(1440, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(_harness());
+      await _settle(tester);
+
+      final play = find.widgetWithText(FilledButton, 'Lire S1E1');
+      final shuffle = find.widgetWithText(OutlinedButton, 'Aléatoire');
+      expect(play, findsOneWidget);
+      expect(
+        find.ancestor(of: play, matching: find.byType(KidflixFocusZoom)),
+        findsWidgets,
+        reason: 'a stretched button still zooms when it has room to',
+      );
+
+      final playRect = tester.getRect(play);
+      final gap = tester.getRect(shuffle).left - playRect.right;
+      final overflow = playRect.width * (KidflixFocusable.defaultScale - 1) / 2;
+
+      expect(
+        overflow,
+        lessThanOrEqualTo(gap),
+        reason:
+            'the zoom grows $overflow pt each side into a $gap pt gap — '
+            'raise the gap or lower the scale, the two only make sense '
+            'together',
+      );
+    });
+
     testWidgets('right reaches the season download button, no Tab needed', (
       tester,
     ) async {
