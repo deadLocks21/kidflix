@@ -7,6 +7,7 @@ import 'package:kidflix/core/application/services/logger_application.service.dar
 import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/ui/focus/escape_to_pop.dart';
+import 'package:kidflix/ui/focus/keyboard_focus_theme.dart';
 import 'package:kidflix/ui/focus/keyboard_mode.dart';
 import 'package:kidflix/ui/router/app_router.dart';
 import 'package:kidflix/ui/theme/app_theme_data.dart';
@@ -141,7 +142,9 @@ class KidflixApp extends ConsumerWidget {
         // shadow the framework defaults — and above every route, so a
         // page never has to install them itself.
         builder: (context, child) => KeyboardModeScope(
-          child: EscapeToPop(child: child ?? const SizedBox.shrink()),
+          child: KeyboardFocusTheme(
+            child: EscapeToPop(child: child ?? const SizedBox.shrink()),
+          ),
         ),
       ),
       loading: () => MaterialApp(
