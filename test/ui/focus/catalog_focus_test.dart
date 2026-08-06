@@ -24,17 +24,36 @@ CatalogRowDto _row(String label, int count) => CatalogRowDto(
   ],
 );
 
-/// Mirrors the home page's own list: same scope, same cache extent, same
-/// row widget. Only the data source is faked.
-Widget _harness(List<CatalogRowDto> rows, {bool enabled = true}) => MaterialApp(
+final _appBarAction = FocusNode(debugLabel: 'appbar:profil');
+
+/// Mirrors the home page: the scope sits *above* the [Scaffold] so it
+/// covers the app bar, and only the body is excluded while searching.
+/// Same cache extent and same row widget too — only the data is faked.
+Widget _harness(
+  List<CatalogRowDto> rows, {
+  bool enabled = true,
+  bool withAppBar = false,
+}) => MaterialApp(
   theme: AppThemeData.buildDarkTheme(),
   builder: (context, child) =>
       KeyboardModeScope(child: child ?? const SizedBox.shrink()),
-  home: Scaffold(
-    body: ExcludeFocus(
-      excluding: !enabled,
-      child: CatalogFocusScope(
-        enabled: enabled,
+  home: CatalogFocusScope(
+    enabled: enabled,
+    child: Scaffold(
+      appBar: withAppBar
+          ? AppBar(
+              title: const Text('Kidflix'),
+              actions: [
+                IconButton(
+                  focusNode: _appBarAction,
+                  icon: const Icon(Icons.person),
+                  onPressed: () {},
+                ),
+              ],
+            )
+          : null,
+      body: ExcludeFocus(
+        excluding: !enabled,
         child: CustomScrollView(
           cacheExtent: 400,
           slivers: [
@@ -218,6 +237,51 @@ void main() {
             'past the last poster of a row the key is absorbed — focus '
             'must not walk sideways into another row',
       );
+    });
+
+    testWidgets('coming down from the app bar lands in the catalog, not in '
+        'whatever row happens to sit under the button', (tester) async {
+      // A first row that stops well short of the right edge is what makes
+      // the framework's own guess go wrong: nothing of row 0 sits under
+      // the app bar action, so it reaches for the nearest poster in the
+      // row below.
+      await tester.pumpWidget(
+        _harness([_row('A', 3), _row('B', 12)], withAppBar: true),
+      );
+      await tester.pumpAndSettle();
+      await _enterKeyboardMode(tester);
+      expect(_focused(), 'catalog(0, 0)');
+
+      _appBarAction.requestFocus();
+      await tester.pumpAndSettle();
+      expect(_focused(), 'appbar:profil');
+
+      await _press(tester, LogicalKeyboardKey.arrowDown);
+
+      expect(
+        _focused(),
+        'catalog(0, 0)',
+        reason:
+            'going back down must return where the catalog was left, '
+            'not to the far end of the second row',
+      );
+    });
+
+    testWidgets('coming down from the app bar returns to the poster the '
+        'keyboard left', (tester) async {
+      await tester.pumpWidget(
+        _harness([_row('A', 8), _row('B', 8)], withAppBar: true),
+      );
+      await tester.pumpAndSettle();
+      await _enterKeyboardMode(tester);
+      await _press(tester, LogicalKeyboardKey.arrowRight, times: 3);
+      expect(_focused(), 'catalog(0, 3)');
+
+      _appBarAction.requestFocus();
+      await tester.pumpAndSettle();
+      await _press(tester, LogicalKeyboardKey.arrowDown);
+
+      expect(_focused(), 'catalog(0, 3)');
     });
 
     testWidgets('the start of a row holds focus too', (tester) async {

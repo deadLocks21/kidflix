@@ -97,7 +97,12 @@ class _CatalogDirectionalFocusAction extends DirectionalFocusAction {
     // root, so the "first press only reveals the ring" rule has to be
     // honoured here too.
     if (KeyboardModeScope.revealOnly(_scope.context)) return;
-    if (_scope._coordinator._move(intent.direction)) return;
+    // While search mode owns the screen the grid is hidden behind an
+    // [ExcludeFocus] ; letting the coordinator answer would drag focus
+    // into posters the user cannot see.
+    if (_scope.widget.enabled && _scope._coordinator._move(intent.direction)) {
+      return;
+    }
     super.invoke(intent);
   }
 }
@@ -151,7 +156,15 @@ class CatalogFocusCoordinator {
   /// the framework's traversal.
   bool _move(TraversalDirection direction) {
     final origin = _slots[FocusManager.instance.primaryFocus];
-    if (origin == null) return false;
+    if (origin == null) {
+      // Focus is outside the grid — in practice the app bar, the only
+      // thing sitting above it. Coming back down has to be answered here
+      // rather than left to geometry: the framework looks for whatever is
+      // directly below the button, finds nothing under a first row that
+      // stops short of the screen edge, and settles for the nearest
+      // poster in the row *below* it.
+      return direction == TraversalDirection.down && _restoreFocus();
+    }
     return switch (direction) {
       TraversalDirection.left => _step(origin, -1),
       TraversalDirection.right => _step(origin, 1),
@@ -219,19 +232,28 @@ class CatalogFocusCoordinator {
 
   /// Puts focus back on the poster the keyboard last used, or on the first
   /// one still built if that poster has since been recycled away.
-  void _restoreFocus() {
+  ///
+  /// Serves both ways back into the grid — returning from search, and
+  /// coming down from the app bar — so the two behave alike: you land
+  /// where you left off, which for someone who went straight up from the
+  /// very first poster is that same first poster.
+  ///
+  /// Returns `false` when the grid holds nothing to focus yet (skeleton,
+  /// empty or failed catalog), leaving the key to the caller.
+  bool _restoreFocus() {
     final remembered = _lastFocused;
     if (remembered != null && remembered.canRequestFocus) {
-      remembered.requestFocus();
-      return;
+      _focus(remembered, forward: true);
+      return true;
     }
     final rows = _rows.keys.toList()..sort();
     for (final row in rows) {
       final columns = _rows[row]!.nodes.keys.toList()..sort();
       if (columns.isEmpty) continue;
       _focus(_rows[row]!.nodes[columns.first]!, forward: false);
-      return;
+      return true;
     }
+    return false;
   }
 
   void _focus(FocusNode node, {required bool forward}) {

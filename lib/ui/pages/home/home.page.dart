@@ -54,13 +54,22 @@ class HomePage extends ConsumerWidget {
     return _SearchShortcuts(
       isSearching: isSearching,
       controller: ref.read(searchUiControllerProvider.notifier),
-      child: _buildScaffold(
-        context,
-        ref,
-        drivingHost: drivingHost,
-        isSearching: isSearching,
-        online: online,
-        rows: rows,
+      // Above the [Scaffold], not just around the rows: the coordinator
+      // answers the arrow keys, and it has to be reachable from the app
+      // bar too. Otherwise coming back down from the search or profile
+      // button falls to the framework's geometric guess, which lands on
+      // whatever poster happens to sit under the button — a row too low
+      // whenever the first row stops short of the screen edge.
+      child: CatalogFocusScope(
+        enabled: !isSearching,
+        child: _buildScaffold(
+          context,
+          ref,
+          drivingHost: drivingHost,
+          isSearching: isSearching,
+          online: online,
+          rows: rows,
+        ),
       ),
     );
   }
@@ -108,7 +117,6 @@ class HomePage extends ConsumerWidget {
                 ExcludeFocus(
                   excluding: isSearching,
                   child: _HomeBody(
-                    focusEnabled: !isSearching,
                     rows: rows,
                     onMovieTap: (movie) => drivingHost
                         ? _openRemoteMovieDetail(context, ref, movie)
@@ -330,14 +338,10 @@ class _HomeBody extends StatelessWidget {
   final void Function(MovieDto movie) onMovieTap;
   final void Function(SeriesDto series) onSeriesTap;
 
-  /// `false` while search mode owns the keyboard.
-  final bool focusEnabled;
-
   const _HomeBody({
     required this.rows,
     required this.onMovieTap,
     required this.onSeriesTap,
-    required this.focusEnabled,
   });
 
   @override
@@ -354,7 +358,6 @@ class _HomeBody extends StatelessWidget {
               rows: list,
               onMovieTap: onMovieTap,
               onSeriesTap: onSeriesTap,
-              focusEnabled: focusEnabled,
             );
     }
     if (rows.hasError) return const _ErrorState();
@@ -366,39 +369,34 @@ class _CatalogList extends StatelessWidget {
   final List<CatalogRowDto> rows;
   final void Function(MovieDto movie) onMovieTap;
   final void Function(SeriesDto series) onSeriesTap;
-  final bool focusEnabled;
 
   const _CatalogList({
     required this.rows,
     required this.onMovieTap,
     required this.onSeriesTap,
-    required this.focusEnabled,
   });
 
   @override
   Widget build(BuildContext context) {
-    return CatalogFocusScope(
-      enabled: focusEnabled,
-      child: CustomScrollView(
-        // One full row (320 dp of cards + label + spacing) beyond the
-        // viewport, so a vertical keyboard move always finds the next row
-        // already built — the focus coordinator can scroll *within* a row
-        // to reach an unbuilt card, but it cannot conjure an unbuilt row.
-        cacheExtent: 400,
-        slivers: [
-          const SliverToBoxAdapter(child: SizedBox(height: 16)),
-          SliverList.builder(
-            itemCount: rows.length,
-            itemBuilder: (_, i) => CatalogRowWidget(
-              index: i,
-              row: rows[i],
-              onMovieTap: onMovieTap,
-              onSeriesTap: onSeriesTap,
-            ),
+    return CustomScrollView(
+      // One full row (320 dp of cards + label + spacing) beyond the
+      // viewport, so a vertical keyboard move always finds the next row
+      // already built — the focus coordinator can scroll *within* a row
+      // to reach an unbuilt card, but it cannot conjure an unbuilt row.
+      cacheExtent: 400,
+      slivers: [
+        const SliverToBoxAdapter(child: SizedBox(height: 16)),
+        SliverList.builder(
+          itemCount: rows.length,
+          itemBuilder: (_, i) => CatalogRowWidget(
+            index: i,
+            row: rows[i],
+            onMovieTap: onMovieTap,
+            onSeriesTap: onSeriesTap,
           ),
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
-        ],
-      ),
+        ),
+        const SliverToBoxAdapter(child: SizedBox(height: 24)),
+      ],
     );
   }
 }
