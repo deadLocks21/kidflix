@@ -105,7 +105,10 @@ abstract class RemoteControlClientService {
   /// Throws [RemoteQueryException] on failure — no connection, the host
   /// refusing, or a timeout — so a screen can show a retry rather than
   /// hanging. Success returns the raw payload for the caller to decode.
-  Future<Map<String, Object?>> query(String kind, {Map<String, Object?> params});
+  Future<Map<String, Object?>> query(
+    String kind, {
+    Map<String, Object?> params,
+  });
 
   Future<void> dispose();
 }

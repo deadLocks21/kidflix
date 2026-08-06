@@ -303,10 +303,9 @@ class Installer {
       (d) => d.path.endsWith('.app'),
       orElse: () => throw StateError('Aucun .app dans l\'asset updater macOS'),
     );
-    final files = Directory(p.join(app.path, 'Contents', 'MacOS'))
-        .listSync()
-        .whereType<File>()
-        .toList();
+    final files = Directory(
+      p.join(app.path, 'Contents', 'MacOS'),
+    ).listSync().whereType<File>().toList();
     if (files.isEmpty) {
       throw StateError('Binaire introuvable dans ${app.path}');
     }

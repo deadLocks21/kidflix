@@ -5,10 +5,7 @@ import 'package:kidflix/core/application/remote/remote_query.dart';
 void main() {
   group('RemoteQuery round-trip', () {
     test('a home-rows query survives encode → decode', () {
-      const query = RemoteQuery(
-        queryId: 'q1',
-        kind: RemoteQuery.kindHomeRows,
-      );
+      const query = RemoteQuery(queryId: 'q1', kind: RemoteQuery.kindHomeRows);
 
       final message =
           RemoteProtocol.decode(RemoteProtocol.encodeQuery(query))

@@ -58,8 +58,7 @@ abstract final class RemoteCatalogCodec {
     items: switch (json['items']) {
       final List raw => [
         for (final item in raw)
-          if (item is Map)
-            ?decodeItem(Map<String, Object?>.from(item)),
+          if (item is Map) ?decodeItem(Map<String, Object?>.from(item)),
       ],
       _ => const [],
     },
@@ -117,16 +116,13 @@ abstract final class RemoteCatalogCodec {
     'director': movie.director,
     'topCast': [
       for (final member in movie.topCast)
-        {
-          'name': member.name,
-          'role': member.role,
-          'photoUrl': member.photoUrl,
-        },
+        {'name': member.name, 'role': member.role, 'photoUrl': member.photoUrl},
     ],
   };
 
   static MovieDetailDto decodeMovieDetail(Map<String, Object?> json) {
-    String? str(String key) => json[key] is String ? json[key]! as String : null;
+    String? str(String key) =>
+        json[key] is String ? json[key]! as String : null;
     List<String> strings(String key) => switch (json[key]) {
       final List raw => [
         for (final entry in raw)

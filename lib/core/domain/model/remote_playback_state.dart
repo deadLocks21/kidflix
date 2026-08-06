@@ -15,9 +15,7 @@ enum RemotePlaybackStatus {
   paused;
 
   static RemotePlaybackStatus fromName(String? value) =>
-      RemotePlaybackStatus.values
-          .where((s) => s.name == value)
-          .firstOrNull ??
+      RemotePlaybackStatus.values.where((s) => s.name == value).firstOrNull ??
       RemotePlaybackStatus.idle;
 }
 

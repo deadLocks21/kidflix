@@ -343,27 +343,24 @@ void main() {
       },
     );
 
-    test(
-      'maps 409 device_already_registered to '
-      'DeviceAlreadyRegisteredException',
-      () async {
-        final adapter = _FakeAdapter(
-          (_, _) => _jsonResponse(409, {
-            'error': {'code': 'device_already_registered'},
-          }),
-        );
-        final repo = DioAuthRepository(_makeDio(adapter));
+    test('maps 409 device_already_registered to '
+        'DeviceAlreadyRegisteredException', () async {
+      final adapter = _FakeAdapter(
+        (_, _) => _jsonResponse(409, {
+          'error': {'code': 'device_already_registered'},
+        }),
+      );
+      final repo = DioAuthRepository(_makeDio(adapter));
 
-        await expectLater(
-          repo.verifyOtp(
-            PhoneNumber.parse('0612345678'),
-            OtpCode.parse('123456'),
-            const Device(id: 'abc'),
-          ),
-          throwsA(isA<DeviceAlreadyRegisteredException>()),
-        );
-      },
-    );
+      await expectLater(
+        repo.verifyOtp(
+          PhoneNumber.parse('0612345678'),
+          OtpCode.parse('123456'),
+          const Device(id: 'abc'),
+        ),
+        throwsA(isA<DeviceAlreadyRegisteredException>()),
+      );
+    });
 
     test('rethrows a 409 carrying an unrelated error code', () async {
       final adapter = _FakeAdapter(

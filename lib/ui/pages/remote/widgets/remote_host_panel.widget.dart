@@ -209,9 +209,9 @@ class _AddressHint extends StatelessWidget {
           onPressed: () async {
             await Clipboard.setData(ClipboardData(text: primary));
             if (!context.mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Adresse copiée.')),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('Adresse copiée.')));
           },
         ),
       ],

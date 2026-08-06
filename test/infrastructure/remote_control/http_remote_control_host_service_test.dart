@@ -141,26 +141,29 @@ void main() {
     expect(json['version'], equals(RemoteProtocol.version));
   });
 
-  test('/pair rejects a wrong code and issues a token for the right one', () async {
-    final status = await host.start();
+  test(
+    '/pair rejects a wrong code and issues a token for the right one',
+    () async {
+      final status = await host.start();
 
-    final rejected = await post(RemoteProtocol.pairPath, {'code': '000000'});
-    await rejected.drain<void>();
-    expect(rejected.statusCode, equals(HttpStatus.forbidden));
+      final rejected = await post(RemoteProtocol.pairPath, {'code': '000000'});
+      await rejected.drain<void>();
+      expect(rejected.statusCode, equals(HttpStatus.forbidden));
 
-    final accepted = await post(RemoteProtocol.pairPath, {
-      'code': status.pairingCode,
-    });
-    final json =
-        jsonDecode(await utf8.decoder.bind(accepted).join())
-            as Map<String, Object?>;
+      final accepted = await post(RemoteProtocol.pairPath, {
+        'code': status.pairingCode,
+      });
+      final json =
+          jsonDecode(await utf8.decoder.bind(accepted).join())
+              as Map<String, Object?>;
 
-    expect(accepted.statusCode, equals(HttpStatus.ok));
-    expect(json['token'], isA<String>());
-    expect(json['token'], isNotEmpty);
-    // Persisted, so the token survives a restart of the host.
-    expect(pairing.issued, contains(json['token']));
-  });
+      expect(accepted.statusCode, equals(HttpStatus.ok));
+      expect(json['token'], isA<String>());
+      expect(json['token'], isNotEmpty);
+      // Persisted, so the token survives a restart of the host.
+      expect(pairing.issued, contains(json['token']));
+    },
+  );
 
   test('pairing code rotates after 5 failed attempts', () async {
     final status = await host.start();
@@ -311,7 +314,12 @@ void main() {
     addTearDown(subscription.cancel);
 
     // A newer remote may speak verbs this build has never heard of.
-    socket.add(jsonEncode({'kind': 'command', 'payload': {'type': 'teleport'}}));
+    socket.add(
+      jsonEncode({
+        'kind': 'command',
+        'payload': {'type': 'teleport'},
+      }),
+    );
     socket.add(RemoteProtocol.encodeCommand(const RemotePauseCommand()));
     await _settle();
 
@@ -411,4 +419,5 @@ Future<WebSocket> _connectPaired(
 }
 
 /// Lets the event loop drain pending socket I/O.
-Future<void> _settle() => Future<void>.delayed(const Duration(milliseconds: 60));
+Future<void> _settle() =>
+    Future<void>.delayed(const Duration(milliseconds: 60));

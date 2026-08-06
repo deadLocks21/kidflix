@@ -34,9 +34,9 @@ Future<String?> showRemoteTrackSheet(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
               child: Text(
                 title,
-                style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  sheetContext,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
             ),
             for (final track in tracks)

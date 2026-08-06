@@ -52,12 +52,14 @@ class RemoteHostQueryHandler {
       }
       host.answerQuery(RemoteQueryResult.success(query.queryId, data));
     } catch (e, st) {
-      _ref.read(loggerProvider).warn(
-        'remote.host.query_failed',
-        attrs: {'query.kind': query.kind},
-        error: e,
-        stack: st,
-      );
+      _ref
+          .read(loggerProvider)
+          .warn(
+            'remote.host.query_failed',
+            attrs: {'query.kind': query.kind},
+            error: e,
+            stack: st,
+          );
       host.answerQuery(
         RemoteQueryResult.failure(
           query.queryId,
@@ -75,7 +77,9 @@ class RemoteHostQueryHandler {
       return null;
     }
     final rows = await _ref.read(homeCatalogRowsProvider.future);
-    return {'rows': [for (final row in rows) RemoteCatalogCodec.encodeRow(row)]};
+    return {
+      'rows': [for (final row in rows) RemoteCatalogCodec.encodeRow(row)],
+    };
   }
 
   Future<Map<String, Object?>?> _mediaDetail(RemoteQuery query) async {
@@ -87,10 +91,10 @@ class RemoteHostQueryHandler {
     if (query.params['isSeries'] == true) return null;
 
     final pool = await _ref.read(catalogRepositoryProvider).listCatalog();
-    final movie = pool
-        .whereType<Movie>()
-        .cast<Movie?>()
-        .firstWhere((m) => m?.id == mediaId, orElse: () => null);
+    final movie = pool.whereType<Movie>().cast<Movie?>().firstWhere(
+      (m) => m?.id == mediaId,
+      orElse: () => null,
+    );
     if (movie == null) return null;
     return {
       'movie': RemoteCatalogCodec.encodeMovieDetail(

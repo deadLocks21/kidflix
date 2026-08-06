@@ -117,13 +117,14 @@ class _SeenSetupPageState extends ConsumerState<SeenSetupPage> {
             ),
           ),
         ),
-        for (final section in sections) _SectionView(
-          title: section.title,
-          movies: section.movies,
-          selected: _selected,
-          onToggleMovie: _toggleMovie,
-          onToggleSection: _toggleSection,
-        ),
+        for (final section in sections)
+          _SectionView(
+            title: section.title,
+            movies: section.movies,
+            selected: _selected,
+            onToggleMovie: _toggleMovie,
+            onToggleSection: _toggleSection,
+          ),
       ],
     );
   }
@@ -247,9 +248,7 @@ class _SectionView extends StatelessWidget {
           padding: const EdgeInsets.only(top: 8, bottom: 4),
           child: Row(
             children: [
-              Expanded(
-                child: Text(title, style: theme.textTheme.titleMedium),
-              ),
+              Expanded(child: Text(title, style: theme.textTheme.titleMedium)),
               Text(
                 '$selectedCount/${ids.length}',
                 style: theme.textTheme.bodySmall?.copyWith(
@@ -319,7 +318,9 @@ class _PosterTile extends StatelessWidget {
                     _Poster(posterUrl: movie.posterUrl),
                     if (selected)
                       Container(
-                        color: theme.colorScheme.primary.withValues(alpha: 0.45),
+                        color: theme.colorScheme.primary.withValues(
+                          alpha: 0.45,
+                        ),
                         alignment: Alignment.center,
                         child: Icon(
                           Icons.check_circle,

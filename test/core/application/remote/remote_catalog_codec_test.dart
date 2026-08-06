@@ -89,9 +89,7 @@ void main() {
         ageCategory: 'enfant',
         genres: ['Animation', 'Aventure'],
         director: ['Roger Allers', 'Rob Minkoff'],
-        topCast: [
-          CastMemberDto(name: 'Matthew Broderick', role: 'Simba'),
-        ],
+        topCast: [CastMemberDto(name: 'Matthew Broderick', role: 'Simba')],
       );
 
       final decoded = RemoteCatalogCodec.decodeMovieDetail(

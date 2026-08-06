@@ -58,7 +58,10 @@ void main() {
     });
 
     test('a global unicast address is not private', () {
-      expect(isPrivateAddress(InternetAddress('2001:4860:4860::8888')), isFalse);
+      expect(
+        isPrivateAddress(InternetAddress('2001:4860:4860::8888')),
+        isFalse,
+      );
     });
 
     test('an IPv4-mapped private address is judged on its IPv4 part', () {

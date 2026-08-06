@@ -96,17 +96,14 @@ void main() {
       expect(await run(useCase), isA<VerifyOtpExpired>());
     });
 
-    test(
-      'maps DeviceAlreadyRegisteredException to '
-      'VerifyOtpDeviceAlreadyRegistered',
-      () async {
-        final (:useCase, :logs) = build(
-          error: const DeviceAlreadyRegisteredException(),
-        );
+    test('maps DeviceAlreadyRegisteredException to '
+        'VerifyOtpDeviceAlreadyRegistered', () async {
+      final (:useCase, :logs) = build(
+        error: const DeviceAlreadyRegisteredException(),
+      );
 
-        expect(await run(useCase), isA<VerifyOtpDeviceAlreadyRegistered>());
-      },
-    );
+      expect(await run(useCase), isA<VerifyOtpDeviceAlreadyRegistered>());
+    });
 
     test('maps a network DioException to VerifyOtpFailure', () async {
       final (:useCase, :logs) = build(

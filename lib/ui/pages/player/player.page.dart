@@ -173,8 +173,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   /// Handle published to remote devices while this page is mounted. Held
   /// as a field so [dispose] can hand back the *same* instance — see
   /// [RemotePlaybackHost.detach] for why identity matters here.
-  late final _RemotePlaybackControls _remoteControls =
-      _RemotePlaybackControls(this);
+  late final _RemotePlaybackControls _remoteControls = _RemotePlaybackControls(
+    this,
+  );
 
   /// Cached at bootstrap: [dispose] must detach without touching [ref].
   RemotePlaybackHost? _remoteHost;
@@ -288,12 +289,14 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
   void _onBootstrapFailed(Object error, StackTrace stack) {
     if (_disposed || !mounted) return;
     unawaited(
-      ref.read(loggerProvider).error(
-        'playback.bootstrap_failed',
-        attrs: {'content.id': _currentMediaId()},
-        error: error,
-        stack: stack,
-      ),
+      ref
+          .read(loggerProvider)
+          .error(
+            'playback.bootstrap_failed',
+            attrs: {'content.id': _currentMediaId()},
+            error: error,
+            stack: stack,
+          ),
     );
     setState(() => _bootstrapError = error.toString());
     // Reaches any connected remote, which would otherwise sit on a
@@ -718,18 +721,20 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     if (!_downloadInterruptLogged) {
       _downloadInterruptLogged = true;
       unawaited(
-        ref.read(loggerProvider).warn(
-          'playback.download_interrupted',
-          attrs: {
-            'content.id': _currentMediaId(),
-            'download.status': dl.status.name,
-            'download.bytes_received': dl.bytesReceived,
-            'download.bytes_total': dl.bytesTotal,
-            'download.error': dl.errorMessage,
-            'playback.engine_running': _engine != null,
-            'playback.position_ms': _position.inMilliseconds,
-          },
-        ),
+        ref
+            .read(loggerProvider)
+            .warn(
+              'playback.download_interrupted',
+              attrs: {
+                'content.id': _currentMediaId(),
+                'download.status': dl.status.name,
+                'download.bytes_received': dl.bytesReceived,
+                'download.bytes_total': dl.bytesTotal,
+                'download.error': dl.errorMessage,
+                'playback.engine_running': _engine != null,
+                'playback.position_ms': _position.inMilliseconds,
+              },
+            ),
       );
     }
     if (_engine == null || _downloadInterrupted) return;
@@ -800,17 +805,19 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     final initialPosition = await _resolveInitialPosition();
     if (_disposed) return;
     unawaited(
-      ref.read(loggerProvider).debug(
-        'playback.handover',
-        attrs: {
-          'content.id': _currentMediaId(),
-          'playback.resume_prompt_ms': DateTime.now()
-              .difference(handoverStartedAt)
-              .inMilliseconds,
-          'playback.initial_position_ms': initialPosition.inMilliseconds,
-          'download.status': _lastDownload?.status.name,
-        },
-      ),
+      ref
+          .read(loggerProvider)
+          .debug(
+            'playback.handover',
+            attrs: {
+              'content.id': _currentMediaId(),
+              'playback.resume_prompt_ms': DateTime.now()
+                  .difference(handoverStartedAt)
+                  .inMilliseconds,
+              'playback.initial_position_ms': initialPosition.inMilliseconds,
+              'download.status': _lastDownload?.status.name,
+            },
+          ),
     );
 
     final engine = widget.engineFactory();
@@ -886,29 +893,32 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     } catch (e, st) {
       if (_disposed) return;
       unawaited(
-        ref.read(loggerProvider).error(
-          'playback.failed',
-          attrs: {'content.id': _currentMediaId()},
-          error: e,
-          stack: st,
-        ),
+        ref
+            .read(loggerProvider)
+            .error(
+              'playback.failed',
+              attrs: {'content.id': _currentMediaId()},
+              error: e,
+              stack: st,
+            ),
       );
       rethrow;
     }
     if (_disposed) return;
     unawaited(
-      ref.read(loggerProvider).info(
-        'playback.started',
-        attrs: {
-          'content.id': _currentMediaId(),
-          'content.type': switch (_currentMedia) {
-            PlayerMovieRef() => 'movie',
-            PlayerEpisodeRef() => 'episode',
-          },
-          'is_offline':
-              _lastDownload?.status == DownloadStatusDto.complete,
-        },
-      ),
+      ref
+          .read(loggerProvider)
+          .info(
+            'playback.started',
+            attrs: {
+              'content.id': _currentMediaId(),
+              'content.type': switch (_currentMedia) {
+                PlayerMovieRef() => 'movie',
+                PlayerEpisodeRef() => 'episode',
+              },
+              'is_offline': _lastDownload?.status == DownloadStatusDto.complete,
+            },
+          ),
     );
   }
 
@@ -1273,10 +1283,9 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
     }
     if (target == null) return;
     unawaited(
-      ref.read(loggerProvider).debug(
-        'playback.next_episode',
-        attrs: {'content.id': target.id},
-      ),
+      ref
+          .read(loggerProvider)
+          .debug('playback.next_episode', attrs: {'content.id': target.id}),
     );
     await _switchToEpisode(target.id);
   }
@@ -2090,8 +2099,8 @@ class _RemotePlaybackControls implements PlaybackRemoteControls {
       _state._onRetryBootstrap();
       return;
     }
-    if (_state._lastDownload?.status case DownloadStatusDto.failed ||
-        DownloadStatusDto.cancelled) {
+    if (_state._lastDownload?.status
+        case DownloadStatusDto.failed || DownloadStatusDto.cancelled) {
       _state._onRetryDownload();
     }
   }

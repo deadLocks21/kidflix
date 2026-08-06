@@ -183,8 +183,7 @@ class _PinStep extends ConsumerWidget {
           ),
         ),
         TextButton(
-          onPressed: () =>
-              client.send(const RemoteCancelProfilePinCommand()),
+          onPressed: () => client.send(const RemoteCancelProfilePinCommand()),
           child: const Text('Choisir un autre profil'),
         ),
       ],
@@ -272,9 +271,9 @@ class _StepHeader extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
           ],

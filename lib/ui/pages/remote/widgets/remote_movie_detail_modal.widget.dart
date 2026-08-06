@@ -103,11 +103,7 @@ class _Content extends ConsumerWidget {
             overflow: TextOverflow.ellipsis,
           ),
           onPressed: () async {
-            final cast = await castIfRemoting(
-              context,
-              ref,
-              mediaId: movie.id,
-            );
+            final cast = await castIfRemoting(context, ref, mediaId: movie.id);
             if (!context.mounted) return;
             // Casting always applies here (the sheet only exists while
             // driving a host), so close either way.

@@ -71,7 +71,11 @@ class BonsoirRemoteDiscoveryService implements RemoteDiscoveryService {
       if (!broadcast.isStopped) await broadcast.stop();
     } catch (e, st) {
       unawaited(
-        _logger.warn('remote.discovery.stop_advertise_failed', error: e, stack: st),
+        _logger.warn(
+          'remote.discovery.stop_advertise_failed',
+          error: e,
+          stack: st,
+        ),
       );
     }
   }
@@ -167,7 +171,8 @@ class BonsoirRemoteDiscoveryService implements RemoteDiscoveryService {
       port: service.port,
       platform: service.attributes[RemoteProtocol.txtPlatform] ?? 'unknown',
       protocolVersion:
-          int.tryParse(service.attributes[RemoteProtocol.txtVersion] ?? '') ?? 1,
+          int.tryParse(service.attributes[RemoteProtocol.txtVersion] ?? '') ??
+          1,
     );
   }
 

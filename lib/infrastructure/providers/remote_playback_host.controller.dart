@@ -138,8 +138,7 @@ class RemotePlaybackHost extends _$RemotePlaybackHost {
         stage: RemoteSessionStage.profileSelection,
         profiles: options(session),
       ),
-      Anonymous() ||
-      OtpRequested() => const RemoteSessionSnapshot(
+      Anonymous() || OtpRequested() => const RemoteSessionSnapshot(
         stage: RemoteSessionStage.anonymous,
       ),
     };
@@ -154,23 +153,25 @@ class RemotePlaybackHost extends _$RemotePlaybackHost {
       if (await _applyWithoutPlayer(command)) return;
     } catch (e, st) {
       unawaited(
-        ref.read(loggerProvider).error(
-          'remote.host.command_failed',
-          attrs: {'command': command.type},
-          error: e,
-          stack: st,
-        ),
+        ref
+            .read(loggerProvider)
+            .error(
+              'remote.host.command_failed',
+              attrs: {'command': command.type},
+              error: e,
+              stack: st,
+            ),
       );
-      _reportError('command_failed', "L'appareil n'a pas pu exécuter l'action.");
+      _reportError(
+        'command_failed',
+        "L'appareil n'a pas pu exécuter l'action.",
+      );
       return;
     }
 
     final controls = _controls;
     if (controls == null) {
-      _reportError(
-        'no_player',
-        "Aucune lecture en cours sur l'appareil.",
-      );
+      _reportError('no_player', "Aucune lecture en cours sur l'appareil.");
       return;
     }
     try {
@@ -207,12 +208,14 @@ class RemotePlaybackHost extends _$RemotePlaybackHost {
       }
     } catch (e, st) {
       unawaited(
-        ref.read(loggerProvider).warn(
-          'remote.host.command_failed',
-          attrs: {'command': command.type},
-          error: e,
-          stack: st,
-        ),
+        ref
+            .read(loggerProvider)
+            .warn(
+              'remote.host.command_failed',
+              attrs: {'command': command.type},
+              error: e,
+              stack: st,
+            ),
       );
     }
   }
@@ -323,10 +326,7 @@ class RemotePlaybackHost extends _$RemotePlaybackHost {
     if (session is! ProfileSelected) {
       // The router's redirect guard would bounce the navigation anyway;
       // saying why beats a silent no-op on the remote.
-      _reportError(
-        'no_profile',
-        "Choisis d'abord un profil sur l'appareil.",
-      );
+      _reportError('no_profile', "Choisis d'abord un profil sur l'appareil.");
       return;
     }
     if (!command.isEpisode && !await _movieExists(command.mediaId)) {
@@ -341,10 +341,15 @@ class RemotePlaybackHost extends _$RemotePlaybackHost {
         ? _episodeRoute(command)
         : '/player/${command.mediaId}';
     unawaited(
-      ref.read(loggerProvider).info(
-        'remote.host.play_media',
-        attrs: {'content.id': command.mediaId, 'is_episode': command.isEpisode},
-      ),
+      ref
+          .read(loggerProvider)
+          .info(
+            'remote.host.play_media',
+            attrs: {
+              'content.id': command.mediaId,
+              'is_episode': command.isEpisode,
+            },
+          ),
     );
     ref.read(appRouterProvider).go(target);
   }
@@ -416,9 +421,8 @@ class RemoteHostController extends _$RemoteHostController {
       ),
     );
     _querySub ??= host.queries.listen(
-      (query) => unawaited(
-        ref.read(remoteHostQueryHandlerProvider).handle(query),
-      ),
+      (query) =>
+          unawaited(ref.read(remoteHostQueryHandlerProvider).handle(query)),
     );
     await host.start();
     // Seed the server with whatever is on screen right now — including
@@ -439,6 +443,5 @@ class RemoteHostController extends _$RemoteHostController {
     state = false;
   }
 
-  Future<void> toggle(bool enabled) =>
-      enabled ? enable() : disable();
+  Future<void> toggle(bool enabled) => enabled ? enable() : disable();
 }

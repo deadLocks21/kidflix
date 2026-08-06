@@ -46,11 +46,14 @@ AuthenticateWithBiometricsUseCase _build(
 
 void main() {
   group('isOfferedFor', () {
-    test('false when the profile has not opted-in (skips availability)', () async {
-      final biometrics = _FakeBiometrics(available: true);
-      final usecase = _build(_FakePrefs(), biometrics);
-      expect(await usecase.isOfferedFor('p1'), isFalse);
-    });
+    test(
+      'false when the profile has not opted-in (skips availability)',
+      () async {
+        final biometrics = _FakeBiometrics(available: true);
+        final usecase = _build(_FakePrefs(), biometrics);
+        expect(await usecase.isOfferedFor('p1'), isFalse);
+      },
+    );
 
     test('false when opted-in but device unavailable', () async {
       final usecase = _build(
@@ -83,10 +86,7 @@ void main() {
         _FakePrefs({'p1': true}),
         _FakeBiometrics(available: true, authResult: false),
       );
-      expect(
-        await usecase.execute(profileId: 'p1', reason: 'unlock'),
-        isFalse,
-      );
+      expect(await usecase.execute(profileId: 'p1', reason: 'unlock'), isFalse);
     });
 
     test('returns true when offered and authenticated', () async {

@@ -63,10 +63,7 @@ class CreateProfileUseCase {
         rawPin: rawPin,
         avatarId: avatarId,
       );
-      await _logger.info(
-        'profile.created',
-        attrs: {'profile.id': created.id},
-      );
+      await _logger.info('profile.created', attrs: {'profile.id': created.id});
       return CreateProfileSuccess(created);
     } catch (e, st) {
       await _logger.warn('profile.create_failed', error: e, stack: st);

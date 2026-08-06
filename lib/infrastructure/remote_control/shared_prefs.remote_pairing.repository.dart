@@ -56,9 +56,7 @@ class SharedPrefsRemotePairingRepository implements RemotePairingRepository {
     const maxTokens = 20;
     await prefs.setStringList(
       remoteIssuedTokensKey,
-      next.length <= maxTokens
-          ? next
-          : next.sublist(next.length - maxTokens),
+      next.length <= maxTokens ? next : next.sublist(next.length - maxTokens),
     );
   }
 

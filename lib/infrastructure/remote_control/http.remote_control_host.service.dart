@@ -307,7 +307,9 @@ class HttpRemoteControlHostService implements RemoteControlHostService {
           await _reject(request, HttpStatus.notFound, 'not_found');
       }
     } catch (e, st) {
-      unawaited(_logger.warn('remote.host.handler_failed', error: e, stack: st));
+      unawaited(
+        _logger.warn('remote.host.handler_failed', error: e, stack: st),
+      );
       try {
         await _reject(request, HttpStatus.internalServerError, 'server_error');
       } catch (_) {
@@ -419,7 +421,9 @@ class HttpRemoteControlHostService implements RemoteControlHostService {
       },
       onDone: () => _removeSocket(socket),
       onError: (Object e, StackTrace st) {
-        unawaited(_logger.warn('remote.host.socket_error', error: e, stack: st));
+        unawaited(
+          _logger.warn('remote.host.socket_error', error: e, stack: st),
+        );
         _removeSocket(socket);
       },
       cancelOnError: true,

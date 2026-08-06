@@ -75,15 +75,13 @@ Future<bool> castIfRemoting(
       messenger.hideCurrentSnackBar();
       messenger.showSnackBar(
         SnackBar(
-          content: Text(
-            switch (result) {
-              _CastOutcome.accepted => 'Lecture lancée sur $deviceName.',
-              _CastOutcome.refused =>
-                client.connection.errorMessage ??
-                    '$deviceName a refusé la lecture.',
-              _CastOutcome.timedOut => '$deviceName n’a pas répondu.',
-            },
-          ),
+          content: Text(switch (result) {
+            _CastOutcome.accepted => 'Lecture lancée sur $deviceName.',
+            _CastOutcome.refused =>
+              client.connection.errorMessage ??
+                  '$deviceName a refusé la lecture.',
+            _CastOutcome.timedOut => '$deviceName n’a pas répondu.',
+          }),
         ),
       );
     }),

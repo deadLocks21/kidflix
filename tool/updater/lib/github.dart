@@ -58,8 +58,10 @@ class Release {
   /// les installations existantes les cherchent au nom exact.
   ReleaseAsset? get updaterAsset {
     if (Platform.isMacOS) {
-      final re =
-          RegExp(r'^kidflix-installer-macos-.*\.zip$', caseSensitive: false);
+      final re = RegExp(
+        r'^kidflix-installer-macos-.*\.zip$',
+        caseSensitive: false,
+      );
       return _firstWhereOrNull(assets, (a) => re.hasMatch(a.name));
     }
     final wanted = Platform.isWindows

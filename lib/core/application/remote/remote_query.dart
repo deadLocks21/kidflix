@@ -71,8 +71,10 @@ class RemoteQueryResult {
     this.errorMessage,
   });
 
-  factory RemoteQueryResult.success(String queryId, Map<String, Object?> data) =>
-      RemoteQueryResult(queryId: queryId, data: data);
+  factory RemoteQueryResult.success(
+    String queryId,
+    Map<String, Object?> data,
+  ) => RemoteQueryResult(queryId: queryId, data: data);
 
   factory RemoteQueryResult.failure(
     String queryId, {

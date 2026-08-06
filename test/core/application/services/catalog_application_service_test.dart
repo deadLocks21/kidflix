@@ -749,27 +749,24 @@ void main() {
         },
       );
 
-      test(
-        'row is shown even with a single unseen movie (exempt from the '
-        'min-items gate that applies to genre rows)',
-        () async {
-          final movies = [for (var i = 0; i < 5; i++) _m(id: 'n$i')];
-          final service = CatalogApplicationService(
-            _FakeRepo(movies),
-            watchProgress: _CannedProgressRepo([
-              _movieProgress('n0'),
-              _movieProgress('n1'),
-              _movieProgress('n2'),
-              _movieProgress('n3'),
-            ]),
-          );
-          final rows = await service.buildHomeRowsFor(
-            _profile(AgeCategory.enfant),
-          );
-          final neverWatched = rows.firstWhere((r) => r.type == 'neverWatched');
-          expect(neverWatched.items.map((i) => i.id), ['n4']);
-        },
-      );
+      test('row is shown even with a single unseen movie (exempt from the '
+          'min-items gate that applies to genre rows)', () async {
+        final movies = [for (var i = 0; i < 5; i++) _m(id: 'n$i')];
+        final service = CatalogApplicationService(
+          _FakeRepo(movies),
+          watchProgress: _CannedProgressRepo([
+            _movieProgress('n0'),
+            _movieProgress('n1'),
+            _movieProgress('n2'),
+            _movieProgress('n3'),
+          ]),
+        );
+        final rows = await service.buildHomeRowsFor(
+          _profile(AgeCategory.enfant),
+        );
+        final neverWatched = rows.firstWhere((r) => r.type == 'neverWatched');
+        expect(neverWatched.items.map((i) => i.id), ['n4']);
+      });
 
       test('row is hidden only when no unseen movie remains', () async {
         final movies = [for (var i = 0; i < 3; i++) _m(id: 'n$i')];

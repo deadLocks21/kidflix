@@ -276,11 +276,10 @@ class WsRemoteControlClientService implements RemoteControlClientService {
       final decoded = jsonDecode(body);
       final token = decoded is Map ? decoded['token'] : null;
       if (token is! String || token.isEmpty) return false;
-      await _pairing.saveTokenForHost(
-        hostDeviceId: device.id,
-        token: token,
+      await _pairing.saveTokenForHost(hostDeviceId: device.id, token: token);
+      unawaited(
+        _logger.info('remote.client.paired', attrs: {'host': device.id}),
       );
-      unawaited(_logger.info('remote.client.paired', attrs: {'host': device.id}));
       await connect(device);
       return true;
     } catch (e, st) {
@@ -309,7 +308,10 @@ class WsRemoteControlClientService implements RemoteControlClientService {
   }) async {
     final socket = _socket;
     if (socket == null || socket.readyState != WebSocket.open) {
-      throw const RemoteQueryException('disconnected', 'Appareil non connecté.');
+      throw const RemoteQueryException(
+        'disconnected',
+        'Appareil non connecté.',
+      );
     }
     _queryCounter++;
     final queryId = 'q$_queryCounter';

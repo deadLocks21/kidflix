@@ -91,9 +91,7 @@ class _RemoteControlPanelState extends ConsumerState<RemoteControlPanel> {
             onChanged: (value) => setState(() => _scrubbingMs = value),
             onChangeEnd: (value) {
               setState(() => _scrubbingMs = null);
-              _send(
-                RemoteSeekCommand(Duration(milliseconds: value.round())),
-              );
+              _send(RemoteSeekCommand(Duration(milliseconds: value.round())));
             },
           ),
           const SizedBox(height: 8),
@@ -101,8 +99,10 @@ class _RemoteControlPanelState extends ConsumerState<RemoteControlPanel> {
             playback: playback,
             onPrevious: () => _send(const RemotePreviousEpisodeCommand()),
             onNext: () => _send(const RemoteNextEpisodeCommand()),
-            onBackward: () => _send(const RemoteSeekRelativeCommand(_skipBackward)),
-            onForward: () => _send(const RemoteSeekRelativeCommand(_skipForward)),
+            onBackward: () =>
+                _send(const RemoteSeekRelativeCommand(_skipBackward)),
+            onForward: () =>
+                _send(const RemoteSeekRelativeCommand(_skipForward)),
             onTogglePlay: () => _send(const RemoteTogglePlayCommand()),
           ),
           const SizedBox(height: 12),
@@ -254,7 +254,8 @@ class _Timeline extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final durationMs = playback.duration?.inMilliseconds ?? 0;
-    final positionMs = scrubbingMs ?? playback.position.inMilliseconds.toDouble();
+    final positionMs =
+        scrubbingMs ?? playback.position.inMilliseconds.toDouble();
     // A still-downloading title cannot be seeked past what is on disk —
     // the host clamps anyway, but stopping the thumb at the real ceiling
     // is honest rather than snapping back.
@@ -405,10 +406,7 @@ class _VolumeRow extends StatelessWidget {
           child: Text(
             '${volume.round()}',
             textAlign: TextAlign.end,
-            style: const TextStyle(
-              fontSize: 12,
-              color: KidflixPalette.grey100,
-            ),
+            style: const TextStyle(fontSize: 12, color: KidflixPalette.grey100),
           ),
         ),
       ],
@@ -500,11 +498,7 @@ class _TrackButton extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(
-            icon,
-            size: 18,
-            color: disabled ? KidflixPalette.grey250 : null,
-          ),
+          Icon(icon, size: 18, color: disabled ? KidflixPalette.grey250 : null),
           const SizedBox(width: 8),
           Expanded(
             child: Column(

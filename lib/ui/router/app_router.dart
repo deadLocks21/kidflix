@@ -81,9 +81,8 @@ bool _isPlayerRoute(String path) => path.startsWith('/player/');
 /// player directly, which is exactly the case the pattern-level key gets
 /// wrong. Keying on the full URI (query string included, so a change of
 /// series or shuffle mode also counts) forces a genuine remount.
-ValueKey<String> playerPageKey(Uri location) => ValueKey<String>(
-  location.toString(),
-);
+ValueKey<String> playerPageKey(Uri location) =>
+    ValueKey<String>(location.toString());
 
 bool _isSettingsRoute(String path) =>
     path == AppRoutes.settings ||

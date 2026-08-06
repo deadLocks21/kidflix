@@ -55,9 +55,7 @@ class RemoteDeviceList extends ConsumerWidget {
             connection?.errorMessage != null)
           _ErrorBanner(message: connection!.errorMessage!),
         switch (devices) {
-          AsyncError(:final error) => _Hint(
-            'Découverte impossible : $error',
-          ),
+          AsyncError(:final error) => _Hint('Découverte impossible : $error'),
           AsyncData(value: final list) when list.isEmpty => const _Hint(
             'Aucun appareil trouvé. Vérifie que l’autre appareil est sur '
             'le même Wi-Fi et que « Autoriser le contrôle » y est activé.',
@@ -176,7 +174,11 @@ class _ErrorBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, size: 18, color: KidflixPalette.red100),
+          const Icon(
+            Icons.error_outline,
+            size: 18,
+            color: KidflixPalette.red100,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(message, style: Theme.of(context).textTheme.bodySmall),

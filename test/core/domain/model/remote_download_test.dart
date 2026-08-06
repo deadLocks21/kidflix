@@ -102,7 +102,10 @@ void main() {
       );
 
       expect(state.downloadedFraction, closeTo(0.25, 0.001));
-      expect(RemoteProtocol.encodeState(state), isNot(contains('downloadedFraction')));
+      expect(
+        RemoteProtocol.encodeState(state),
+        isNot(contains('downloadedFraction')),
+      );
     });
 
     test('a frame from a host predating this decodes to "none"', () {

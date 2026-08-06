@@ -43,9 +43,9 @@ void main() {
     test('builds a MovieProgress when given a Movie', () async {
       final fake = _FakeRepo();
       final useCase = SaveWatchProgressUseCase(
-      fake,
-      LoggerApplicationService(InMemoryLoggerService()),
-    );
+        fake,
+        LoggerApplicationService(InMemoryLoggerService()),
+      );
       final movie = Movie(
         id: 'nemo',
         title: 'Nemo',
@@ -73,9 +73,9 @@ void main() {
     test('builds an EpisodeProgress when given an Episode', () async {
       final fake = _FakeRepo();
       final useCase = SaveWatchProgressUseCase(
-      fake,
-      LoggerApplicationService(InMemoryLoggerService()),
-    );
+        fake,
+        LoggerApplicationService(InMemoryLoggerService()),
+      );
       final episode = Episode(
         id: 'ep-1',
         seriesId: 'pingu',

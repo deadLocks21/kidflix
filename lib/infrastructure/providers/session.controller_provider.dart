@@ -705,9 +705,11 @@ Future<void> bootstrap(Ref ref) async {
   // record that `restore()` publishes. Starting the server before they
   // are loaded advertises an empty id — which every remote drops, since
   // the id is what a pairing token is keyed on.
-  unawaited(() async {
-    await ref.read(remoteDeviceIdProvider.notifier).load();
-    await ref.read(remoteDeviceNameProvider.notifier).load();
-    await ref.read(remoteHostControllerProvider.notifier).restore();
-  }().catchError((Object _) {}));
+  unawaited(
+    () async {
+      await ref.read(remoteDeviceIdProvider.notifier).load();
+      await ref.read(remoteDeviceNameProvider.notifier).load();
+      await ref.read(remoteHostControllerProvider.notifier).restore();
+    }().catchError((Object _) {}),
+  );
 }

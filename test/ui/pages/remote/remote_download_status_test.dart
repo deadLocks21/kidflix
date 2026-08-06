@@ -33,7 +33,9 @@ void main() {
       expect(find.text('Réessayer'), findsNothing);
     });
 
-    testWidgets('stays indeterminate when the total is unknown', (tester) async {
+    testWidgets('stays indeterminate when the total is unknown', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         _card(
           const RemoteDownloadSnapshot(

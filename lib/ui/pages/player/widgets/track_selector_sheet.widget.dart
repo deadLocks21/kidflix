@@ -96,7 +96,6 @@ class _TrackSelectorContent extends StatelessWidget {
       ),
     );
   }
-
 }
 
 class _TrackTile extends StatelessWidget {

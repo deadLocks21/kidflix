@@ -8,10 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 Widget _app() => const ProviderScope(
   child: MaterialApp(
-    home: Scaffold(
-      appBar: null,
-      body: Row(children: [RemoteControlButton()]),
-    ),
+    home: Scaffold(appBar: null, body: Row(children: [RemoteControlButton()])),
   ),
 );
 
@@ -51,24 +48,27 @@ void main() {
       expect(find.text('Cet appareil'), findsOneWidget);
     });
 
-    testWidgets('hosting is off by default and shows the explanatory subtitle', (
-      tester,
-    ) async {
-      await tester.pumpWidget(_app());
-      await tester.pump();
-      await tester.tap(find.byType(IconButton));
-      await tester.pumpAndSettle();
+    testWidgets(
+      'hosting is off by default and shows the explanatory subtitle',
+      (tester) async {
+        await tester.pumpWidget(_app());
+        await tester.pump();
+        await tester.tap(find.byType(IconButton));
+        await tester.pumpAndSettle();
 
-      final toggle = tester.widget<SwitchListTile>(find.byType(SwitchListTile));
-      expect(toggle.value, isFalse);
-      expect(
-        find.text('Les autres appareils ne peuvent pas piloter celui-ci.'),
-        findsOneWidget,
-      );
-      // No pairing code is shown while the server is off — there is
-      // nothing to pair with yet.
-      expect(find.text('Code d’association'), findsNothing);
-    });
+        final toggle = tester.widget<SwitchListTile>(
+          find.byType(SwitchListTile),
+        );
+        expect(toggle.value, isFalse);
+        expect(
+          find.text('Les autres appareils ne peuvent pas piloter celui-ci.'),
+          findsOneWidget,
+        );
+        // No pairing code is shown while the server is off — there is
+        // nothing to pair with yet.
+        expect(find.text('Code d’association'), findsNothing);
+      },
+    );
 
     testWidgets('offers the manual pairing fallback', (tester) async {
       await tester.pumpWidget(_app());
@@ -87,10 +87,7 @@ void main() {
       await tester.tap(find.byType(IconButton));
       await tester.pumpAndSettle();
 
-      expect(
-        find.textContaining('Aucun appareil trouvé'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('Aucun appareil trouvé'), findsOneWidget);
     });
   });
 }

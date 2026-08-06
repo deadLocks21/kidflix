@@ -20,9 +20,7 @@ class RemoteControlButton extends ConsumerWidget {
     final isHosting = ref.watch(remoteHostControllerProvider);
 
     return IconButton(
-      tooltip: isCasting
-          ? 'Télécommande — connectée'
-          : 'Télécommande',
+      tooltip: isCasting ? 'Télécommande — connectée' : 'Télécommande',
       icon: Stack(
         clipBehavior: Clip.none,
         children: [
