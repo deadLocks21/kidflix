@@ -15,6 +15,7 @@ import 'package:kidflix/infrastructure/providers/watch_progress.repository_provi
 import 'package:kidflix/shared/duration_format.dart';
 import 'package:kidflix/shared/tmdb_image.dart';
 import 'package:kidflix/ui/focus/kidflix_focus_zoom.widget.dart';
+import 'package:kidflix/ui/theme/button_styles.dart';
 import 'package:kidflix/ui/pages/home/widgets/download_intent_button.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/favorite_button.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/resume_progress_bar.widget.dart';
@@ -512,7 +513,20 @@ class _SeasonSection extends StatelessWidget {
   }
 }
 
-class _EpisodeTile extends ConsumerWidget {
+/// One episode of a season.
+///
+/// Clicking anywhere on the row still plays the episode, but the row is
+/// deliberately *not* a keyboard stop — its two buttons are.
+///
+/// A focusable row wrapping a focusable button is what kept the right
+/// arrow from ever reaching "Télécharger": directional traversal only
+/// considers candidates whose centre lies beyond the current node's edge,
+/// and a trailing button sits well inside the row that contains it. Only
+/// Tab, which walks reading order instead of geometry, could get there.
+/// Two sibling buttons have no such problem, and they also make "play
+/// this episode" something you can see rather than something you have to
+/// guess.
+class _EpisodeTile extends ConsumerStatefulWidget {
   final Episode episode;
   final String parentSeriesTitle;
   final EpisodeProgress? progress;
@@ -524,108 +538,142 @@ class _EpisodeTile extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_EpisodeTile> createState() => _EpisodeTileState();
+}
+
+class _EpisodeTileState extends ConsumerState<_EpisodeTile> {
+  String get _epRef => widget.episode.seasonNumber == 0
+      ? 'S0E${widget.episode.episodeNumber}'
+      : 'E${widget.episode.episodeNumber}';
+
+  Future<void> _play() async {
+    final episode = widget.episode;
+    // Pre-cache so the manager resolves this episode regardless
+    // of the parent's /catalog visibility, AND so the offline
+    // series detail modal can rebuild the seasons tree.
+    unawaited(
+      ref
+          .read(downloadRepositoryProvider)
+          .cacheMediaMetadata(
+            mediaId: episode.id,
+            isEpisode: true,
+            title: '$_epRef · ${episode.title}',
+            posterUrl: episode.thumbUrl,
+            parentSeriesTitle: widget.parentSeriesTitle,
+            originalTitle: episode.originalTitle,
+            durationSeconds: episode.duration.inSeconds,
+            ageCategory: episode.ageCategory.name,
+            synopsis: episode.synopsis,
+            seriesId: episode.seriesId,
+            seasonNumber: episode.seasonNumber,
+            episodeNumber: episode.episodeNumber,
+          ),
+    );
+    final cast = await castIfRemoting(
+      context,
+      ref,
+      mediaId: episode.id,
+      isEpisode: true,
+      seriesId: episode.seriesId,
+    );
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    if (cast) return;
+    context.go('/player/episode/${episode.id}?series=${episode.seriesId}');
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final epRef = episode.seasonNumber == 0
-        ? 'S0E${episode.episodeNumber}'
-        : 'E${episode.episodeNumber}';
+    final episode = widget.episode;
+    final progress = widget.progress;
     final isWatched = progress?.completed ?? false;
     final totalSeconds = episode.duration.inSeconds;
     final inProgress =
         progress != null &&
-        !progress!.completed &&
-        progress!.positionSeconds > 0 &&
+        !progress.completed &&
+        progress.positionSeconds > 0 &&
         totalSeconds > 0;
-    return ListTile(
-      leading: SizedBox(
-        width: 80,
-        height: 45,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Opacity(
-                opacity: isWatched ? 0.5 : 1.0,
-                child: _EpisodeThumb(url: episode.thumbUrl),
-              ),
-              if (inProgress)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: ResumeProgressBar(
-                    progress: progress!.positionSeconds / totalSeconds,
-                  ),
+    // A plain [GestureDetector] rather than `ListTile.onTap`: the tile
+    // would hand its node to an [InkWell], and an [InkWell] overwrites
+    // `canRequestFocus` and `skipTraversal` on whatever node it is given.
+    // There is no way to keep its tap and refuse its focus stop. This
+    // gives up the row's ripple, and nothing else — the two buttons carry
+    // the keyboard.
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _play,
+      child: ListTile(
+        leading: SizedBox(
+          width: 80,
+          height: 45,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Opacity(
+                  opacity: isWatched ? 0.5 : 1.0,
+                  child: _EpisodeThumb(url: episode.thumbUrl),
                 ),
-            ],
+                if (inProgress)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: ResumeProgressBar(
+                      progress: progress.positionSeconds / totalSeconds,
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
-      ),
-      title: Text(
-        '$epRef · ${episode.title}',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: isWatched
-            ? theme.textTheme.bodyLarge?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              )
-            : null,
-      ),
-      subtitle: Text(
-        formatDurationHuman(episode.duration),
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
+        title: Text(
+          '$_epRef · ${episode.title}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: isWatched
+              ? theme.textTheme.bodyLarge?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                )
+              : null,
+        ),
+        subtitle: Text(
+          formatDurationHuman(episode.duration),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            KidflixFocusZoom(
+              child: FilledButton.icon(
+                style: KidflixButtonStyles.primarySmall,
+                icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                label: const Text('Lire'),
+                onPressed: _play,
+              ),
+            ),
+            const SizedBox(width: 8),
+            DownloadIntentButton(
+              mediaId: episode.id,
+              isEpisode: true,
+              title: '$_epRef · ${episode.title}',
+              posterUrl: episode.thumbUrl,
+              parentSeriesTitle: widget.parentSeriesTitle,
+              originalTitle: episode.originalTitle,
+              durationSeconds: episode.duration.inSeconds,
+              ageCategory: episode.ageCategory.name,
+              synopsis: episode.synopsis,
+              seriesId: episode.seriesId,
+              seasonNumber: episode.seasonNumber,
+              episodeNumber: episode.episodeNumber,
+            ),
+          ],
         ),
       ),
-      trailing: DownloadIntentButton(
-        mediaId: episode.id,
-        isEpisode: true,
-        title: '$epRef · ${episode.title}',
-        posterUrl: episode.thumbUrl,
-        parentSeriesTitle: parentSeriesTitle,
-        originalTitle: episode.originalTitle,
-        durationSeconds: episode.duration.inSeconds,
-        ageCategory: episode.ageCategory.name,
-        synopsis: episode.synopsis,
-        seriesId: episode.seriesId,
-        seasonNumber: episode.seasonNumber,
-        episodeNumber: episode.episodeNumber,
-      ),
-      onTap: () async {
-        // Pre-cache so the manager resolves this episode regardless
-        // of the parent's /catalog visibility, AND so the offline
-        // series detail modal can rebuild the seasons tree.
-        unawaited(
-          ref
-              .read(downloadRepositoryProvider)
-              .cacheMediaMetadata(
-                mediaId: episode.id,
-                isEpisode: true,
-                title: '$epRef · ${episode.title}',
-                posterUrl: episode.thumbUrl,
-                parentSeriesTitle: parentSeriesTitle,
-                originalTitle: episode.originalTitle,
-                durationSeconds: episode.duration.inSeconds,
-                ageCategory: episode.ageCategory.name,
-                synopsis: episode.synopsis,
-                seriesId: episode.seriesId,
-                seasonNumber: episode.seasonNumber,
-                episodeNumber: episode.episodeNumber,
-              ),
-        );
-        final cast = await castIfRemoting(
-          context,
-          ref,
-          mediaId: episode.id,
-          isEpisode: true,
-          seriesId: episode.seriesId,
-        );
-        if (!context.mounted) return;
-        Navigator.of(context).pop();
-        if (cast) return;
-        context.go('/player/episode/${episode.id}?series=${episode.seriesId}');
-      },
     );
   }
 }
