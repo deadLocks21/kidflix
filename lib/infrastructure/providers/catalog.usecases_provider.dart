@@ -14,6 +14,7 @@ import 'package:kidflix/infrastructure/providers/download.repository_provider.da
 import 'package:kidflix/infrastructure/providers/download_management.usecases_provider.dart';
 import 'package:kidflix/infrastructure/providers/download_manifest_store.provider.dart';
 import 'package:kidflix/infrastructure/providers/favorites.controller_provider.dart';
+import 'package:kidflix/infrastructure/observability/perf_trace.dart';
 import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/offline_catalog.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/seen.controller_provider.dart';
@@ -83,7 +84,14 @@ Future<List<CatalogRowDto>> homeCatalogRows(Ref ref) async {
     throw StateError('homeCatalogRows requires an active profile');
   }
   final profile = ProfileDto.fromDomain(state.profile);
-  final inventory = await ref.watch(downloadInventoryProvider.future);
+  // Times the whole build. `inventory_ms` is local disk work that runs
+  // BEFORE any network call starts, so it is pure added latency on the
+  // critical path — worth seeing next to the rest rather than buried.
+  final trace = PerfTrace();
+  final inventory = await trace.measure(
+    'inventory',
+    () => ref.watch(downloadInventoryProvider.future),
+  );
   final seed = ref.watch(homeShuffleSeedProvider);
   // Favorites feed the "Ma liste" row. The controller is keepAlive so
   // a transient AsyncLoading on startup is rare ; treat unresolved
@@ -114,13 +122,22 @@ Future<List<CatalogRowDto>> homeCatalogRows(Ref ref) async {
     );
   }
   final useCase = ref.watch(listHomeCatalogUseCaseProvider);
-  final rows = await useCase.execute(
-    profile,
-    downloads: inventory.downloads,
-    favorites: favorites,
-    seenMovieIds: seenMovieIds,
-    shuffleSeed: seed,
+  final rows = await trace.measure(
+    'rows',
+    () => useCase.execute(
+      profile,
+      downloads: inventory.downloads,
+      favorites: favorites,
+      seenMovieIds: seenMovieIds,
+      shuffleSeed: seed,
+    ),
   );
+  trace.count('rows', rows.length);
+  trace.count('items', rows.fold<int>(0, (n, r) => n + r.items.length));
+  // One record per home load, at info: cheap enough to keep on in
+  // production, and the only place the phases can be read together.
+  // `total_ms` minus the phases is time nobody instrumented.
+  unawaited(ref.read(loggerProvider).info('home.load', attrs: trace.attrs()));
   // Connectivity says online and the call succeeded — fire-and-forget
   // backfill of any manifest entries that lack the full snapshot so
   // the offline home stays accurate. Pass every profile id of the

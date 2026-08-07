@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:kidflix/infrastructure/http/auth.interceptor.dart';
+import 'package:kidflix/infrastructure/http/timing.interceptor.dart';
+import 'package:kidflix/infrastructure/observability/perf_trace.dart';
+import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/api_base_url.provider.dart';
 import 'package:kidflix/infrastructure/providers/current_profile_id.provider.dart';
 import 'package:kidflix/infrastructure/providers/current_session.provider.dart';
@@ -72,5 +75,11 @@ Dio dio(Ref ref) {
       ),
     ),
   );
+  // Added last so it wraps the auth interceptor's work too, and only
+  // under the perf-trace flag — one record per call is a diagnostic
+  // volume, not a production one.
+  if (kPerfTrace) {
+    dio.interceptors.add(TimingInterceptor(ref.read(loggerProvider)));
+  }
   return dio;
 }

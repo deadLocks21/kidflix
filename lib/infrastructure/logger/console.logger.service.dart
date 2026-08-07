@@ -1,5 +1,6 @@
 import 'dart:developer' as developer;
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:kidflix/core/domain/model/log_level.dart';
 import 'package:kidflix/core/domain/services/logger.service.dart';
 
@@ -26,7 +27,23 @@ class ConsoleLoggerService implements LoggerService {
   /// view as the category.
   final String name;
 
-  const ConsoleLoggerService({this.prefix, this.name = 'kidflix'});
+  /// Mirror every record to stdout on top of `dart:developer`.
+  ///
+  /// `developer.log` only reaches the VM service — DevTools' Logging
+  /// view shows it, `flutter run`'s console does **not**. That is fine
+  /// day to day, but it makes a terminal-driven diagnostic session blind:
+  /// the records exist and nothing prints them. When [mirrorToStdout] is
+  /// set the same line also goes through `debugPrint`, so `flutter run`,
+  /// `flutter logs` and a piped log file all see it.
+  ///
+  /// Off by default; the provider turns it on for perf-trace runs.
+  final bool mirrorToStdout;
+
+  const ConsoleLoggerService({
+    this.prefix,
+    this.name = 'kidflix',
+    this.mirrorToStdout = false,
+  });
 
   @override
   Future<void> log(
@@ -46,14 +63,19 @@ class ConsoleLoggerService implements LoggerService {
         ' ',
       );
     }
+    final line = buf.toString();
     developer.log(
-      buf.toString(),
+      line,
       name: name,
       level:
           level.otelSeverityNumber * 100, // dart:developer expects 0..2000-ish
       error: error,
       stackTrace: stack,
     );
+    if (mirrorToStdout) {
+      debugPrint('[$name] ${level.otelSeverityText} $line');
+      if (error != null) debugPrint('[$name]   error: $error');
+    }
   }
 
   @override

@@ -20,6 +20,7 @@ import 'package:kidflix/core/domain/model/avatar_update.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/model/session.dart';
 import 'package:kidflix/infrastructure/providers/api_base_url.provider.dart';
+import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/auth.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/authenticate_with_biometrics.usecase_provider.dart';
 import 'package:kidflix/infrastructure/providers/in_memory_accounts_store.provider.dart';
@@ -681,6 +682,23 @@ class SessionController extends _$SessionController {
 @Riverpod(keepAlive: true)
 Future<void> bootstrap(Ref ref) async {
   await ref.read(apiBaseUrlProvider.notifier).load();
+  // Which backend the run actually resolved to. Cheap, once per launch,
+  // and it removes the single most confusing failure mode when reading
+  // any other telemetry: an empty or demo URL silently swaps every
+  // repository for its in-memory twin, so timings look impossibly good
+  // and no HTTP is ever logged.
+  final resolvedBaseUrl = ref.read(apiBaseUrlProvider);
+  unawaited(
+    ref
+        .read(loggerProvider)
+        .info(
+          'app.backend',
+          attrs: {
+            'api.base_url': resolvedBaseUrl.isEmpty ? '(vide)' : resolvedBaseUrl,
+            'api.in_memory': isInMemoryBaseUrl(resolvedBaseUrl),
+          },
+        ),
+  );
   await ref.read(sessionControllerProvider.notifier).restoreSession();
   // Once the persisted session is back in memory, fire-and-forget a
   // profile refresh against the auth repo so the latest server-side

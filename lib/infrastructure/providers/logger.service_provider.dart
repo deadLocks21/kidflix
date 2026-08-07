@@ -6,6 +6,7 @@ import 'package:kidflix/core/domain/services/logger.service.dart';
 import 'package:kidflix/infrastructure/logger/composite.logger.service.dart';
 import 'package:kidflix/infrastructure/logger/console.logger.service.dart';
 import 'package:kidflix/infrastructure/logger/signoz.logger.service.dart';
+import 'package:kidflix/infrastructure/observability/perf_trace.dart';
 import 'package:kidflix/infrastructure/providers/current_profile_id.provider.dart';
 import 'package:kidflix/infrastructure/providers/current_session.provider.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -59,6 +60,9 @@ LoggerService loggerService(Ref ref) {
 
   final console = ConsoleLoggerService(
     prefix: hasSignoz && !kReleaseMode ? '[→signoz]' : null,
+    // A perf-trace run is driven from a terminal, and `developer.log`
+    // alone never reaches it — see `ConsoleLoggerService.mirrorToStdout`.
+    mirrorToStdout: kPerfTrace,
   );
 
   if (!hasSignoz) {
