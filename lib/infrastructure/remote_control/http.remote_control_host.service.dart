@@ -11,6 +11,7 @@ import 'package:kidflix/core/domain/model/remote_playback_state.dart';
 import 'package:kidflix/core/domain/services/remote_control_host.service.dart';
 import 'package:kidflix/core/domain/services/remote_discovery.service.dart';
 import 'package:kidflix/core/domain/services/remote_pairing.repository.dart';
+import 'package:kidflix/infrastructure/observability/perf_trace.dart';
 import 'package:kidflix/infrastructure/remote_control/lan_address.dart';
 
 /// Minimum gap between two pushes that differ only by playback position.
@@ -120,7 +121,14 @@ class HttpRemoteControlHostService implements RemoteControlHostService {
     // a user who is mid-way through typing it on their phone.
     if (_server != null) return _status;
 
-    _issuedTokens = await _pairing.loadIssuedTokens();
+    // `start()` runs on the main isolate at bootstrap, so every step here
+    // delays whatever else is queued there — including the responses to
+    // the app's first HTTP calls. Measured end to end it was ~2 s, which
+    // made three unrelated 792-byte requests look like 2.2 s each. The
+    // per-step breakdown is what says whether that is the socket, the
+    // interface enumeration or the mDNS registration.
+    final trace = PerfTrace();
+    _issuedTokens = await trace.measure('tokens', _pairing.loadIssuedTokens);
     _failedPairingAttempts = 0;
 
     if (resolveDeviceId().isEmpty) {
@@ -140,7 +148,7 @@ class HttpRemoteControlHostService implements RemoteControlHostService {
 
     final HttpServer server;
     try {
-      server = await _bind();
+      server = await trace.measure('bind', _bind);
     } on SocketException catch (e, st) {
       unawaited(
         _logger.error(
@@ -165,7 +173,7 @@ class HttpRemoteControlHostService implements RemoteControlHostService {
       ),
     );
 
-    final addresses = await localNetworkAddresses();
+    final addresses = await trace.measure('addresses', localNetworkAddresses);
     _emit(
       RemoteHostStatus(
         running: true,
@@ -177,15 +185,18 @@ class HttpRemoteControlHostService implements RemoteControlHostService {
     );
 
     try {
-      await _discovery.advertise(
-        name: resolveDeviceName(),
-        port: server.port,
-        attributes: {
-          RemoteProtocol.txtDeviceId: resolveDeviceId(),
-          RemoteProtocol.txtDeviceName: resolveDeviceName(),
-          RemoteProtocol.txtPlatform: platformName,
-          RemoteProtocol.txtVersion: '${RemoteProtocol.version}',
-        },
+      await trace.measure(
+        'advertise',
+        () => _discovery.advertise(
+          name: resolveDeviceName(),
+          port: server.port,
+          attributes: {
+            RemoteProtocol.txtDeviceId: resolveDeviceId(),
+            RemoteProtocol.txtDeviceName: resolveDeviceName(),
+            RemoteProtocol.txtPlatform: platformName,
+            RemoteProtocol.txtVersion: '${RemoteProtocol.version}',
+          },
+        ),
       );
     } catch (e, st) {
       // The socket is up and manual pairing by IP still works — degrade
@@ -204,7 +215,12 @@ class HttpRemoteControlHostService implements RemoteControlHostService {
     unawaited(
       _logger.info(
         'remote.host.started',
-        attrs: {'port': server.port, 'addresses': addresses.join(',')},
+        attrs: {
+          'port': server.port,
+          'addresses': addresses.join(','),
+          'interfaces': addresses.length,
+          ...trace.attrs(),
+        },
       ),
     );
     return _status;
