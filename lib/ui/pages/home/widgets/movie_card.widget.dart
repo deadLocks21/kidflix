@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
 import 'package:kidflix/shared/duration_format.dart';
 import 'package:kidflix/shared/tmdb_image.dart';
+import 'package:kidflix/ui/focus/kidflix_focus_ring.widget.dart';
 import 'package:kidflix/ui/focus/kidflix_focusable.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/resume_progress_bar.widget.dart';
 
@@ -53,26 +54,33 @@ class MovieCard extends StatelessWidget {
         focusNode: focusNode,
         autofocus: autofocus,
         borderRadius: BorderRadius.circular(8),
+        // The ring goes around the poster only, placed below — see the
+        // [KidflixFocusRing] on the next lines.
+        ring: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: SizedBox(
-                width: width,
-                height: posterHeight,
-                child: Stack(
-                  children: [
-                    Positioned.fill(child: _Poster(posterUrl: movie.posterUrl)),
-                    if (progress != null && progress! > 0)
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        child: ResumeProgressBar(progress: progress!),
+            KidflixFocusRing(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  width: width,
+                  height: posterHeight,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: _Poster(posterUrl: movie.posterUrl),
                       ),
-                  ],
+                      if (progress != null && progress! > 0)
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          child: ResumeProgressBar(progress: progress!),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -84,12 +92,26 @@ class MovieCard extends StatelessWidget {
               style: theme.textTheme.titleSmall,
             ),
             const SizedBox(height: 2),
-            Text(
-              _caption(movie),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+            // Built below the focusable so it can read its state: the
+            // caption steps up from grey to full white on the selected
+            // card, which is what makes the whole tile come forward
+            // rather than just its outline.
+            Builder(
+              builder: (context) => AnimatedDefaultTextStyle(
+                duration: KidflixFocusable.duration,
+                curve: KidflixFocusable.curve,
+                style:
+                    theme.textTheme.bodySmall?.copyWith(
+                      color: KidflixFocusable.isFocused(context)
+                          ? theme.colorScheme.onSurface
+                          : theme.colorScheme.onSurfaceVariant,
+                    ) ??
+                    const TextStyle(),
+                child: Text(
+                  _caption(movie),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ),
           ],

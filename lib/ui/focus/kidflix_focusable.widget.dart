@@ -35,6 +35,12 @@ class KidflixFocusable extends StatefulWidget {
   /// vertical slack, and the ring already carries most of the signal.
   final double scale;
 
+  /// Ring the whole child. The catalog cards turn it off and place their
+  /// own around the poster alone, reading [isFocused]: a ring that took
+  /// in the caption too ran straight through the text, which starts flush
+  /// against the card's edge.
+  final bool ring;
+
   const KidflixFocusable({
     super.key,
     required this.child,
@@ -44,7 +50,14 @@ class KidflixFocusable extends StatefulWidget {
     this.focusNode,
     this.borderRadius = const BorderRadius.all(Radius.circular(8)),
     this.scale = defaultScale,
+    this.ring = true,
   });
+
+  /// Whether the enclosing focusable is showing as focused — it holds
+  /// focus *and* the user is on the keyboard. Lets a child emphasise
+  /// itself without owning a focus node of its own.
+  static bool isFocused(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_FocusedMarker>()?.on ?? false;
 
   /// Extra room a host must reserve around an item of [extent] so the zoom
   /// is not clipped by a surrounding viewport.
@@ -84,6 +97,11 @@ class _KidflixFocusableState extends State<KidflixFocusable> {
         autofocus: widget.autofocus,
         onTap: widget.onTap,
         onLongPress: widget.onLongPress,
+        // The ring and the zoom *are* the focus indicator. Left on, the
+        // ink highlight also paints `ThemeData.focusColor` behind the
+        // child — which an opaque poster hides and a caption does not. It
+        // showed up as a grey slab under the title, and nowhere else.
+        focusColor: Colors.transparent,
         onFocusChange: (focused) {
           if (focused == _focused) return;
           setState(() => _focused = focused);
@@ -108,37 +126,53 @@ class _KidflixFocusableState extends State<KidflixFocusable> {
     required Widget child,
   }) {
     final scheme = Theme.of(context).colorScheme;
-    return AnimatedScale(
-      scale: on ? widget.scale : 1,
-      duration: KidflixFocusable.duration,
-      curve: KidflixFocusable.curve,
-      child: AnimatedContainer(
+    return _FocusedMarker(
+      on: on,
+      child: AnimatedScale(
+        scale: on ? widget.scale : 1,
         duration: KidflixFocusable.duration,
         curve: KidflixFocusable.curve,
-        // `decoration` would inset the child by the border width and make
-        // the card twitch as focus arrives; `foregroundDecoration` paints
-        // the ring over the poster edge and leaves layout alone.
-        decoration: BoxDecoration(
-          borderRadius: widget.borderRadius,
-          boxShadow: on
-              ? const [
-                  BoxShadow(
-                    color: Color(0x99000000),
-                    blurRadius: 18,
-                    spreadRadius: 1,
-                  ),
-                ]
-              : const [],
-        ),
-        foregroundDecoration: BoxDecoration(
-          borderRadius: widget.borderRadius,
-          border: Border.all(
-            color: on ? KidflixFocusable.ringColor(scheme) : Colors.transparent,
-            width: KidflixFocusable.ringWidth,
+        child: AnimatedContainer(
+          duration: KidflixFocusable.duration,
+          curve: KidflixFocusable.curve,
+          // `decoration` would inset the child by the border width and
+          // make the card twitch as focus arrives; `foregroundDecoration`
+          // paints the ring over the edge and leaves layout alone.
+          decoration: BoxDecoration(
+            borderRadius: widget.borderRadius,
+            boxShadow: on && widget.ring
+                ? const [
+                    BoxShadow(
+                      color: Color(0x99000000),
+                      blurRadius: 18,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : const [],
           ),
+          foregroundDecoration: widget.ring
+              ? BoxDecoration(
+                  borderRadius: widget.borderRadius,
+                  border: Border.all(
+                    color: on
+                        ? KidflixFocusable.ringColor(scheme)
+                        : Colors.transparent,
+                    width: KidflixFocusable.ringWidth,
+                  ),
+                )
+              : null,
+          child: child,
         ),
-        child: child,
       ),
     );
   }
+}
+
+class _FocusedMarker extends InheritedWidget {
+  final bool on;
+
+  const _FocusedMarker({required this.on, required super.child});
+
+  @override
+  bool updateShouldNotify(_FocusedMarker oldWidget) => on != oldWidget.on;
 }
