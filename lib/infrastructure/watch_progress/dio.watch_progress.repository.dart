@@ -22,14 +22,43 @@ import 'package:kidflix/core/domain/services/watch_progress.repository.dart';
 /// contract, with a defensive fallback on a `null` body if the backend
 /// opts for `200` + null.
 ///
-/// The required `Authorization`, `X-Device-Id`, `X-Profile-Id` headers
-/// are injected transparently by the `AuthInterceptor` registered on
-/// `dioProvider`. No metier-level error mapping: any 4xx / 5xx /
-/// network error surfaces as a generic [DioException].
+/// `Authorization` and `X-Device-Id` are injected transparently by the
+/// `AuthInterceptor` registered on `dioProvider`. No metier-level error
+/// mapping: any 4xx / 5xx / network error surfaces as a generic
+/// [DioException].
+///
+/// ## `X-Profile-Id` is pinned here, not inherited
+///
+/// Every route below is scoped by a `{profileId}` in its path, and the
+/// backend rejects the call unless `X-Profile-Id` matches that path
+/// segment. So the header is set explicitly from the `profileId` the
+/// caller passed — [_profileHeader] — instead of being left to the
+/// interceptor, which fills it from the *currently active* profile.
+///
+/// Letting the interceptor decide was wrong twice over, both observed
+/// against production:
+///
+/// * **No active profile yet** → header omitted → `400
+///   missing_profile_id`. The first progress fetch after selecting a
+///   profile raced the provider that publishes the active id, so
+///   Continue Watching silently started empty.
+/// * **A different active profile** → header disagrees with the path →
+///   `403 forbidden_profile`. This is how a queued offline write for one
+///   kid was replayed while another kid's profile was active. It could
+///   never succeed, and since `WatchProgressSyncService` stops draining
+///   on the first failure to preserve FIFO order, that one op blocked
+///   every queued write behind it.
+///
+/// Pinning the header removes both: the request now carries the profile
+/// it is actually about, whoever is watching.
 class DioWatchProgressRepository implements WatchProgressRepository {
   final Dio _dio;
 
   DioWatchProgressRepository({required Dio dio}) : _dio = dio;
+
+  /// Per-call override the `AuthInterceptor` preserves as-is.
+  static Options _profileHeader(String profileId) =>
+      Options(headers: {'X-Profile-Id': profileId});
 
   @override
   Future<MovieProgress?> findForMovie({
@@ -38,6 +67,7 @@ class DioWatchProgressRepository implements WatchProgressRepository {
   }) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/profiles/$profileId/progress/movies/$movieId',
+      options: _profileHeader(profileId),
     );
     if (response.statusCode == 204 || response.data == null) return null;
     final progress = watchProgressFromJson(response.data!);
@@ -57,6 +87,7 @@ class DioWatchProgressRepository implements WatchProgressRepository {
   }) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/profiles/$profileId/progress/episodes/$episodeId',
+      options: _profileHeader(profileId),
     );
     if (response.statusCode == 204 || response.data == null) return null;
     final progress = watchProgressFromJson(response.data!);
@@ -77,11 +108,13 @@ class DioWatchProgressRepository implements WatchProgressRepository {
         await _dio.put<void>(
           '/profiles/$profileId/progress/movies/$movieId',
           data: body,
+          options: _profileHeader(profileId),
         );
       case EpisodeProgress(:final profileId, :final episodeId):
         await _dio.put<void>(
           '/profiles/$profileId/progress/episodes/$episodeId',
           data: body,
+          options: _profileHeader(profileId),
         );
     }
   }
@@ -90,6 +123,7 @@ class DioWatchProgressRepository implements WatchProgressRepository {
   Future<List<WatchProgress>> listForProfile(String profileId) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/profiles/$profileId/progress',
+      options: _profileHeader(profileId),
     );
     final list = (response.data!['progress'] as List)
         .cast<Map<String, dynamic>>();
@@ -103,6 +137,7 @@ class DioWatchProgressRepository implements WatchProgressRepository {
   }) async {
     await _dio.post<void>(
       '/profiles/$profileId/progress/movies/$movieId/dismiss',
+      options: _profileHeader(profileId),
     );
   }
 
@@ -113,6 +148,7 @@ class DioWatchProgressRepository implements WatchProgressRepository {
   }) async {
     await _dio.delete<void>(
       '/profiles/$profileId/progress/movies/$movieId/dismiss',
+      options: _profileHeader(profileId),
     );
   }
 
@@ -123,6 +159,7 @@ class DioWatchProgressRepository implements WatchProgressRepository {
   }) async {
     await _dio.post<void>(
       '/profiles/$profileId/progress/episodes/$episodeId/dismiss',
+      options: _profileHeader(profileId),
     );
   }
 
@@ -133,6 +170,7 @@ class DioWatchProgressRepository implements WatchProgressRepository {
   }) async {
     await _dio.delete<void>(
       '/profiles/$profileId/progress/episodes/$episodeId/dismiss',
+      options: _profileHeader(profileId),
     );
   }
 }

@@ -450,4 +450,87 @@ void main() {
       expect((result[1] as EpisodeProgress).episodeId, 'ep-1');
     });
   });
+
+  group('DioWatchProgressRepository — X-Profile-Id', () {
+    // Ces routes sont scopées par un {profileId} dans le chemin, et le
+    // backend refuse l'appel si le header ne correspond pas. Le header
+    // doit donc venir du profileId passé, jamais du profil actif : sinon
+    // une écriture en file pour un autre profil part avec le mauvais
+    // header et prend un 403 qu'aucun rejeu ne pourra corriger.
+    late _FakeAdapter adapter;
+    late DioWatchProgressRepository repo;
+
+    setUp(() {
+      adapter = _FakeAdapter((_) => _jsonResponse(200, {'progress': []}));
+      repo = DioWatchProgressRepository(dio: _makeDio(adapter));
+    });
+
+    String? headerOf(int i) => adapter.requests[i].headers['X-Profile-Id'] as String?;
+
+    test('listForProfile épingle le profil du chemin', () async {
+      await repo.listForProfile('kid-2');
+
+      expect(adapter.requests.single.path, '/profiles/kid-2/progress');
+      expect(headerOf(0), 'kid-2');
+    });
+
+    test('save épingle le profil porté par la progression', () async {
+      adapter = _FakeAdapter((_) => _emptyResponse(204));
+      repo = DioWatchProgressRepository(dio: _makeDio(adapter));
+
+      await repo.save(
+        MovieProgress(
+          profileId: 'kid-2',
+          movieId: 'nemo',
+          positionSeconds: 42,
+          completed: false,
+          updatedAt: DateTime.utc(2026, 5, 4),
+        ),
+      );
+
+      expect(headerOf(0), 'kid-2');
+    });
+
+    test('save épisode épingle aussi le bon profil', () async {
+      adapter = _FakeAdapter((_) => _emptyResponse(204));
+      repo = DioWatchProgressRepository(dio: _makeDio(adapter));
+
+      await repo.save(
+        EpisodeProgress(
+          profileId: 'kid-2',
+          episodeId: 'ep-9',
+          positionSeconds: 12,
+          completed: false,
+          updatedAt: DateTime.utc(2026, 5, 4),
+        ),
+      );
+
+      expect(headerOf(0), 'kid-2');
+    });
+
+    test('les routes dismiss épinglent le profil du chemin', () async {
+      adapter = _FakeAdapter((_) => _emptyResponse(204));
+      repo = DioWatchProgressRepository(dio: _makeDio(adapter));
+
+      await repo.dismissMovie(profileId: 'kid-2', movieId: 'nemo');
+      await repo.unDismissMovie(profileId: 'kid-2', movieId: 'nemo');
+      await repo.dismissEpisode(profileId: 'kid-3', episodeId: 'ep-9');
+      await repo.unDismissEpisode(profileId: 'kid-3', episodeId: 'ep-9');
+
+      expect(
+        [for (var i = 0; i < 4; i++) headerOf(i)],
+        ['kid-2', 'kid-2', 'kid-3', 'kid-3'],
+      );
+    });
+
+    test('les lectures unitaires épinglent le profil du chemin', () async {
+      adapter = _FakeAdapter((_) => _emptyResponse(204));
+      repo = DioWatchProgressRepository(dio: _makeDio(adapter));
+
+      await repo.findForMovie(profileId: 'kid-2', movieId: 'nemo');
+      await repo.findForEpisode(profileId: 'kid-3', episodeId: 'ep-9');
+
+      expect([headerOf(0), headerOf(1)], ['kid-2', 'kid-3']);
+    });
+  });
 }
