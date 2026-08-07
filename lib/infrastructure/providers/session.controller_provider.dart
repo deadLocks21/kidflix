@@ -21,6 +21,7 @@ import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/model/session.dart';
 import 'package:kidflix/infrastructure/providers/api_base_url.provider.dart';
 import 'package:kidflix/infrastructure/observability/event_loop_probe.dart';
+import 'package:kidflix/infrastructure/observability/idle_task.dart';
 import 'package:kidflix/infrastructure/observability/perf_trace.dart';
 import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/auth.service_provider.dart';
@@ -765,13 +766,23 @@ Future<void> bootstrap(Ref ref) async {
   // record that `restore()` publishes. Starting the server before they
   // are loaded advertises an empty id — which every remote drops, since
   // the id is what a pairing token is keyed on.
+  // Scheduled at idle rather than merely unawaited. `unawaited` only
+  // means nobody waits for the result — the work still starts at once
+  // and competes with the frames the app is trying to render.
+  //
+  // Every individual step of the server start was measured and none of
+  // them holds the isolate: tokens 0 ms, bind 3 ms, interfaces ~180 ms,
+  // seed 1 ms, and the mDNS wait blocks ~180 ms of its 1.6 s. Yet
+  // enabling the server adds ~1.2 s of stall, in the frames that follow
+  // it coming up. There is no step to optimise — the fix is to stop
+  // paying it while the first screens are rendering.
+  //
+  // Deferred, not dropped: the server still comes up by itself, and the
+  // delay is invisible. mDNS requires ~1.6 s of conflict probing before
+  // the device is discoverable at all, so "started at launch" never
+  // meant "discoverable at launch".
   unawaited(
-    () async {
-      // Timed: `restore()` binds a socket and publishes an mDNS record on
-      // every interface the host has, which on a dev machine can be eight
-      // Docker and VPN bridges. It runs unawaited, but the work still
-      // lands on the main isolate and delays whatever is queued there —
-      // including the first HTTP responses.
+    runWhenIdle(() async {
       final trace = PerfTrace();
       await trace.measure(
         'ids',
@@ -797,6 +808,6 @@ Future<void> bootstrap(Ref ref) async {
           'lag_at_ms': lag['max_lag_at_ms'],
         }),
       );
-    }().catchError((Object _) {}),
+    }, debugLabel: 'remote-host-restore').catchError((Object _) {}),
   );
 }
