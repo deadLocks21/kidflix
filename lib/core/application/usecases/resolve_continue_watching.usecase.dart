@@ -14,20 +14,38 @@ import 'package:kidflix/core/domain/services/watch_progress.repository.dart';
 ///
 /// 1. Fetch all watch progresses for the profile.
 /// 2. Sort by `updatedAt` desc.
-/// 3. For each progress entry, project to a [ContinueWatchingItemDto]:
+/// 3. Resolve, in ONE batch, the parent series of every episode entry
+///    (cf. [_resolveEpisodeParents]).
+/// 4. For each progress entry, project to a [ContinueWatchingItemDto]:
 ///    * [MovieProgress] → resolve the [Movie] via the catalog.
-///    * [EpisodeProgress] → fetch the parent [Series] via
-///      [SeriesRepository.findById] and apply the next-episode rule
-///      ([ContinueWatchingState]).
-/// 4. Deduplicate by `seriesId` (multiple episode progresses on the
+///    * [EpisodeProgress] → apply the next-episode rule
+///      ([ContinueWatchingState]) on the resolved parent.
+/// 5. Deduplicate by `seriesId` (multiple episode progresses on the
 ///   same series collapse to the most recent one).
-/// 5. Per-item failure handling: when [SeriesRepository.findById]
+/// 6. Per-item failure handling: when [SeriesRepository.findById]
 ///    throws, the offending entry is silently omitted ; the rest of
 ///    the list is unaffected.
 ///
 /// The Continue Watching row is computed entirely client-side — the
 /// backend exposes no equivalent endpoint by design (cf. `API.md`
 /// § "Continue watching" note).
+///
+/// ## Network shape
+///
+/// This use case used to be the app's dominant source of latency: it
+/// re-fetched `/catalog` and then walked `GET /series/{id}` over the
+/// WHOLE catalog, sequentially, **once per episode progress** — an N×M
+/// round-trip fan-out that pushed the home to ~10 s while `/catalog`
+/// itself answered in under 70 ms. Production logs showed every series
+/// of the catalog being fetched 60+ times an hour.
+///
+/// Two invariants keep that from coming back:
+///
+/// * [execute] never fetches what the caller already has — pass
+///   `catalog` and `progresses` (the home does, cf.
+///   `CatalogApplicationService.buildHomeRowsFor`).
+/// * Series resolution is batched and deduplicated across the whole
+///   call, never nested inside the per-progress loop.
 class ResolveContinueWatchingUseCase {
   final WatchProgressRepository _progressRepo;
   final CatalogRepository _catalogRepo;
@@ -44,15 +62,32 @@ class ResolveContinueWatchingUseCase {
        _seriesRepo = seriesRepo,
        _logger = logger;
 
-  Future<List<ContinueWatchingItemDto>> execute(String profileId) async {
-    final progresses = await _progressRepo.listForProfile(profileId);
-    final sorted = [...progresses]
+  /// [catalog] and [progresses] let the caller hand over data it has
+  /// already loaded. Both are fetched on demand when omitted, so a
+  /// standalone call still works — but the home path supplies them and
+  /// thereby spares a duplicate `/catalog` and `/progress` round-trip
+  /// each.
+  Future<List<ContinueWatchingItemDto>> execute(
+    String profileId, {
+    List<CatalogItem>? catalog,
+    List<WatchProgress>? progresses,
+  }) async {
+    final allProgresses =
+        progresses ?? await _progressRepo.listForProfile(profileId);
+    final sorted = [...allProgresses]
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
-    final catalog = await _catalogRepo.listCatalog();
+    final items = catalog ?? await _catalogRepo.listCatalog();
     final moviesById = <String, Movie>{
-      for (final m in catalog.whereType<Movie>()) m.id: m,
+      for (final m in items.whereType<Movie>()) m.id: m,
     };
+
+    // One batch for every episode entry, before the projection loop —
+    // the loop itself must stay free of any await on the network.
+    final episodeParents = await _resolveEpisodeParents(
+      sorted.whereType<EpisodeProgress>().where((p) => !p.dismissed),
+      items.whereType<Series>().toList(growable: false),
+    );
 
     final result = <ContinueWatchingItemDto>[];
     final seenSeriesIds = <String>{};
@@ -83,17 +118,8 @@ class ResolveContinueWatchingUseCase {
             ),
           );
         case EpisodeProgress():
-          // We don't know the seriesId until we resolve the parent
-          // series. The `Episode.seriesId` field is on the Episode
-          // domain — but the watch progress only carries `episodeId`.
-          // Inspect each loaded series to find which one owns the
-          // episode. To avoid N×M lookups, we build a parent-of-episode
-          // map on demand, but also handle the case where the series
-          // isn't in our cache: walk through `findById` for series we
-          // haven't seen.
-          final episodeRef = await _resolveEpisodeWithSeries(
-            episodeId: progress.episodeId,
-          );
+          // Already resolved in batch above — no network here.
+          final episodeRef = episodeParents[progress.episodeId];
           if (episodeRef == null) continue;
           final (series, episode) = episodeRef;
 
@@ -123,41 +149,97 @@ class ResolveContinueWatchingUseCase {
     return result;
   }
 
-  /// Locate the [Series] and [Episode] that own [episodeId]. Catches
-  /// per-item failures and returns `null` so the caller can omit the
-  /// entry from the resulting Continue Watching list.
+  /// Maps every episode id in [progresses] to its parent `(Series,
+  /// Episode)`, in a single batch. Entries that cannot be resolved are
+  /// absent from the result and get dropped by the caller.
   ///
-  /// In practice the implementation iterates over all the series the
-  /// app knows about — for the in-memory repo this is the seeded list,
-  /// for HTTP we'd need either a `/episodes/{id}/series` endpoint
-  /// (out of scope) or a brute-force walk over recent series. For MVP
-  /// the contract is honored: the parent [Series] is fetched via
-  /// `SeriesRepository.findById(seriesId)` once we know the id.
+  /// Two paths, and which one runs is what decides the cost of the whole
+  /// home load:
   ///
-  /// Today we discover the seriesId via the catalog: every series in
-  /// the catalog can be loaded fully via [SeriesRepository.findById].
-  /// If [findById] throws for any series, that series is silently
-  /// excluded from the lookup.
-  Future<(Series, Episode)?> _resolveEpisodeWithSeries({
-    required String episodeId,
-  }) async {
-    final catalog = await _catalogRepo.listCatalog();
-    for (final item in catalog.whereType<Series>()) {
-      try {
-        final fullSeries = await _seriesRepo.findById(item.id);
-        for (final season in fullSeries.seasons) {
-          for (final ep in season.episodes) {
-            if (ep.id == episodeId) {
-              return (fullSeries, ep);
-            }
-          }
+  /// * **Fast** — [EpisodeProgress.seriesId] is known (the backend sends
+  ///   `series_id` on every episode progress, cf. `API.md`
+  ///   § Progression de lecture). Only the distinct series actually
+  ///   referenced are fetched, concurrently. Typically 1–2 requests.
+  /// * **Fallback** — at least one entry has no `seriesId` (older
+  ///   backend, or a progress saved locally that never round-tripped).
+  ///   The whole catalog is then loaded to build the index. Still ONE
+  ///   pass for the entire call, concurrent, and shared by every
+  ///   unresolved entry — where the previous implementation restarted a
+  ///   sequential walk for each one.
+  ///
+  /// [catalogSeries] is only read for the fallback ; the fast path never
+  /// touches it.
+  Future<Map<String, (Series, Episode)>> _resolveEpisodeParents(
+    Iterable<EpisodeProgress> progresses,
+    List<Series> catalogSeries,
+  ) async {
+    final pending = progresses.toList(growable: false);
+    if (pending.isEmpty) return const {};
+
+    final knownSeriesIds = <String>{for (final p in pending) ?p.seriesId};
+    final needsFallback = pending.any((p) => p.seriesId == null);
+    final loaded = await _loadSeries({
+      ...knownSeriesIds,
+      if (needsFallback) ...catalogSeries.map((s) => s.id),
+    });
+
+    final out = <String, (Series, Episode)>{};
+    for (final progress in pending) {
+      final seriesId = progress.seriesId;
+      if (seriesId != null) {
+        // Trust the backend's pointer. A miss here means the series
+        // failed to load (already logged) or the pointer is stale —
+        // either way, scanning the rest would not be more correct.
+        final series = loaded[seriesId];
+        if (series == null) continue;
+        final episode = _findEpisodeIn(series, progress.episodeId);
+        if (episode != null) out[progress.episodeId] = (series, episode);
+        continue;
+      }
+      for (final series in loaded.values) {
+        final episode = _findEpisodeIn(series, progress.episodeId);
+        if (episode != null) {
+          out[progress.episodeId] = (series, episode);
+          break;
         }
-      } catch (e) {
-        await _logger.warn(
-          'continue_watching.series_skipped',
-          attrs: {'series.id': item.id},
-          error: e,
-        );
+      }
+    }
+    return out;
+  }
+
+  /// Loads [ids] concurrently. A series that fails to load is logged and
+  /// omitted — one unreachable series never sinks the whole row.
+  ///
+  /// The fan-out is bounded by the catalog size in the fallback path,
+  /// which is acceptable because that path is transitional: once every
+  /// stored progress carries a `seriesId`, only the handful of series on
+  /// the rail are ever fetched.
+  Future<Map<String, Series>> _loadSeries(Set<String> ids) async {
+    if (ids.isEmpty) return const {};
+    final ordered = ids.toList(growable: false);
+    final loaded = await Future.wait(
+      ordered.map((id) async {
+        try {
+          return await _seriesRepo.findById(id);
+        } catch (e) {
+          await _logger.warn(
+            'continue_watching.series_skipped',
+            attrs: {'series.id': id},
+            error: e,
+          );
+          return null;
+        }
+      }),
+    );
+    return {
+      for (var i = 0; i < ordered.length; i++) ordered[i]: ?loaded[i],
+    };
+  }
+
+  Episode? _findEpisodeIn(Series series, String episodeId) {
+    for (final season in series.seasons) {
+      for (final episode in season.episodes) {
+        if (episode.id == episodeId) return episode;
       }
     }
     return null;

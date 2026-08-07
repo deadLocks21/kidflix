@@ -116,9 +116,21 @@ class _CannedCWUseCase extends ResolveContinueWatchingUseCase {
         logger: LoggerApplicationService(InMemoryLoggerService()),
       );
 
+  /// Captures what the service hands over, so the "no duplicate fetch"
+  /// contract can be asserted without a network double.
+  List<CatalogItem>? receivedCatalog;
+  List<WatchProgress>? receivedProgresses;
+
   @override
-  Future<List<ContinueWatchingItemDto>> execute(String profileId) async =>
-      List.unmodifiable(_items);
+  Future<List<ContinueWatchingItemDto>> execute(
+    String profileId, {
+    List<CatalogItem>? catalog,
+    List<WatchProgress>? progresses,
+  }) async {
+    receivedCatalog = catalog;
+    receivedProgresses = progresses;
+    return List.unmodifiable(_items);
+  }
 }
 
 Series _s({

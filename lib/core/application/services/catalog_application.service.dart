@@ -69,17 +69,25 @@ class CatalogApplicationService {
     int? shuffleSeed,
   }) async {
     final rng = shuffleSeed != null ? Random(shuffleSeed) : Random();
-    final itemsFuture = _repository.listCatalog();
-    final cwFuture = _continueWatching == null
-        ? Future<List<ContinueWatchingItemDto>>.value(const [])
-        : _continueWatching.execute(profile.id);
-    final wpFuture =
-        _watchProgress?.listForProfile(profile.id) ??
-        Future<List<WatchProgress>>.value(const []);
-    final results = await Future.wait([itemsFuture, cwFuture, wpFuture]);
+    // The catalog and the progress list are the only two independent
+    // fetches — they run together. Continue Watching then reuses BOTH
+    // instead of re-fetching them: it used to issue its own
+    // `listCatalog()` plus one more per episode entry, so a single home
+    // load hit `/catalog` three times or more.
+    final results = await Future.wait([
+      _repository.listCatalog(),
+      _watchProgress?.listForProfile(profile.id) ??
+          Future<List<WatchProgress>>.value(const []),
+    ]);
     final items = results[0] as List<CatalogItem>;
-    final cwEntries = results[1] as List<ContinueWatchingItemDto>;
-    final progresses = results[2] as List<WatchProgress>;
+    final progresses = results[1] as List<WatchProgress>;
+    final cwEntries = _continueWatching == null
+        ? const <ContinueWatchingItemDto>[]
+        : await _continueWatching.execute(
+            profile.id,
+            catalog: items,
+            progresses: progresses,
+          );
     final watchedMovieIds = <String>{
       for (final p in progresses)
         if (p is MovieProgress) p.movieId,

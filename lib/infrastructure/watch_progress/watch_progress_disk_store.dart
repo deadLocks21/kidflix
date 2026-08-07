@@ -220,11 +220,16 @@ class JsonFileWatchProgressStore implements WatchProgressDiskStore {
     await tmp.rename(finalFile.path);
   }
 
+  /// The key already encodes kind + profile + media id, so only the
+  /// mutable state is written. `seriesId` is the exception: it is not
+  /// derivable from the key, and dropping it would cost the offline
+  /// Continue Watching a catalog walk on every cold start.
   Map<String, dynamic> _entryToJson(WatchProgress p) => {
     'positionSeconds': p.positionSeconds,
     'completed': p.completed,
     'dismissed': p.dismissed,
     'updatedAt': p.updatedAt.toUtc().toIso8601String(),
+    if (p is EpisodeProgress && p.seriesId != null) 'seriesId': p.seriesId,
   };
 
   WatchProgress? _parseEntry(String key, Object? raw) {
@@ -247,6 +252,9 @@ class JsonFileWatchProgressStore implements WatchProgressDiskStore {
       return EpisodeProgress(
         profileId: profileId,
         episodeId: mediaId,
+        // Absent from snapshots written before the field existed —
+        // resolves to null, which the caller treats as "unknown".
+        seriesId: json['seriesId'] as String?,
         positionSeconds: positionSeconds,
         completed: completed,
         dismissed: dismissed,
@@ -276,6 +284,7 @@ class JsonFileWatchProgressStore implements WatchProgressDiskStore {
       EpisodeProgress() => EpisodeProgress(
         profileId: p.profileId,
         episodeId: p.episodeId,
+        seriesId: p.seriesId,
         positionSeconds: p.positionSeconds,
         completed: p.completed,
         dismissed: dismissed,

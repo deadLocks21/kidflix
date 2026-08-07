@@ -11,6 +11,7 @@ import 'package:kidflix/core/domain/model/watch_progress.dart';
 ///   "kind": "movie" | "episode",
 ///   "profile_id": "...",
 ///   "media_id": "...",         // movie_id ou episode_id selon kind
+///   "series_id": "...",        // épisodes uniquement, absent sur film
 ///   "position_seconds": 1845,
 ///   "completed": false,
 ///   "dismissed": false,
@@ -22,6 +23,11 @@ import 'package:kidflix/core/domain/model/watch_progress.dart';
 /// of `add-progress-dismiss` lands, but we default to `false` when the
 /// key is missing so the client keeps working against an older backend
 /// during the deployment window.
+///
+/// `series_id` gets the same treatment: an older backend omits it and we
+/// map that to a `null` [EpisodeProgress.seriesId], which Continue
+/// Watching handles via its fallback resolution. Never fail-fast on it —
+/// a missing shortcut must not break progress parsing.
 ///
 /// Fail-fast on missing or unknown `kind` (FormatException).
 WatchProgress watchProgressFromJson(Map<String, dynamic> json) {
@@ -47,6 +53,7 @@ WatchProgress watchProgressFromJson(Map<String, dynamic> json) {
       return EpisodeProgress(
         profileId: profileId,
         episodeId: mediaId,
+        seriesId: json['series_id'] as String?,
         positionSeconds: positionSeconds,
         completed: completed,
         dismissed: dismissed,

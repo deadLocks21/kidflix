@@ -46,6 +46,30 @@ void main() {
       expect(ep.updatedAt, DateTime.utc(2026, 5, 4, 18, 30));
     });
 
+    test('picks up series_id on an episode entry', () {
+      final payload = _episodePayload()..['series_id'] = 'series-uuid-1';
+
+      final ep = watchProgressFromJson(payload) as EpisodeProgress;
+
+      expect(ep.seriesId, 'series-uuid-1');
+    });
+
+    test('tolerates a missing series_id (older backend)', () {
+      final ep = watchProgressFromJson(_episodePayload()) as EpisodeProgress;
+
+      // null means "unknown", and Continue Watching falls back to its
+      // catalog walk rather than dropping the entry.
+      expect(ep.seriesId, isNull);
+    });
+
+    test('tolerates an explicit null series_id (orphan progress)', () {
+      final payload = _episodePayload()..['series_id'] = null;
+
+      final ep = watchProgressFromJson(payload) as EpisodeProgress;
+
+      expect(ep.seriesId, isNull);
+    });
+
     test('throws on unknown kind', () {
       final payload = _moviePayload()..['kind'] = 'podcast';
 

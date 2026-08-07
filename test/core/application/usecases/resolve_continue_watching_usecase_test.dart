@@ -60,8 +60,17 @@ Series _seriesWith({required String id, required List<Season> seasons}) {
 class _FakeCatalog implements CatalogRepository {
   _FakeCatalog(this._items);
   final List<CatalogItem> _items;
+
+  /// Number of `listCatalog()` round-trips — the home used to trigger
+  /// three or more per load.
+  int listCalls = 0;
+
   @override
-  Future<List<CatalogItem>> listCatalog() async => _items;
+  Future<List<CatalogItem>> listCatalog() async {
+    listCalls++;
+    return _items;
+  }
+
   @override
   Future<List<CatalogItem>> searchCatalog({required String query}) async => [];
   @override
@@ -73,8 +82,14 @@ class _FakeSeries implements SeriesRepository {
   _FakeSeries(this._byId);
   final Map<String, Series> _byId;
   Object? throwForId;
+
+  /// Every `findById` in call order — the assertion surface for the
+  /// N×M regression this use case used to carry.
+  final List<String> findByIdCalls = [];
+
   @override
   Future<Series> findById(String seriesId) async {
+    findByIdCalls.add(seriesId);
     if (throwForId == seriesId) throw StateError('series-down');
     final hit = _byId[seriesId];
     if (hit == null) throw StateError('not found: $seriesId');
@@ -575,5 +590,185 @@ void main() {
         expect(result[1], isA<MovieContinueDto>());
       },
     );
+
+    group('network shape', () {
+      /// Builds a catalog of [count] series, each with one episode
+      /// `<id>-e1`, plus the matching full-detail map for `_FakeSeries`.
+      ({List<CatalogItem> catalog, Map<String, Series> details}) bigCatalog(
+        int count,
+      ) {
+        final catalog = <CatalogItem>[];
+        final details = <String, Series>{};
+        for (var i = 0; i < count; i++) {
+          final id = 'series-$i';
+          catalog.add(_seriesWith(id: id, seasons: const []));
+          details[id] = _seriesWith(
+            id: id,
+            seasons: [
+              Season(
+                seasonNumber: 1,
+                episodes: [
+                  _ep(
+                    id: '$id-e1',
+                    seriesId: id,
+                    seasonNumber: 1,
+                    episodeNumber: 1,
+                  ),
+                ],
+              ),
+            ],
+          );
+        }
+        return (catalog: catalog, details: details);
+      }
+
+      EpisodeProgress epProgress({
+        required String episodeId,
+        String? seriesId,
+        required DateTime updatedAt,
+      }) => EpisodeProgress(
+        profileId: 'p1',
+        episodeId: episodeId,
+        seriesId: seriesId,
+        positionSeconds: 60,
+        completed: false,
+        updatedAt: updatedAt,
+      );
+
+      test('a known seriesId fetches that series and nothing else', () async {
+        final big = bigCatalog(20);
+        final series = _FakeSeries(big.details);
+        final uc = ResolveContinueWatchingUseCase(
+          progressRepo: _FakeProgress([
+            epProgress(
+              episodeId: 'series-7-e1',
+              seriesId: 'series-7',
+              updatedAt: DateTime(2026, 5, 6),
+            ),
+          ]),
+          catalogRepo: _FakeCatalog(big.catalog),
+          seriesRepo: series,
+          logger: _logger,
+        );
+
+        final result = await uc.execute('p1');
+
+        expect(result, hasLength(1));
+        expect(series.findByIdCalls, ['series-7']);
+      });
+
+      test('several entries on one series fetch it once', () async {
+        final big = bigCatalog(20);
+        final series = _FakeSeries(big.details);
+        final uc = ResolveContinueWatchingUseCase(
+          progressRepo: _FakeProgress([
+            epProgress(
+              episodeId: 'series-3-e1',
+              seriesId: 'series-3',
+              updatedAt: DateTime(2026, 5, 6),
+            ),
+            epProgress(
+              episodeId: 'series-3-e1',
+              seriesId: 'series-3',
+              updatedAt: DateTime(2026, 5, 5),
+            ),
+          ]),
+          catalogRepo: _FakeCatalog(big.catalog),
+          seriesRepo: series,
+          logger: _logger,
+        );
+
+        final result = await uc.execute('p1');
+
+        // Dedup by series still collapses them to one card.
+        expect(result, hasLength(1));
+        expect(series.findByIdCalls, ['series-3']);
+      });
+
+      test(
+        'without a seriesId the catalog is walked once, not once per entry',
+        () async {
+          final big = bigCatalog(20);
+          final series = _FakeSeries(big.details);
+          final uc = ResolveContinueWatchingUseCase(
+            progressRepo: _FakeProgress([
+              epProgress(
+                episodeId: 'series-2-e1',
+                updatedAt: DateTime(2026, 5, 6),
+              ),
+              epProgress(
+                episodeId: 'series-9-e1',
+                updatedAt: DateTime(2026, 5, 5),
+              ),
+              epProgress(
+                episodeId: 'series-15-e1',
+                updatedAt: DateTime(2026, 5, 4),
+              ),
+            ]),
+            catalogRepo: _FakeCatalog(big.catalog),
+            seriesRepo: series,
+            logger: _logger,
+          );
+
+          final result = await uc.execute('p1');
+
+          expect(result, hasLength(3));
+          // The old implementation restarted a full sequential walk per
+          // entry: 3 × 20 = up to 60 calls. One shared pass caps it at
+          // the catalog size, and no series is ever fetched twice.
+          expect(series.findByIdCalls, hasLength(20));
+          expect(series.findByIdCalls.toSet(), hasLength(20));
+        },
+      );
+
+      test('supplied catalog and progresses are not re-fetched', () async {
+        final big = bigCatalog(5);
+        final catalog = _FakeCatalog(big.catalog);
+        final progressRepo = _FakeProgress([]);
+        final uc = ResolveContinueWatchingUseCase(
+          progressRepo: progressRepo,
+          catalogRepo: catalog,
+          seriesRepo: _FakeSeries(big.details),
+          logger: _logger,
+        );
+
+        final result = await uc.execute(
+          'p1',
+          catalog: big.catalog,
+          progresses: [
+            epProgress(
+              episodeId: 'series-1-e1',
+              seriesId: 'series-1',
+              updatedAt: DateTime(2026, 5, 6),
+            ),
+          ],
+        );
+
+        expect(result, hasLength(1));
+        expect(catalog.listCalls, 0);
+      });
+
+      test('a stale seriesId drops the entry instead of walking', () async {
+        final big = bigCatalog(20);
+        final series = _FakeSeries(big.details);
+        final uc = ResolveContinueWatchingUseCase(
+          progressRepo: _FakeProgress([
+            epProgress(
+              episodeId: 'series-4-e1',
+              seriesId: 'gone',
+              updatedAt: DateTime(2026, 5, 6),
+            ),
+          ]),
+          catalogRepo: _FakeCatalog(big.catalog),
+          seriesRepo: series,
+          logger: _logger,
+        );
+
+        final result = await uc.execute('p1');
+
+        expect(result, isEmpty);
+        expect(series.findByIdCalls, ['gone']);
+      });
+    });
   });
 }

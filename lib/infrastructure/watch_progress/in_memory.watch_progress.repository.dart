@@ -55,6 +55,7 @@ class InMemoryWatchProgressRepository implements WatchProgressRepository {
         _episodes[_key(profileId, episodeId)] = EpisodeProgress(
           profileId: profileId,
           episodeId: episodeId,
+          seriesId: progress.seriesId,
           positionSeconds: progress.positionSeconds,
           completed: progress.completed,
           updatedAt: progress.updatedAt,
@@ -112,6 +113,7 @@ class InMemoryWatchProgressRepository implements WatchProgressRepository {
     _episodes[_key(profileId, episodeId)] = EpisodeProgress(
       profileId: existing.profileId,
       episodeId: existing.episodeId,
+      seriesId: existing.seriesId,
       positionSeconds: existing.positionSeconds,
       completed: existing.completed,
       dismissed: value,

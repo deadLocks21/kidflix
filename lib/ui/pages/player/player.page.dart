@@ -1115,6 +1115,10 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       EpisodeProgress(
         profileId: profileId,
         episodeId: mediaRef.episodeId,
+        // Stamped so the entry written back to the offline store already
+        // knows its parent — Continue Watching then resolves it without
+        // walking the catalog on the way back to the home.
+        seriesId: mediaRef.seriesContext?.seriesId,
         positionSeconds: positionSeconds,
         completed: completed,
         updatedAt: DateTime.now(),

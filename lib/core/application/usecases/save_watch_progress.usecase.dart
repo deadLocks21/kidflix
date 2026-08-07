@@ -57,6 +57,7 @@ class SaveWatchProgressUseCase {
       Episode() => EpisodeProgress(
         profileId: profileId,
         episodeId: media.id,
+        seriesId: media.seriesId,
         positionSeconds: positionSeconds,
         completed: completed,
         updatedAt: DateTime.now(),
