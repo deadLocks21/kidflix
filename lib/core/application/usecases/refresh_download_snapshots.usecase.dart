@@ -24,7 +24,13 @@ class RefreshDownloadSnapshotsUseCase {
   final DownloadRepository _downloads;
   final DownloadManifestStore _manifest;
 
-  const RefreshDownloadSnapshotsUseCase({
+  /// Signature of the work attempted last, or `null` before the first
+  /// pass. Guards against re-running an identical pass: the caller fires
+  /// this after **every** home build, and the home rebuilds several
+  /// times while favourites, déjà-vu and the download inventory settle.
+  String? _lastAttempt;
+
+  RefreshDownloadSnapshotsUseCase({
     required CatalogRepository catalog,
     required SeriesRepository series,
     required DownloadRepository downloads,
@@ -55,16 +61,46 @@ class RefreshDownloadSnapshotsUseCase {
     }
     if (records.isEmpty) return;
 
+    // What actually needs healing, decided entirely from the local
+    // manifest. This MUST come before any network call: the pass used to
+    // fetch every profile's catalog up front and only then discover it
+    // had nothing to do. Measured on a real session, that was 9
+    // `/catalog` responses (7.6 MB) and 83 `/series/{id}` calls for one
+    // profile selection — enough to saturate the connection pool and
+    // push the tail requests past 8 s while the home was rendering.
+    final movieIdsToRefresh = <String>{
+      for (final record in records)
+        if (record.kind == ManifestEntryKind.movie &&
+            !_isMovieSnapshotComplete(record.entry))
+          record.mediaId,
+    };
+    final (seriesIdsToRefresh, completedEpisodesBySeries) = _seriesNeedingRefresh(
+      records,
+    );
+    if (movieIdsToRefresh.isEmpty && seriesIdsToRefresh.isEmpty) return;
+
+    // Same work as the previous attempt in this session — either it
+    // succeeded and something else is re-triggering us, or it failed and
+    // will fail again. Retrying on every home rebuild only competes with
+    // the screen the user is waiting for. A restart retries.
+    final signature = [
+      ...movieIdsToRefresh,
+      ...seriesIdsToRefresh,
+    ]..sort();
+    final signatureKey = signature.join(',');
+    if (signatureKey == _lastAttempt) return;
+    _lastAttempt = signatureKey;
+
+    // Only movie healing needs the catalog; series are always loaded
+    // through `findById` below because catalog entries carry no seasons.
     final moviesById = <String, Movie>{};
-    final seriesById = <String, Series>{};
-    if (profileIds.isEmpty) {
+    if (movieIdsToRefresh.isEmpty) {
+      // nothing to look up
+    } else if (profileIds.isEmpty) {
       try {
         final catalog = await _catalog.listCatalog();
         for (final m in catalog.whereType<Movie>()) {
           moviesById[m.id] = m;
-        }
-        for (final s in catalog.whereType<Series>()) {
-          seriesById[s.id] = s;
         }
       } catch (_) {
         return;
@@ -76,21 +112,15 @@ class RefreshDownloadSnapshotsUseCase {
           for (final m in items.whereType<Movie>()) {
             moviesById[m.id] = m;
           }
-          for (final s in items.whereType<Series>()) {
-            seriesById[s.id] = s;
-          }
         } catch (_) {
           // Best-effort per profile.
         }
       }
-      if (moviesById.isEmpty && seriesById.isEmpty) return;
     }
 
     // Refresh movie snapshots.
-    for (final record in records) {
-      if (record.kind != ManifestEntryKind.movie) continue;
-      if (_isMovieSnapshotComplete(record.entry)) continue;
-      final movie = moviesById[record.mediaId];
+    for (final mediaId in movieIdsToRefresh) {
+      final movie = moviesById[mediaId];
       if (movie == null) continue;
       try {
         await _downloads.cacheMediaMetadata(
@@ -122,47 +152,15 @@ class RefreshDownloadSnapshotsUseCase {
       }
     }
 
-    // Identify which series have at least one downloaded episode whose
-    // snapshot is incomplete OR whose `series/<id>` entry is missing.
-    // For each, fetch the full series via SeriesRepository and snapshot
-    // it + its downloaded episodes.
-    final seriesIdsToRefresh = <String>{};
-    final completedEpisodesBySeries = <String, List<DownloadManifestRecord>>{};
-    for (final record in records) {
-      if (record.kind != ManifestEntryKind.episode) continue;
-      if (record.entry.completedAt == null) continue;
-      // Best-effort lookup: we may not know the seriesId from a legacy
-      // entry. Skip those — they'll self-heal when the user opens the
-      // series modal next time online.
-      final seriesId = record.entry.cachedSeriesId;
-      if (seriesId != null) {
-        completedEpisodesBySeries.putIfAbsent(seriesId, () => []).add(record);
-      }
-      if (!_isEpisodeSnapshotComplete(record.entry)) {
-        if (seriesId != null) seriesIdsToRefresh.add(seriesId);
-      }
-    }
-    // Also refresh series whose `series/<id>` snapshot is missing OR
-    // incomplete but for which we DO have downloaded episodes.
-    final knownSeriesEntries = <String, DownloadManifestEntry>{
-      for (final r in records)
-        if (r.kind == ManifestEntryKind.series) r.mediaId: r.entry,
-    };
-    for (final seriesId in completedEpisodesBySeries.keys) {
-      final entry = knownSeriesEntries[seriesId];
-      if (entry == null || !_isSeriesSnapshotComplete(entry)) {
-        seriesIdsToRefresh.add(seriesId);
-      }
-    }
-
     for (final seriesId in seriesIdsToRefresh) {
-      Series? series = seriesById[seriesId];
-      if (series == null || series.seasons.isEmpty) {
-        try {
-          series = await _series.findById(seriesId);
-        } catch (_) {
-          continue;
-        }
+      // Always through `findById`: a catalog entry carries no seasons,
+      // and the seasons are precisely what the episode snapshots below
+      // are built from.
+      final Series series;
+      try {
+        series = await _series.findById(seriesId);
+      } catch (_) {
+        continue;
       }
       try {
         await _downloads.cacheSeriesMetadata(
@@ -225,6 +223,41 @@ class RefreshDownloadSnapshotsUseCase {
         }
       }
     }
+  }
+
+  /// Series that need a refresh, plus the completed downloaded episodes
+  /// grouped by series (needed to know which episodes to snapshot once
+  /// the series detail is loaded).
+  ///
+  /// A series qualifies when one of its downloaded episodes has an
+  /// incomplete snapshot, or when its own `series/<id>` entry is missing
+  /// or incomplete.
+  (Set<String>, Map<String, List<DownloadManifestRecord>>)
+  _seriesNeedingRefresh(List<DownloadManifestRecord> records) {
+    final toRefresh = <String>{};
+    final completedEpisodesBySeries = <String, List<DownloadManifestRecord>>{};
+    for (final record in records) {
+      if (record.kind != ManifestEntryKind.episode) continue;
+      if (record.entry.completedAt == null) continue;
+      // Best-effort lookup: we may not know the seriesId from a legacy
+      // entry. Skip those — they'll self-heal when the user opens the
+      // series modal next time online.
+      final seriesId = record.entry.cachedSeriesId;
+      if (seriesId == null) continue;
+      completedEpisodesBySeries.putIfAbsent(seriesId, () => []).add(record);
+      if (!_isEpisodeSnapshotComplete(record.entry)) toRefresh.add(seriesId);
+    }
+    final knownSeriesEntries = <String, DownloadManifestEntry>{
+      for (final r in records)
+        if (r.kind == ManifestEntryKind.series) r.mediaId: r.entry,
+    };
+    for (final seriesId in completedEpisodesBySeries.keys) {
+      final entry = knownSeriesEntries[seriesId];
+      if (entry == null || !_isSeriesSnapshotComplete(entry)) {
+        toRefresh.add(seriesId);
+      }
+    }
+    return (toRefresh, completedEpisodesBySeries);
   }
 
   bool _isMovieSnapshotComplete(DownloadManifestEntry entry) {
