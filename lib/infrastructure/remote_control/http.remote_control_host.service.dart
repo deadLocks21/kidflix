@@ -11,6 +11,7 @@ import 'package:kidflix/core/domain/model/remote_playback_state.dart';
 import 'package:kidflix/core/domain/services/remote_control_host.service.dart';
 import 'package:kidflix/core/domain/services/remote_discovery.service.dart';
 import 'package:kidflix/core/domain/services/remote_pairing.repository.dart';
+import 'package:kidflix/infrastructure/observability/event_loop_probe.dart';
 import 'package:kidflix/infrastructure/observability/perf_trace.dart';
 import 'package:kidflix/infrastructure/remote_control/lan_address.dart';
 
@@ -184,6 +185,12 @@ class HttpRemoteControlHostService implements RemoteControlHostService {
       ),
     );
 
+    // Scoped probe: separates "this call takes 1.7 s" from "this call
+    // holds the isolate for 1.7 s". mDNS registration is required by
+    // RFC 6762 to probe for name conflicts before claiming a name, so a
+    // large *wall-clock* here is expected and harmless — it only matters
+    // if the isolate cannot run anything meanwhile.
+    final advertiseProbe = EventLoopProbe()..start();
     try {
       await trace.measure(
         'advertise',
@@ -211,6 +218,7 @@ class HttpRemoteControlHostService implements RemoteControlHostService {
         ),
       );
     }
+    final advertiseLag = advertiseProbe.stop();
 
     unawaited(
       _logger.info(
@@ -220,6 +228,8 @@ class HttpRemoteControlHostService implements RemoteControlHostService {
           'addresses': addresses.join(','),
           'interfaces': addresses.length,
           ...trace.attrs(),
+          // How much of `advertise_ms` the isolate spent unable to run.
+          'advertise_lag_ms': advertiseLag['max_lag_ms'],
         },
       ),
     );
