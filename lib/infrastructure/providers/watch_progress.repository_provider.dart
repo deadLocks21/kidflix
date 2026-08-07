@@ -71,6 +71,7 @@ WatchProgressSyncService watchProgressSyncService(Ref ref) {
       : DioWatchProgressRepository(dio: ref.watch(dioProvider));
   final service = WatchProgressSyncService(
     remote: remote,
+    store: ref.watch(watchProgressDiskStoreProvider),
     queue: ref.watch(watchProgressPendingQueueProvider),
     connectivity: ref.watch(connectivityServiceProvider),
   );

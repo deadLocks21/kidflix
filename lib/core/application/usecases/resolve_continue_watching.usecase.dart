@@ -52,7 +52,22 @@ class ResolveContinueWatchingUseCase {
   final SeriesRepository _seriesRepo;
   final LoggerApplicationService _logger;
 
-  const ResolveContinueWatchingUseCase({
+  /// Episode → parent series, learned from resolutions already done.
+  ///
+  /// An episode never changes parent, so this is safe to keep for the
+  /// lifetime of the use case (the provider is `keepAlive`, so that is
+  /// the app session). It caches the *id* only, never the [Series]
+  /// object: the next load re-fetches the series through the normal fast
+  /// path and so never serves stale seasons or episodes.
+  ///
+  /// Its job is to make the fallback walk a once-per-session cost
+  /// instead of a once-per-home-load one, for entries the backfill
+  /// (`WatchProgressSyncService.backfillSeriesIds`) has not reached —
+  /// the first load after launch, or a progress that only ever existed
+  /// locally.
+  final Map<String, String> _seriesIdByEpisodeId = {};
+
+  ResolveContinueWatchingUseCase({
     required WatchProgressRepository progressRepo,
     required CatalogRepository catalogRepo,
     required SeriesRepository seriesRepo,
@@ -160,12 +175,13 @@ class ResolveContinueWatchingUseCase {
   ///   `series_id` on every episode progress, cf. `API.md`
   ///   § Progression de lecture). Only the distinct series actually
   ///   referenced are fetched, concurrently. Typically 1–2 requests.
-  /// * **Fallback** — at least one entry has no `seriesId` (older
-  ///   backend, or a progress saved locally that never round-tripped).
-  ///   The whole catalog is then loaded to build the index. Still ONE
-  ///   pass for the entire call, concurrent, and shared by every
-  ///   unresolved entry — where the previous implementation restarted a
-  ///   sequential walk for each one.
+  /// * **Fallback** — at least one entry has no `seriesId` and none was
+  ///   learned earlier in the session. The whole catalog is then loaded
+  ///   to build the index. Still ONE pass for the entire call,
+  ///   concurrent, and shared by every unresolved entry — where the
+  ///   previous implementation restarted a sequential walk for each one.
+  ///   Whatever it discovers is remembered in [_seriesIdByEpisodeId], so
+  ///   a session pays this at most once.
   ///
   /// [catalogSeries] is only read for the fallback ; the fast path never
   /// touches it.
@@ -176,20 +192,27 @@ class ResolveContinueWatchingUseCase {
     final pending = progresses.toList(growable: false);
     if (pending.isEmpty) return const {};
 
-    final knownSeriesIds = <String>{for (final p in pending) ?p.seriesId};
-    final needsFallback = pending.any((p) => p.seriesId == null);
+    // The backend's pointer wins ; the session cache covers the entries
+    // it has not reached yet.
+    final seriesIdFor = <String, String>{
+      for (final p in pending)
+        p.episodeId: ?(p.seriesId ?? _seriesIdByEpisodeId[p.episodeId]),
+    };
+    final needsFallback = pending.any(
+      (p) => !seriesIdFor.containsKey(p.episodeId),
+    );
     final loaded = await _loadSeries({
-      ...knownSeriesIds,
+      ...seriesIdFor.values,
       if (needsFallback) ...catalogSeries.map((s) => s.id),
     });
 
     final out = <String, (Series, Episode)>{};
     for (final progress in pending) {
-      final seriesId = progress.seriesId;
+      final seriesId = seriesIdFor[progress.episodeId];
       if (seriesId != null) {
-        // Trust the backend's pointer. A miss here means the series
-        // failed to load (already logged) or the pointer is stale —
-        // either way, scanning the rest would not be more correct.
+        // Trust the pointer. A miss here means the series failed to load
+        // (already logged) or the pointer is stale — either way,
+        // scanning the rest would not be more correct.
         final series = loaded[seriesId];
         if (series == null) continue;
         final episode = _findEpisodeIn(series, progress.episodeId);
@@ -200,6 +223,7 @@ class ResolveContinueWatchingUseCase {
         final episode = _findEpisodeIn(series, progress.episodeId);
         if (episode != null) {
           out[progress.episodeId] = (series, episode);
+          _seriesIdByEpisodeId[progress.episodeId] = series.id;
           break;
         }
       }

@@ -696,7 +696,24 @@ Future<void> bootstrap(Ref ref) async {
   // Start the watch-progress sync service. Subscribes to connectivity
   // and drains any queued writes once we're online — silent if there
   // is nothing to replay.
-  ref.read(watchProgressSyncServiceProvider).start();
+  final progressSync = ref.read(watchProgressSyncServiceProvider);
+  progressSync.start();
+  // Then stamp the parent series onto any episode progress that still
+  // lacks it. One request per profile, and only when something is
+  // actually missing — but without it Continue Watching re-walks the
+  // whole catalog on every single home load. Fire-and-forget: the home
+  // must not wait on an optimisation.
+  if (restoredState case Authenticated(:final session) ||
+      PinRequired(:final session) ||
+      ProfileSelected(:final session) ||
+      ManagementPinRequired(:final session) ||
+      ManagingProfiles(:final session)) {
+    unawaited(
+      progressSync
+          .backfillSeriesIds(session.profiles.map((p) => p.id))
+          .catchError((Object _) {}),
+    );
+  }
   // Bring the LAN remote-control server back up if the user had enabled
   // it. Fire-and-forget: a device that cannot bind or advertise must
   // still boot into the catalogue, and the sheet surfaces the error.
