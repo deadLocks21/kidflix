@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kidflix/core/application/services/logger_application.service.dart';
+import 'package:kidflix/infrastructure/observability/event_loop_probe.dart';
+import 'package:kidflix/infrastructure/observability/perf_trace.dart';
 import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/ui/focus/escape_to_pop.dart';
@@ -24,17 +26,44 @@ void main(List<String> args) {
     return;
   }
 
+  // Everything from here to `runApp` runs synchronously on the main
+  // isolate, so each step delays not just the first frame but every
+  // callback queued behind it — including the responses to the first
+  // HTTP calls. Timed so `startup.jank` can be attributed rather than
+  // just observed.
+  final boot = Stopwatch()..start();
   WidgetsFlutterBinding.ensureInitialized();
+  final bindingMs = boot.elapsedMilliseconds;
   MediaKit.ensureInitialized();
+  final mediaKitMs = boot.elapsedMilliseconds - bindingMs;
 
   // Build the Riverpod container manually so we can read the logger
   // before `runApp` and wire the framework-wide error handlers below.
   final container = ProviderContainer();
   final logger = container.read(loggerProvider);
+  final containerMs = boot.elapsedMilliseconds - bindingMs - mediaKitMs;
 
   _installErrorHandlers(logger);
   _lifecycleFlush = _installLifecycleFlush(logger);
-  logger.info('app.started');
+  logger.info(
+    'app.started',
+    attrs: {
+      'binding_ms': bindingMs,
+      'media_kit_ms': mediaKitMs,
+      'container_ms': containerMs,
+      'total_ms': boot.elapsedMilliseconds,
+    },
+  );
+
+  // Startup is when the isolate is busiest, and it is also when the
+  // first HTTP calls go out — so `http.call` durations from this window
+  // cannot be read without knowing how much of them is queueing.
+  if (kPerfTrace) {
+    final probe = EventLoopProbe()..start();
+    Timer(const Duration(seconds: 12), () {
+      unawaited(logger.info('startup.jank', attrs: probe.stop()));
+    });
+  }
 
   runApp(
     UncontrolledProviderScope(container: container, child: const KidflixApp()),

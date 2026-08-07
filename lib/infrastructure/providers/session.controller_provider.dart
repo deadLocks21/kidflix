@@ -20,6 +20,7 @@ import 'package:kidflix/core/domain/model/avatar_update.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/model/session.dart';
 import 'package:kidflix/infrastructure/providers/api_base_url.provider.dart';
+import 'package:kidflix/infrastructure/observability/perf_trace.dart';
 import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/auth.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/authenticate_with_biometrics.usecase_provider.dart';
@@ -588,7 +589,30 @@ class SessionController extends _$SessionController {
   /// Throws [StateError] when called from `Anonymous` or `OtpRequested`
   /// (no session to refresh) — the throw is delegated to
   /// [replaceProfiles].
-  Future<void> refreshProfiles() async {
+  /// Concurrent callers share one in-flight refresh.
+  ///
+  /// `bootstrap()` fires one at cold start and the profile-selection
+  /// screen fires another from its first post-frame callback — on a cold
+  /// start those land milliseconds apart and produced two identical
+  /// `GET /profiles`, both on the critical path of the very first screen.
+  /// Neither call site is wrong: one wants fresh data at launch, the
+  /// other wants it on every visit. Coalescing here keeps both intentions
+  /// and issues one request.
+  Future<void>? _inFlightRefresh;
+
+  Future<void> refreshProfiles() {
+    final pending = _inFlightRefresh;
+    if (pending != null) return pending;
+    final future = _refreshProfiles();
+    _inFlightRefresh = future;
+    // Cleared on both paths so a failed refresh doesn't wedge every
+    // later attempt into returning the same dead future.
+    return future.whenComplete(() {
+      if (identical(_inFlightRefresh, future)) _inFlightRefresh = null;
+    });
+  }
+
+  Future<void> _refreshProfiles() async {
     final usecase = ref.read(refreshProfilesUseCaseProvider);
     final profiles = await usecase.execute();
     await replaceProfiles(profiles);
@@ -742,9 +766,24 @@ Future<void> bootstrap(Ref ref) async {
   // the id is what a pairing token is keyed on.
   unawaited(
     () async {
-      await ref.read(remoteDeviceIdProvider.notifier).load();
-      await ref.read(remoteDeviceNameProvider.notifier).load();
-      await ref.read(remoteHostControllerProvider.notifier).restore();
+      // Timed: `restore()` binds a socket and publishes an mDNS record on
+      // every interface the host has, which on a dev machine can be eight
+      // Docker and VPN bridges. It runs unawaited, but the work still
+      // lands on the main isolate and delays whatever is queued there —
+      // including the first HTTP responses.
+      final trace = PerfTrace();
+      await trace.measure(
+        'ids',
+        () async {
+          await ref.read(remoteDeviceIdProvider.notifier).load();
+          await ref.read(remoteDeviceNameProvider.notifier).load();
+        },
+      );
+      await trace.measure(
+        'restore',
+        () => ref.read(remoteHostControllerProvider.notifier).restore(),
+      );
+      unawaited(ref.read(loggerProvider).info('remote.boot', attrs: trace.attrs()));
     }().catchError((Object _) {}),
   );
 }
