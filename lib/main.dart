@@ -26,34 +26,19 @@ void main(List<String> args) {
     return;
   }
 
-  // Everything from here to `runApp` runs synchronously on the main
-  // isolate, so each step delays not just the first frame but every
-  // callback queued behind it — including the responses to the first
-  // HTTP calls. Timed so `startup.jank` can be attributed rather than
-  // just observed.
-  final boot = Stopwatch()..start();
   WidgetsFlutterBinding.ensureInitialized();
-  final bindingMs = boot.elapsedMilliseconds;
   MediaKit.ensureInitialized();
-  final mediaKitMs = boot.elapsedMilliseconds - bindingMs;
 
   // Build the Riverpod container manually so we can read the logger
   // before `runApp` and wire the framework-wide error handlers below.
   final container = ProviderContainer();
   final logger = container.read(loggerProvider);
-  final containerMs = boot.elapsedMilliseconds - bindingMs - mediaKitMs;
 
   _installErrorHandlers(logger);
   _lifecycleFlush = _installLifecycleFlush(logger);
-  logger.info(
-    'app.started',
-    attrs: {
-      'binding_ms': bindingMs,
-      'media_kit_ms': mediaKitMs,
-      'container_ms': containerMs,
-      'total_ms': boot.elapsedMilliseconds,
-    },
-  );
+  // The synchronous part of `main` was measured at 47-72 ms across runs
+  // — never the problem — so it is no longer broken down here.
+  logger.info('app.started');
 
   // Startup is when the isolate is busiest, and it is also when the
   // first HTTP calls go out — so `http.call` durations from this window

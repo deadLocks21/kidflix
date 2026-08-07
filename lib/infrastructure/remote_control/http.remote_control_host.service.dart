@@ -11,7 +11,6 @@ import 'package:kidflix/core/domain/model/remote_playback_state.dart';
 import 'package:kidflix/core/domain/services/remote_control_host.service.dart';
 import 'package:kidflix/core/domain/services/remote_discovery.service.dart';
 import 'package:kidflix/core/domain/services/remote_pairing.repository.dart';
-import 'package:kidflix/infrastructure/observability/event_loop_probe.dart';
 import 'package:kidflix/infrastructure/observability/perf_trace.dart';
 import 'package:kidflix/infrastructure/remote_control/lan_address.dart';
 
@@ -122,12 +121,11 @@ class HttpRemoteControlHostService implements RemoteControlHostService {
     // a user who is mid-way through typing it on their phone.
     if (_server != null) return _status;
 
-    // `start()` runs on the main isolate at bootstrap, so every step here
-    // delays whatever else is queued there — including the responses to
-    // the app's first HTTP calls. Measured end to end it was ~2 s, which
-    // made three unrelated 792-byte requests look like 2.2 s each. The
-    // per-step breakdown is what says whether that is the socket, the
-    // interface enumeration or the mDNS registration.
+    // Kept as a regression guard, not as live diagnosis: bringing the
+    // server up is the one costly thing this app does at boot (~700 ms,
+    // almost all of it the mDNS registration), and it is scheduled off
+    // the critical path on that basis — cf. `runWhenIdle` at the call
+    // site. If `advertise_ms` ever grows, that assumption needs revisiting.
     final trace = PerfTrace();
     _issuedTokens = await trace.measure('tokens', _pairing.loadIssuedTokens);
     _failedPairingAttempts = 0;
@@ -185,12 +183,6 @@ class HttpRemoteControlHostService implements RemoteControlHostService {
       ),
     );
 
-    // Scoped probe: separates "this call takes 1.7 s" from "this call
-    // holds the isolate for 1.7 s". mDNS registration is required by
-    // RFC 6762 to probe for name conflicts before claiming a name, so a
-    // large *wall-clock* here is expected and harmless — it only matters
-    // if the isolate cannot run anything meanwhile.
-    final advertiseProbe = EventLoopProbe()..start();
     try {
       await trace.measure(
         'advertise',
@@ -218,7 +210,6 @@ class HttpRemoteControlHostService implements RemoteControlHostService {
         ),
       );
     }
-    final advertiseLag = advertiseProbe.stop();
 
     unawaited(
       _logger.info(
@@ -226,10 +217,11 @@ class HttpRemoteControlHostService implements RemoteControlHostService {
         attrs: {
           'port': server.port,
           'addresses': addresses.join(','),
+          // `interfaces` explains most of the variance in `total_ms`
+          // between machines — a dev box with Docker and VPN bridges
+          // advertises on eight of them, a phone on one or two.
           'interfaces': addresses.length,
           ...trace.attrs(),
-          // How much of `advertise_ms` the isolate spent unable to run.
-          'advertise_lag_ms': advertiseLag['max_lag_ms'],
         },
       ),
     );

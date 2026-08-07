@@ -11,8 +11,6 @@ import 'package:kidflix/core/domain/model/remote_playback_state.dart';
 import 'package:kidflix/core/domain/model/remote_session.dart';
 import 'package:kidflix/core/domain/model/session.dart';
 import 'package:kidflix/infrastructure/providers/catalog.repository_provider.dart';
-import 'package:kidflix/infrastructure/observability/event_loop_probe.dart';
-import 'package:kidflix/infrastructure/observability/perf_trace.dart';
 import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/remote_control.providers.dart';
 import 'package:kidflix/infrastructure/providers/remote_host_query_handler.dart';
@@ -414,51 +412,28 @@ class RemoteHostController extends _$RemoteHostController {
   }
 
   Future<void> enable({bool persist = true}) async {
-    // Instrumented because `start()`'s own breakdown accounts for all of
-    // its wall-clock yet the isolate stall usually lands just AFTER the
-    // mDNS registration returns — so the cost is in what happens around
-    // it, not inside it. These are the remaining candidates.
-    final trace = PerfTrace();
     final host = ref.read(remoteControlHostProvider);
     // Wire before starting so a remote connecting immediately after the
     // socket opens cannot land a command into a void.
-    trace.record('wire', _time(() {
-      _commandSub ??= host.commands.listen(
-        (command) => unawaited(
-          ref.read(remotePlaybackHostProvider.notifier).apply(command),
-        ),
-      );
-      _querySub ??= host.queries.listen(
-        (query) =>
-            unawaited(ref.read(remoteHostQueryHandlerProvider).handle(query)),
-      );
-    }));
-    await trace.measure('start', host.start);
+    _commandSub ??= host.commands.listen(
+      (command) => unawaited(
+        ref.read(remotePlaybackHostProvider.notifier).apply(command),
+      ),
+    );
+    _querySub ??= host.queries.listen(
+      (query) =>
+          unawaited(ref.read(remoteHostQueryHandlerProvider).handle(query)),
+    );
+    // Measured at ~0 ms each, both here and in `refresh()` below: the
+    // cost of bringing the server up is entirely in `host.start()`, which
+    // reports its own breakdown.
+    await host.start();
     // Seed the server with whatever is on screen right now — including
     // who is signed in — so a remote that connects to an already-running
     // device is correct on frame one.
-    final refreshProbe = EventLoopProbe()..start();
-    trace.record(
-      'refresh',
-      _time(() => ref.read(remotePlaybackHostProvider.notifier).refresh()),
-    );
-    final refreshLag = refreshProbe.stop();
-    if (persist) await trace.measure('persist', () => saveRemoteHostEnabled(true));
+    ref.read(remotePlaybackHostProvider.notifier).refresh();
+    if (persist) await saveRemoteHostEnabled(true);
     state = true;
-    unawaited(
-      ref.read(loggerProvider).info('remote.enable', attrs: {
-        ...trace.attrs(),
-        'refresh_lag_ms': refreshLag['max_lag_ms'],
-      }),
-    );
-  }
-
-  /// Runs [body] synchronously and returns how long it took — for the
-  /// steps that are not futures and so cannot go through `measure`.
-  Duration _time(void Function() body) {
-    final sw = Stopwatch()..start();
-    body();
-    return sw.elapsed;
   }
 
   Future<void> disable() async {

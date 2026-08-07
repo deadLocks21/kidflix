@@ -20,9 +20,7 @@ import 'package:kidflix/core/domain/model/avatar_update.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/model/session.dart';
 import 'package:kidflix/infrastructure/providers/api_base_url.provider.dart';
-import 'package:kidflix/infrastructure/observability/event_loop_probe.dart';
 import 'package:kidflix/infrastructure/observability/idle_task.dart';
-import 'package:kidflix/infrastructure/observability/perf_trace.dart';
 import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/auth.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/authenticate_with_biometrics.usecase_provider.dart';
@@ -783,31 +781,9 @@ Future<void> bootstrap(Ref ref) async {
   // meant "discoverable at launch".
   unawaited(
     runWhenIdle(() async {
-      final trace = PerfTrace();
-      await trace.measure(
-        'ids',
-        () async {
-          await ref.read(remoteDeviceIdProvider.notifier).load();
-          await ref.read(remoteDeviceNameProvider.notifier).load();
-        },
-      );
-      // Scoped probe over the whole restore. Compared against the one
-      // inside `advertise`, it says whether the isolate stall lives in
-      // the mDNS wait (it does not — that one measured ~190 ms) or in
-      // the work around it.
-      final probe = EventLoopProbe()..start();
-      await trace.measure(
-        'restore',
-        () => ref.read(remoteHostControllerProvider.notifier).restore(),
-      );
-      final lag = probe.stop();
-      unawaited(
-        ref.read(loggerProvider).info('remote.boot', attrs: {
-          ...trace.attrs(),
-          'lag_ms': lag['max_lag_ms'],
-          'lag_at_ms': lag['max_lag_at_ms'],
-        }),
-      );
+      await ref.read(remoteDeviceIdProvider.notifier).load();
+      await ref.read(remoteDeviceNameProvider.notifier).load();
+      await ref.read(remoteHostControllerProvider.notifier).restore();
     }, debugLabel: 'remote-host-restore').catchError((Object _) {}),
   );
 }
