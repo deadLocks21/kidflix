@@ -41,12 +41,26 @@ class _RemoteControlSheet extends ConsumerWidget {
     // connection state had arrived — so the same sheet opened at 0.6 or
     // 0.75 depending on how fast the socket answered, leaving either a
     // slab of black under the D-pad or a cropped one below the fold.
+    // The software keyboard is not part of the sheet's constraints, so
+    // the insets are folded in twice — once to pad the scroll view, once
+    // to grow the sheet — or the search field ends up *under* the keys
+    // the user is typing on.
+    //
+    // The sheet is anchored to the bottom, so its last `keyboard` pixels
+    // sit behind the keyboard and its *visible* height is `maxHeight -
+    // keyboard`. Capping that visible part at 95% of the space the
+    // keyboard leaves means adding the insets back on top — without the
+    // trailing term the keyboard is subtracted twice and the sheet
+    // shrinks as it opens.
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+
     return ConstrainedBox(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * 0.95,
+        maxHeight:
+            (MediaQuery.sizeOf(context).height - keyboard) * 0.95 + keyboard,
       ),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
+        padding: EdgeInsets.fromLTRB(20, 4, 20, 32 + keyboard),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,

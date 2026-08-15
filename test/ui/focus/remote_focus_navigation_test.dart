@@ -126,6 +126,45 @@ void main() {
       expect(find.text('accueil'), findsOneWidget);
     });
 
+    testWidgets('an arrow leaves the host search field instead of moving '
+        'the caret', (tester) async {
+      final field = FocusNode(debugLabel: 'search');
+      final result = FocusNode(debugLabel: 'result');
+      final navigator = GlobalKey<NavigatorState>();
+      addTearDown(field.dispose);
+      addTearDown(result.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: navigator,
+          home: Scaffold(
+            body: Column(
+              children: [
+                SizedBox(
+                  height: 40,
+                  child: TextField(focusNode: field, autofocus: true),
+                ),
+                Focus(
+                  focusNode: result,
+                  child: const SizedBox(width: 100, height: 40),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(field.hasPrimaryFocus, isTrue);
+
+      applyRemoteNavigation(
+        RemoteNavigationDirection.down,
+        fallbackContext: navigator.currentContext,
+      );
+      await tester.pump();
+
+      expect(result.hasPrimaryFocus, isTrue);
+    });
+
     testWidgets('nothing focused and no fallback is a no-op', (tester) async {
       await tester.pumpWidget(const MaterialApp(home: SizedBox()));
 

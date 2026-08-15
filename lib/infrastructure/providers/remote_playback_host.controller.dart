@@ -204,6 +204,8 @@ class RemotePlaybackHost extends _$RemotePlaybackHost {
           await controls.previousEpisode();
         case RemotePlayMediaCommand():
         case RemoteNavigateCommand():
+        case RemoteSetSearchQueryCommand():
+        case RemoteCloseSearchCommand():
         case RemoteSelectProfileCommand():
         case RemoteSubmitProfilePinCommand():
         case RemoteCancelProfilePinCommand():
@@ -235,6 +237,14 @@ class RemotePlaybackHost extends _$RemotePlaybackHost {
         await _submitPin(pin);
       case RemoteNavigateCommand(direction: RemoteNavigationDirection.search):
         _openSearch();
+      case RemoteSetSearchQueryCommand(:final query):
+        // Reopens as well as types: the remote's search box is the one
+        // the user is looking at, so it wins over whatever the host was
+        // showing.
+        _openSearch();
+        ref.read(searchUiControllerProvider.notifier).updateQuery(query);
+      case RemoteCloseSearchCommand():
+        ref.read(searchUiControllerProvider.notifier).deactivate();
       case RemoteNavigateCommand(:final direction):
         applyRemoteNavigation(
           direction,

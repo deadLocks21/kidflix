@@ -34,6 +34,20 @@ class _RemoteControlPanelState extends ConsumerState<RemoteControlPanel> {
   /// stream would yank the thumb back under their finger twice a second.
   double? _scrubbingMs;
 
+  /// Whether the remote is showing its own search field.
+  ///
+  /// Local state, not mirrored from the host: the phone is where the
+  /// typing happens, so it decides when the box is open, and the host
+  /// follows.
+  bool _searching = false;
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _send(RemoteCommand command) =>
       ref.read(remoteControlClientProvider).send(command);
 
@@ -57,8 +71,20 @@ class _RemoteControlPanelState extends ConsumerState<RemoteControlPanel> {
         // the useful remote is a D-pad, not transport controls.
         else if (!playback.hasMedia) ...[
           _IdleHint(deviceName: deviceName),
+          if (_searching) ...[
+            const SizedBox(height: 16),
+            _SearchField(
+              controller: _searchController,
+              onChanged: (value) => _send(RemoteSetSearchQueryCommand(value)),
+              onClose: _closeSearch,
+            ),
+          ],
           const SizedBox(height: 20),
-          _NavigationPad(onPress: (d) => _send(RemoteNavigateCommand(d))),
+          _NavigationPad(
+            onPress: (d) => d == RemoteNavigationDirection.search
+                ? _openSearch()
+                : _send(RemoteNavigateCommand(d)),
+          ),
         ] else ...[
           Text(
             playback.title ?? '',
@@ -137,6 +163,22 @@ class _RemoteControlPanelState extends ConsumerState<RemoteControlPanel> {
         ],
       ],
     );
+  }
+
+  /// Opens the search on both ends at once — the field here, the search
+  /// bar there — so the results the user is about to steer through are
+  /// already on the TV.
+  void _openSearch() {
+    setState(() => _searching = true);
+    _send(const RemoteNavigateCommand(RemoteNavigationDirection.search));
+  }
+
+  void _closeSearch() {
+    setState(() {
+      _searching = false;
+      _searchController.clear();
+    });
+    _send(const RemoteCloseSearchCommand());
   }
 
   Future<void> _pickAudio(RemotePlaybackState playback) async {
@@ -241,6 +283,54 @@ class _IdleHint extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The remote's own keyboard for the host's search bar.
+///
+/// Every keystroke is sent whole rather than as a diff — see
+/// [RemoteSetSearchQueryCommand]. The host debounces before it queries,
+/// so typing fast costs one search, not one per letter.
+class _SearchField extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClose;
+
+  const _SearchField({
+    required this.controller,
+    required this.onChanged,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: controller,
+            autofocus: true,
+            textInputAction: TextInputAction.search,
+            onChanged: onChanged,
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.search),
+              hintText: 'Chercher sur l’autre appareil…',
+              filled: true,
+              fillColor: KidflixPalette.grey800,
+              border: OutlineInputBorder(borderSide: BorderSide.none),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        KidflixFocusZoom(
+          child: IconButton(
+            tooltip: 'Fermer la recherche',
+            onPressed: onClose,
+            icon: const Icon(Icons.close),
+          ),
+        ),
+      ],
     );
   }
 }

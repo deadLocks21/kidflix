@@ -36,8 +36,19 @@ void applyRemoteNavigation(
     return;
   }
 
+  // A host sitting in a text field (the search bar) installs
+  // `EditableText`'s own directional action, which moves the caret
+  // instead of the focus — right for a keyboard, wrong for a remote,
+  // whose arrows are the only way out of the field. Dispatching from
+  // above the field skips that override; traversal still starts from the
+  // focused node, so it lands on whatever is below the bar.
+  final directionalContext =
+      context.findAncestorWidgetOfExactType<EditableText>() == null
+      ? context
+      : (fallbackContext ?? context);
+
   Actions.maybeInvoke(
-    context,
+    directionalContext,
     DirectionalFocusIntent(switch (direction) {
       RemoteNavigationDirection.up => TraversalDirection.up,
       RemoteNavigationDirection.down => TraversalDirection.down,

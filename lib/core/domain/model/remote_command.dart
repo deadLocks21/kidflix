@@ -79,6 +79,11 @@ sealed class RemoteCommand {
         _ => null,
       },
       'cancelProfilePin' => const RemoteCancelProfilePinCommand(),
+      'setSearchQuery' => switch (stringOf('query')) {
+        final String query => RemoteSetSearchQueryCommand(query),
+        _ => null,
+      },
+      'closeSearch' => const RemoteCloseSearchCommand(),
       'navigate' => switch (RemoteNavigationDirection.tryParse(
         stringOf('direction'),
       )) {
@@ -144,6 +149,31 @@ class RemoteNavigateCommand extends RemoteCommand {
 
   @override
   Map<String, Object?> get payload => {'direction': direction.name};
+}
+
+/// Types into the host's search bar on its behalf.
+///
+/// Carries the whole field, not the last character: a dropped or
+/// reordered frame would otherwise leave the host searching for
+/// something nobody typed, and the field is short enough that resending
+/// it costs nothing.
+class RemoteSetSearchQueryCommand extends RemoteCommand {
+  final String query;
+
+  const RemoteSetSearchQueryCommand(this.query);
+
+  @override
+  String get type => 'setSearchQuery';
+
+  @override
+  Map<String, Object?> get payload => {'query': query};
+}
+
+/// Closes the host's search and clears it.
+class RemoteCloseSearchCommand extends RemoteCommand {
+  const RemoteCloseSearchCommand();
+  @override
+  String get type => 'closeSearch';
 }
 
 class RemotePlayCommand extends RemoteCommand {
