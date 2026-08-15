@@ -34,17 +34,22 @@ class _RemoteControlPanelState extends ConsumerState<RemoteControlPanel> {
   /// stream would yank the thumb back under their finger twice a second.
   double? _scrubbingMs;
 
-  /// Whether the remote is showing its own search field.
+  /// Mirrors the host's focused field.
   ///
-  /// Local state, not mirrored from the host: the phone is where the
-  /// typing happens, so it decides when the box is open, and the host
-  /// follows.
-  bool _searching = false;
-  final TextEditingController _searchController = TextEditingController();
+  /// Driven by the host's snapshot rather than by what this remote last
+  /// opened: dismissing the field on the host has to take the keyboard
+  /// away here too, and a field the host focused on its own is just as
+  /// typable from the couch.
+  final TextEditingController _textController = TextEditingController();
+
+  /// Last text this remote sent, so an echo of our own keystroke is not
+  /// mistaken for the host typing and does not reset the caret under the
+  /// user's thumb.
+  String _sentText = '';
 
   @override
   void dispose() {
-    _searchController.dispose();
+    _textController.dispose();
     super.dispose();
   }
 
@@ -56,6 +61,7 @@ class _RemoteControlPanelState extends ConsumerState<RemoteControlPanel> {
     final connection = widget.connection;
     final playback = connection.playback;
     final deviceName = connection.device?.name ?? 'Appareil';
+    _syncTextField(playback.textInput);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -71,20 +77,20 @@ class _RemoteControlPanelState extends ConsumerState<RemoteControlPanel> {
         // the useful remote is a D-pad, not transport controls.
         else if (!playback.hasMedia) ...[
           _IdleHint(deviceName: deviceName),
-          if (_searching) ...[
+          if (playback.textInput.active) ...[
             const SizedBox(height: 16),
-            _SearchField(
-              controller: _searchController,
-              onChanged: (value) => _send(RemoteSetSearchQueryCommand(value)),
-              onClose: _closeSearch,
+            _HostTextField(
+              controller: _textController,
+              obscured: playback.textInput.obscured,
+              onChanged: (value) {
+                _sentText = value;
+                _send(RemoteSetTextCommand(value));
+              },
+              onClose: () => _send(const RemoteDismissTextInputCommand()),
             ),
           ],
           const SizedBox(height: 20),
-          _NavigationPad(
-            onPress: (d) => d == RemoteNavigationDirection.search
-                ? _openSearch()
-                : _send(RemoteNavigateCommand(d)),
-          ),
+          _NavigationPad(onPress: (d) => _send(RemoteNavigateCommand(d))),
         ] else ...[
           Text(
             playback.title ?? '',
@@ -165,20 +171,23 @@ class _RemoteControlPanelState extends ConsumerState<RemoteControlPanel> {
     );
   }
 
-  /// Opens the search on both ends at once — the field here, the search
-  /// bar there — so the results the user is about to steer through are
-  /// already on the TV.
-  void _openSearch() {
-    setState(() => _searching = true);
-    _send(const RemoteNavigateCommand(RemoteNavigationDirection.search));
-  }
-
-  void _closeSearch() {
-    setState(() {
-      _searching = false;
-      _searchController.clear();
-    });
-    _send(const RemoteCloseSearchCommand());
+  /// Adopts the host's text when the host is the one that changed it —
+  /// a field it pre-filled, cleared, or that someone typed into over
+  /// there. Our own echo is ignored, otherwise every keystroke would
+  /// rewrite the field under the user's thumb.
+  void _syncTextField(RemoteTextInputSnapshot input) {
+    if (!input.active) {
+      _sentText = '';
+      if (_textController.text.isNotEmpty) _textController.clear();
+      return;
+    }
+    if (input.obscured || input.value == _sentText) return;
+    if (_textController.text == input.value) return;
+    _textController.value = TextEditingValue(
+      text: input.value,
+      selection: TextSelection.collapsed(offset: input.value.length),
+    );
+    _sentText = input.value;
   }
 
   Future<void> _pickAudio(RemotePlaybackState playback) async {
@@ -287,18 +296,21 @@ class _IdleHint extends StatelessWidget {
   }
 }
 
-/// The remote's own keyboard for the host's search bar.
+/// The remote's own keyboard for whatever field the host has focused.
 ///
 /// Every keystroke is sent whole rather than as a diff — see
-/// [RemoteSetSearchQueryCommand]. The host debounces before it queries,
-/// so typing fast costs one search, not one per letter.
-class _SearchField extends StatelessWidget {
+/// [RemoteSetTextCommand]. A field that debounces on the host (the
+/// search) still debounces, so typing fast costs one query, not one per
+/// letter.
+class _HostTextField extends StatelessWidget {
   final TextEditingController controller;
+  final bool obscured;
   final ValueChanged<String> onChanged;
   final VoidCallback onClose;
 
-  const _SearchField({
+  const _HostTextField({
     required this.controller,
+    required this.obscured,
     required this.onChanged,
     required this.onClose,
   });
@@ -311,21 +323,25 @@ class _SearchField extends StatelessWidget {
           child: TextField(
             controller: controller,
             autofocus: true,
+            obscureText: obscured,
+            keyboardType: obscured ? TextInputType.number : null,
             textInputAction: TextInputAction.search,
             onChanged: onChanged,
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search),
-              hintText: 'Chercher sur l’autre appareil…',
+            decoration: InputDecoration(
+              prefixIcon: Icon(obscured ? Icons.lock : Icons.keyboard),
+              hintText: obscured
+                  ? 'Saisis le code…'
+                  : 'Écris sur l’autre appareil…',
               filled: true,
               fillColor: KidflixPalette.grey800,
-              border: OutlineInputBorder(borderSide: BorderSide.none),
+              border: const OutlineInputBorder(borderSide: BorderSide.none),
             ),
           ),
         ),
         const SizedBox(width: 8),
         KidflixFocusZoom(
           child: IconButton(
-            tooltip: 'Fermer la recherche',
+            tooltip: 'Fermer le champ',
             onPressed: onClose,
             icon: const Icon(Icons.close),
           ),

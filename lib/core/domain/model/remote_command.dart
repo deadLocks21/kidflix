@@ -79,11 +79,11 @@ sealed class RemoteCommand {
         _ => null,
       },
       'cancelProfilePin' => const RemoteCancelProfilePinCommand(),
-      'setSearchQuery' => switch (stringOf('query')) {
-        final String query => RemoteSetSearchQueryCommand(query),
+      'setText' => switch (stringOf('text')) {
+        final String text => RemoteSetTextCommand(text),
         _ => null,
       },
-      'closeSearch' => const RemoteCloseSearchCommand(),
+      'dismissTextInput' => const RemoteDismissTextInputCommand(),
       'navigate' => switch (RemoteNavigationDirection.tryParse(
         stringOf('direction'),
       )) {
@@ -151,29 +151,33 @@ class RemoteNavigateCommand extends RemoteCommand {
   Map<String, Object?> get payload => {'direction': direction.name};
 }
 
-/// Types into the host's search bar on its behalf.
+/// Types into whatever field the host has focused.
+///
+/// Not tied to the search bar: the host reports its focused field in
+/// [RemoteTextInputSnapshot], and this fills that one — so a remote can
+/// type into any field the app grows later without a new verb.
 ///
 /// Carries the whole field, not the last character: a dropped or
-/// reordered frame would otherwise leave the host searching for
-/// something nobody typed, and the field is short enough that resending
-/// it costs nothing.
-class RemoteSetSearchQueryCommand extends RemoteCommand {
-  final String query;
+/// reordered frame would otherwise leave the host holding text nobody
+/// typed, and a field is short enough that resending it costs nothing.
+class RemoteSetTextCommand extends RemoteCommand {
+  final String text;
 
-  const RemoteSetSearchQueryCommand(this.query);
-
-  @override
-  String get type => 'setSearchQuery';
+  const RemoteSetTextCommand(this.text);
 
   @override
-  Map<String, Object?> get payload => {'query': query};
+  String get type => 'setText';
+
+  @override
+  Map<String, Object?> get payload => {'text': text};
 }
 
-/// Closes the host's search and clears it.
-class RemoteCloseSearchCommand extends RemoteCommand {
-  const RemoteCloseSearchCommand();
+/// Closes the host's focused field — the remote's way of putting the
+/// keyboard away on both ends.
+class RemoteDismissTextInputCommand extends RemoteCommand {
+  const RemoteDismissTextInputCommand();
   @override
-  String get type => 'closeSearch';
+  String get type => 'dismissTextInput';
 }
 
 class RemotePlayCommand extends RemoteCommand {

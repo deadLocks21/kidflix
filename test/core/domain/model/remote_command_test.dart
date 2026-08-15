@@ -19,8 +19,8 @@ void main() {
       const RemoteSelectProfileCommand('profile-4'),
       const RemoteSubmitProfilePinCommand('1234'),
       const RemoteCancelProfilePinCommand(),
-      const RemoteSetSearchQueryCommand('dino'),
-      const RemoteCloseSearchCommand(),
+      const RemoteSetTextCommand('dino'),
+      const RemoteDismissTextInputCommand(),
       const RemoteNavigateCommand(RemoteNavigationDirection.left),
       const RemotePlayMediaCommand(mediaId: 'movie-1'),
       const RemotePlayMediaCommand(
@@ -107,18 +107,18 @@ void main() {
       );
     });
 
-    test('a search query without text decodes to null', () {
-      expect(RemoteCommand.fromJson({'type': 'setSearchQuery'}), isNull);
+    test('typed text without a payload decodes to null', () {
+      expect(RemoteCommand.fromJson({'type': 'setText'}), isNull);
     });
 
-    test('an empty search query is a value, not a missing field', () {
-      // Clearing the field is a real instruction — the host must stop
-      // filtering, not ignore the frame.
+    test('empty text is a value, not a missing field', () {
+      // Clearing the field is a real instruction — the host must empty
+      // it, not ignore the frame.
       final decoded =
-          RemoteCommand.fromJson({'type': 'setSearchQuery', 'query': ''})!
-              as RemoteSetSearchQueryCommand;
+          RemoteCommand.fromJson({'type': 'setText', 'text': ''})!
+              as RemoteSetTextCommand;
 
-      expect(decoded.query, isEmpty);
+      expect(decoded.text, isEmpty);
     });
 
     test('every navigation direction survives the wire', () {

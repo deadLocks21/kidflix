@@ -66,6 +66,66 @@ class RemoteTrackOption {
   int get hashCode => Object.hash(id, label, language);
 }
 
+/// The host's currently focused text field, as seen by a remote.
+///
+/// Exists so the remote can offer its own keyboard for *any* field the
+/// host focuses — search today, a profile name tomorrow — instead of the
+/// remote guessing from the command it happens to have sent. It is also
+/// what makes the remote's box disappear when someone dismisses the
+/// field on the host: the remote renders this, it does not remember what
+/// it opened.
+class RemoteTextInputSnapshot {
+  /// True while the host has an editable field focused.
+  final bool active;
+
+  /// What the field currently holds, so a remote that joins mid-typing —
+  /// or a field the host pre-filled — starts from the right text.
+  final String value;
+
+  /// A PIN or password field. Its content is never mirrored (see
+  /// [toJson]); the remote shows dots and types blind, exactly as
+  /// someone standing at the host would.
+  final bool obscured;
+
+  const RemoteTextInputSnapshot({
+    this.active = false,
+    this.value = '',
+    this.obscured = false,
+  });
+
+  static const RemoteTextInputSnapshot none = RemoteTextInputSnapshot();
+
+  Map<String, Object?> toJson() => {
+    'active': active,
+    // Deliberately withheld for obscured fields: a PIN typed on the host
+    // has no business being broadcast to every paired phone. Commands go
+    // the other way and stay in the authenticated socket.
+    'value': obscured ? '' : value,
+    'obscured': obscured,
+  };
+
+  factory RemoteTextInputSnapshot.fromJson(Map<String, Object?> json) =>
+      RemoteTextInputSnapshot(
+        active: json['active'] == true,
+        value: switch (json['value']) {
+          final String value => value,
+          _ => '',
+        },
+        obscured: json['obscured'] == true,
+      );
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RemoteTextInputSnapshot &&
+          other.active == active &&
+          other.value == value &&
+          other.obscured == obscured);
+
+  @override
+  int get hashCode => Object.hash(active, value, obscured);
+}
+
 /// Immutable snapshot of the host's playback, pushed to every connected
 /// remote on each meaningful change.
 ///
@@ -125,6 +185,10 @@ class RemotePlaybackState {
   /// regardless of whether a player is mounted.
   final RemoteSessionSnapshot session;
 
+  /// The host's focused text field, if any. Merged in at push time like
+  /// [session]: it is true of the device, not of the player.
+  final RemoteTextInputSnapshot textInput;
+
   const RemotePlaybackState({
     this.status = RemotePlaybackStatus.idle,
     this.mediaId,
@@ -142,6 +206,7 @@ class RemotePlaybackState {
     this.canGoNext = false,
     this.canGoPrevious = false,
     this.session = RemoteSessionSnapshot.unknown,
+    this.textInput = RemoteTextInputSnapshot.none,
   });
 
   static const RemotePlaybackState idle = RemotePlaybackState();
@@ -167,6 +232,7 @@ class RemotePlaybackState {
     bool? canGoNext,
     bool? canGoPrevious,
     RemoteSessionSnapshot? session,
+    RemoteTextInputSnapshot? textInput,
   }) => RemotePlaybackState(
     status: status ?? this.status,
     mediaId: mediaId ?? this.mediaId,
@@ -184,6 +250,7 @@ class RemotePlaybackState {
     canGoNext: canGoNext ?? this.canGoNext,
     canGoPrevious: canGoPrevious ?? this.canGoPrevious,
     session: session ?? this.session,
+    textInput: textInput ?? this.textInput,
   );
 
   Map<String, Object?> toJson() => {
@@ -203,6 +270,7 @@ class RemotePlaybackState {
     'canGoNext': canGoNext,
     'canGoPrevious': canGoPrevious,
     'session': session.toJson(),
+    'textInput': textInput.toJson(),
   };
 
   /// Rebuilds a state from its wire form.
@@ -261,6 +329,14 @@ class RemotePlaybackState {
         // Absent from a host running a build that predates profile
         // control — it simply cannot be driven that way.
         _ => RemoteSessionSnapshot.unknown,
+      },
+      textInput: switch (json['textInput']) {
+        final Map raw => RemoteTextInputSnapshot.fromJson(
+          Map<String, Object?>.from(raw),
+        ),
+        // Absent from a host that predates remote typing — it simply
+        // never asks for a keyboard.
+        _ => RemoteTextInputSnapshot.none,
       },
     );
   }

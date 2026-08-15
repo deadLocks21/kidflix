@@ -17,6 +17,7 @@ import 'package:kidflix/infrastructure/providers/remote_host_query_handler.dart'
 import 'package:kidflix/infrastructure/providers/search.controller_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/infrastructure/remote_control/remote_device_identity.dart';
+import 'package:kidflix/ui/focus/host_text_input_observer.dart';
 import 'package:kidflix/ui/focus/remote_focus_navigation.dart';
 import 'package:kidflix/ui/router/app_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -49,11 +50,27 @@ class RemotePlaybackHost extends _$RemotePlaybackHost {
   /// When remote PIN entry becomes possible again.
   DateTime? _pinRetryAfter;
 
+  /// The host's focused text field, refreshed by [_textInputObserver].
+  /// Merged in on every push, like the session.
+  RemoteTextInputSnapshot _textInput = RemoteTextInputSnapshot.none;
+
+  late final HostTextInputObserver _textInputObserver;
+
   @override
   RemotePlaybackState build() {
     // Any session transition (profile picked, PIN accepted, logout) has
     // to reach the remotes; none of them go through [publish].
     ref.listen(sessionControllerProvider, (_, _) => _push());
+    // Lets a remote offer its own keyboard for whatever field the host
+    // focuses — and, just as importantly, take it away again when the
+    // host drops that focus.
+    _textInputObserver = HostTextInputObserver(
+      onChanged: (snapshot) {
+        _textInput = snapshot;
+        _push();
+      },
+    )..start();
+    ref.onDispose(_textInputObserver.stop);
     return RemotePlaybackState.idle;
   }
 
@@ -98,7 +115,10 @@ class RemotePlaybackHost extends _$RemotePlaybackHost {
   /// Merges the current session situation into the playback snapshot and
   /// hands the result to the server.
   void _push() {
-    final merged = _playback.copyWith(session: _readSession());
+    final merged = _playback.copyWith(
+      session: _readSession(),
+      textInput: _textInput,
+    );
     state = merged;
     ref.read(remoteControlHostProvider).publishState(merged);
   }
@@ -204,8 +224,8 @@ class RemotePlaybackHost extends _$RemotePlaybackHost {
           await controls.previousEpisode();
         case RemotePlayMediaCommand():
         case RemoteNavigateCommand():
-        case RemoteSetSearchQueryCommand():
-        case RemoteCloseSearchCommand():
+        case RemoteSetTextCommand():
+        case RemoteDismissTextInputCommand():
         case RemoteSelectProfileCommand():
         case RemoteSubmitProfilePinCommand():
         case RemoteCancelProfilePinCommand():
@@ -237,14 +257,20 @@ class RemotePlaybackHost extends _$RemotePlaybackHost {
         await _submitPin(pin);
       case RemoteNavigateCommand(direction: RemoteNavigationDirection.search):
         _openSearch();
-      case RemoteSetSearchQueryCommand(:final query):
-        // Reopens as well as types: the remote's search box is the one
-        // the user is looking at, so it wins over whatever the host was
-        // showing.
-        _openSearch();
-        ref.read(searchUiControllerProvider.notifier).updateQuery(query);
-      case RemoteCloseSearchCommand():
-        ref.read(searchUiControllerProvider.notifier).deactivate();
+      case RemoteSetTextCommand(:final text):
+        if (!setHostTextInput(text)) {
+          _reportError('no_text_input', "Aucun champ actif sur l'appareil.");
+        }
+      case RemoteDismissTextInputCommand():
+        // Search is more than a focused field — the bar stays up once
+        // the caret leaves — so closing it is its own step. Unfocusing
+        // covers every other field in the app.
+        final search = ref.read(searchUiControllerProvider.notifier);
+        if (ref.read(searchUiControllerProvider).active) {
+          search.deactivate();
+        } else {
+          dismissHostTextInput();
+        }
       case RemoteNavigateCommand(:final direction):
         applyRemoteNavigation(
           direction,
