@@ -100,7 +100,7 @@ final class LoggerServiceProvider
   }
 }
 
-String _$loggerServiceHash() => r'd4776e190e5d6bf22bee8a513efc6e7be48c7fbd';
+String _$loggerServiceHash() => r'3bc8bb0b5536246af8014bcc055715c3c2861404';
 
 /// Ergonomic facade consumed by usecases / UI / `main.dart`.
 ///

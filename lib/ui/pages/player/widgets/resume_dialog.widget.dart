@@ -23,6 +23,10 @@ Future<ResumeChoice?> showResumeDialog(
             child: const Text('Recommencer'),
           ),
           FilledButton(
+            // Focused on open so `OK` — on a keyboard or on a remote's
+            // D-pad — answers with the likely choice straight away
+            // instead of first having to find something to focus.
+            autofocus: true,
             onPressed: () => Navigator.of(context).pop(ResumeChoice.resume),
             child: Text('Reprendre à ${formatDurationHuman(position)}'),
           ),

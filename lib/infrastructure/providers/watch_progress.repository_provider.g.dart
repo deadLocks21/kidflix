@@ -272,4 +272,4 @@ final class WatchProgressSyncServiceProvider
 }
 
 String _$watchProgressSyncServiceHash() =>
-    r'0136e866a3e8f603604024b72ade2a7a615e5363';
+    r'e3a96f7ac01eb630b0510652ec5f974a83e657ab';

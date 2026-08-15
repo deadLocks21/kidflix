@@ -20,6 +20,7 @@ import 'package:kidflix/infrastructure/remote_control/remote_device_identity.dar
 import 'package:kidflix/ui/focus/host_text_input_observer.dart';
 import 'package:kidflix/ui/focus/remote_focus_navigation.dart';
 import 'package:kidflix/ui/router/app_router.dart';
+import 'package:kidflix/ui/router/popup_route_observer.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'remote_playback_host.controller.g.dart';
@@ -71,6 +72,11 @@ class RemotePlaybackHost extends _$RemotePlaybackHost {
       },
     )..start();
     ref.onDispose(_textInputObserver.stop);
+    // Same reasoning as the text field: what the remote can usefully
+    // offer depends on what the host is waiting for.
+    final popups = ref.read(popupRouteObserverProvider).isOpen;
+    popups.addListener(_push);
+    ref.onDispose(() => popups.removeListener(_push));
     return RemotePlaybackState.idle;
   }
 
@@ -118,6 +124,7 @@ class RemotePlaybackHost extends _$RemotePlaybackHost {
     final merged = _playback.copyWith(
       session: _readSession(),
       textInput: _textInput,
+      promptOpen: ref.read(popupRouteObserverProvider).isOpen.value,
     );
     state = merged;
     ref.read(remoteControlHostProvider).publishState(merged);

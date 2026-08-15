@@ -73,12 +73,15 @@ class _RemoteControlPanelState extends ConsumerState<RemoteControlPanel> {
         // transport command, so showing controls would be a lie.
         if (!playback.session.isReady)
           RemoteProfileGate(session: playback.session, deviceName: deviceName)
-        // Nothing is playing: the host is sitting on its catalogue, so
-        // the useful remote is a D-pad, not transport controls.
-        else if (!playback.hasMedia) ...[
-          _IdleHint(deviceName: deviceName),
+        // Nothing is playing, or the host is waiting behind a prompt:
+        // either way the useful remote is a D-pad, not transport
+        // controls — a dialog cannot be answered with a seek bar.
+        else if (!playback.hasMedia || playback.promptOpen) ...[
+          if (playback.promptOpen) ...[
+            _PromptHint(deviceName: deviceName),
+            const SizedBox(height: 20),
+          ],
           if (playback.textInput.active) ...[
-            const SizedBox(height: 16),
             _HostTextField(
               controller: _textController,
               obscured: playback.textInput.obscured,
@@ -88,8 +91,8 @@ class _RemoteControlPanelState extends ConsumerState<RemoteControlPanel> {
               },
               onClose: () => _send(const RemoteDismissTextInputCommand()),
             ),
+            const SizedBox(height: 20),
           ],
-          const SizedBox(height: 20),
           _NavigationPad(onPress: (d) => _send(RemoteNavigateCommand(d))),
         ] else ...[
           Text(
@@ -255,43 +258,6 @@ class _Header extends ConsumerWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _IdleHint extends StatelessWidget {
-  final String deviceName;
-
-  const _IdleHint({required this.deviceName});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: KidflixPalette.grey800,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          const Icon(Icons.movie_outlined, color: KidflixPalette.grey100),
-          const SizedBox(height: 8),
-          Text(
-            '$deviceName ne lit rien pour le moment.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Navigue avec les flèches, ou ferme cette fenêtre et choisis '
-            'un film : il se lancera là-bas.',
-            textAlign: TextAlign.center,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: KidflixPalette.grey100),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -482,6 +448,45 @@ class _PadButton extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Shown when the host is waiting on a dialog — the resume prompt, most
+/// often — instead of the idle hint, because the device *is* playing
+/// something: it just cannot get on with it until someone answers.
+class _PromptHint extends StatelessWidget {
+  final String deviceName;
+
+  const _PromptHint({required this.deviceName});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: KidflixPalette.grey800,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.help_outline, color: KidflixPalette.grey100),
+          const SizedBox(height: 8),
+          Text(
+            '$deviceName attend une réponse.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Choisis avec les flèches et valide avec OK.',
+            textAlign: TextAlign.center,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: KidflixPalette.grey100),
+          ),
+        ],
       ),
     );
   }

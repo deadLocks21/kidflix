@@ -23,6 +23,7 @@ import 'package:kidflix/ui/pages/settings/self_profile_edit.page.dart';
 import 'package:kidflix/ui/pages/settings/settings.page.dart';
 import 'package:kidflix/ui/pages/wishlist/wishlist.page.dart';
 import 'package:kidflix/ui/pages/wishlist/wishlist_search.page.dart';
+import 'package:kidflix/ui/router/popup_route_observer.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'app_router.g.dart';
@@ -122,6 +123,8 @@ GoRouter appRouter(Ref ref) {
   });
   return GoRouter(
     initialLocation: AppRoutes.phone,
+    // Lets a remote know when the host is stuck behind a prompt.
+    observers: [ref.read(popupRouteObserverProvider)],
     refreshListenable: refresh,
     redirect: (context, routerState) {
       final sessionState = ref.read(sessionControllerProvider);

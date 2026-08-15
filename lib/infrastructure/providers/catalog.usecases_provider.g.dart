@@ -314,4 +314,4 @@ final class HomeCatalogRowsProvider
   }
 }
 
-String _$homeCatalogRowsHash() => r'c3a14dd2ed808e9803aff776b6446c350d77e904';
+String _$homeCatalogRowsHash() => r'cc84553cf051b78f4470ec131ebb6fd4446f5f9c';

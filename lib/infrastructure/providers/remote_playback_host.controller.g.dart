@@ -60,7 +60,7 @@ final class RemotePlaybackHostProvider
 }
 
 String _$remotePlaybackHostHash() =>
-    r'b74b0316bb7bc37f39870333f0feb41260620c3b';
+    r'0e31e31ba5b023c3dabf096401f96e62e2d603f0';
 
 /// The application-side half of remote control on the *host* device.
 ///

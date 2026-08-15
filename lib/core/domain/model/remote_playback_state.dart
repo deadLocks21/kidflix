@@ -189,6 +189,12 @@ class RemotePlaybackState {
   /// [session]: it is true of the device, not of the player.
   final RemoteTextInputSnapshot textInput;
 
+  /// A dialog or sheet is up on the host and nothing underneath responds
+  /// until it is answered — the resume prompt being the one that matters.
+  /// The remote offers its D-pad whenever this is true, whatever else is
+  /// on screen: transport controls cannot answer a question.
+  final bool promptOpen;
+
   const RemotePlaybackState({
     this.status = RemotePlaybackStatus.idle,
     this.mediaId,
@@ -207,6 +213,7 @@ class RemotePlaybackState {
     this.canGoPrevious = false,
     this.session = RemoteSessionSnapshot.unknown,
     this.textInput = RemoteTextInputSnapshot.none,
+    this.promptOpen = false,
   });
 
   static const RemotePlaybackState idle = RemotePlaybackState();
@@ -233,6 +240,7 @@ class RemotePlaybackState {
     bool? canGoPrevious,
     RemoteSessionSnapshot? session,
     RemoteTextInputSnapshot? textInput,
+    bool? promptOpen,
   }) => RemotePlaybackState(
     status: status ?? this.status,
     mediaId: mediaId ?? this.mediaId,
@@ -251,6 +259,7 @@ class RemotePlaybackState {
     canGoPrevious: canGoPrevious ?? this.canGoPrevious,
     session: session ?? this.session,
     textInput: textInput ?? this.textInput,
+    promptOpen: promptOpen ?? this.promptOpen,
   );
 
   Map<String, Object?> toJson() => {
@@ -271,6 +280,7 @@ class RemotePlaybackState {
     'canGoPrevious': canGoPrevious,
     'session': session.toJson(),
     'textInput': textInput.toJson(),
+    'promptOpen': promptOpen,
   };
 
   /// Rebuilds a state from its wire form.
@@ -338,6 +348,7 @@ class RemotePlaybackState {
         // never asks for a keyboard.
         _ => RemoteTextInputSnapshot.none,
       },
+      promptOpen: json['promptOpen'] == true,
     );
   }
 }
