@@ -28,12 +28,22 @@ class PinPad extends StatefulWidget {
   /// (e.g. a biometric button). Replaced by a spinner while verifying.
   final Widget? footer;
 
+  /// Sizes to its content instead of filling the viewport.
+  ///
+  /// For the pad embedded in the remote-control sheet: the page layout
+  /// below needs a bounded height to pin the keypad to the bottom, and
+  /// inside a sheet the only honest bound is "as tall as the keys" — a
+  /// guessed one leaves the pad scrolling inside a sheet that already
+  /// scrolls.
+  final bool compact;
+
   const PinPad({
     super.key,
     required this.title,
     required this.onSubmit,
     this.pinLength = 4,
     this.footer,
+    this.compact = false,
   });
 
   @override
@@ -114,6 +124,20 @@ class _PinPadState extends State<PinPad> with SingleTickerProviderStateMixin {
     final platform = theme.platform;
     final showKeypad =
         platform == TargetPlatform.iOS || platform == TargetPlatform.android;
+    if (widget.compact) {
+      return Focus(
+        focusNode: _focusNode,
+        autofocus: true,
+        onKeyEvent: _onKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _header(theme, showKeypad, padding: 16),
+            if (showKeypad) _keypadSection(theme, bottomPadding: 0),
+          ],
+        ),
+      );
+    }
     return Focus(
       focusNode: _focusNode,
       autofocus: true,
@@ -131,64 +155,66 @@ class _PinPadState extends State<PinPad> with SingleTickerProviderStateMixin {
                   children: [
                     // Title + code dots, vertically centred in the space
                     // above the keypad.
-                    Expanded(
-                      child: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                widget.title,
-                                textAlign: TextAlign.center,
-                                style: theme.textTheme.headlineSmall,
-                              ),
-                              const SizedBox(height: 32),
-                              _dots(theme),
-                              if (!showKeypad) ...[
-                                const SizedBox(height: 28),
-                                SizedBox(
-                                  height: 26,
-                                  child: _verifying
-                                      ? const SizedBox(
-                                          width: 22,
-                                          height: 22,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2.4,
-                                          ),
-                                        )
-                                      : Text(
-                                          'Saisis ton code au clavier',
-                                          style: theme.textTheme.bodyMedium
-                                              ?.copyWith(
-                                                color:
-                                                    context.appColors.grey100,
-                                              ),
-                                        ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+                    Expanded(child: Center(child: _header(theme, showKeypad))),
                     // Keypad pinned to the bottom — touch platforms only.
-                    if (showKeypad)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 360),
-                            child: _keypad(theme),
-                          ),
-                        ),
-                      ),
+                    if (showKeypad) _keypadSection(theme),
                   ],
                 ),
               ),
             ),
           );
         },
+      ),
+    );
+  }
+
+  /// Title, code dots and — on desktop — the typing hint.
+  Widget _header(ThemeData theme, bool showKeypad, {double padding = 24}) {
+    return Padding(
+      padding: EdgeInsets.all(padding),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (widget.title.isNotEmpty) ...[
+            Text(
+              widget.title,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 32),
+          ],
+          _dots(theme),
+          if (!showKeypad) ...[
+            const SizedBox(height: 28),
+            SizedBox(
+              height: 26,
+              child: _verifying
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2.4),
+                    )
+                  : Text(
+                      'Saisis ton code au clavier',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: context.appColors.grey100,
+                      ),
+                    ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _keypadSection(ThemeData theme, {double bottomPadding = 24}) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(24, 0, 24, bottomPadding),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: _keypad(theme),
+        ),
       ),
     );
   }

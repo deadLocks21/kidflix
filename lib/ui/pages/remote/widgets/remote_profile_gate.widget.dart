@@ -165,22 +165,19 @@ class _PinStep extends ConsumerWidget {
           title: 'Code de ${pending?.name ?? 'ce profil'}',
           subtitle: 'Il sera vérifié sur $deviceName.',
         ),
-        // The pad is tall and lives inside a scrollable sheet, so it gets
-        // a bounded height rather than the full-page layout it uses on
-        // the profile-unlock screen.
-        SizedBox(
-          height: 420,
-          child: PinPad(
-            title: '',
-            onSubmit: (pin) async {
-              await client.send(RemoteSubmitProfilePinCommand(pin));
-              // The host is the only side that knows if the code was
-              // right, and it answers with a state frame. Report failure
-              // so the pad shakes and clears; a success replaces this
-              // whole widget with the transport controls anyway.
-              return _awaitUnlock(client, session.pendingProfileId);
-            },
-          ),
+        // Compact rather than the full-page layout of the unlock screen:
+        // inside a sheet the pad has to be as tall as its keys, no more.
+        PinPad(
+          title: '',
+          compact: true,
+          onSubmit: (pin) async {
+            await client.send(RemoteSubmitProfilePinCommand(pin));
+            // The host is the only side that knows if the code was right,
+            // and it answers with a state frame. Report failure so the
+            // pad shakes and clears; a success replaces this whole widget
+            // with the transport controls anyway.
+            return _awaitUnlock(client, session.pendingProfileId);
+          },
         ),
         TextButton(
           onPressed: () => client.send(const RemoteCancelProfilePinCommand()),

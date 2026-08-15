@@ -167,4 +167,43 @@ void main() {
 
     expect(submitted, ['1234']);
   });
+
+  group('PinPad compact', () {
+    testWidgets('sizes to its keys and adds no scroll view of its own', (
+      tester,
+    ) async {
+      // The sheet it lives in already scrolls; a second scrollable inside
+      // is what made the pad look cropped.
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(
+            extensions: const [AppColors.dark()],
+            platform: TargetPlatform.android,
+          ),
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: Column(
+                children: [
+                  const SizedBox(height: 600),
+                  PinPad(title: '', compact: true, onSubmit: (_) async => true),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(
+        find.descendant(
+          of: find.byType(PinPad),
+          matching: find.byType(SingleChildScrollView),
+        ),
+        findsNothing,
+      );
+      for (final digit in ['1', '5', '9', '0']) {
+        expect(find.text(digit), findsOneWidget);
+      }
+    });
+  });
 }
