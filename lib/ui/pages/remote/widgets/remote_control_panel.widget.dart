@@ -53,9 +53,13 @@ class _RemoteControlPanelState extends ConsumerState<RemoteControlPanel> {
         // transport command, so showing controls would be a lie.
         if (!playback.session.isReady)
           RemoteProfileGate(session: playback.session, deviceName: deviceName)
-        else if (!playback.hasMedia)
-          _IdleHint(deviceName: deviceName)
-        else ...[
+        // Nothing is playing: the host is sitting on its catalogue, so
+        // the useful remote is a D-pad, not transport controls.
+        else if (!playback.hasMedia) ...[
+          _IdleHint(deviceName: deviceName),
+          const SizedBox(height: 20),
+          _NavigationPad(onPress: (d) => _send(RemoteNavigateCommand(d))),
+        ] else ...[
           Text(
             playback.title ?? '',
             style: Theme.of(
@@ -228,14 +232,150 @@ class _IdleHint extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Ferme cette fenêtre et choisis un film : il se lancera '
-            'là-bas.',
+            'Navigue avec les flèches, ou ferme cette fenêtre et choisis '
+            'un film : il se lancera là-bas.',
             textAlign: TextAlign.center,
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: KidflixPalette.grey100),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Cross-shaped D-pad: four arrows around a central OK.
+///
+/// Drives the host's keyboard-navigation layer, so what happens over
+/// there is what an arrow key would do — same focus ring, same fences.
+/// Laid out as a real cross rather than a row of buttons because it is
+/// used without looking at the phone, thumb on the screen and eyes on
+/// the TV.
+class _NavigationPad extends StatelessWidget {
+  final ValueChanged<RemoteNavigationDirection> onPress;
+
+  const _NavigationPad({required this.onPress});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      // 232 = three 64 dp buttons plus a 20 dp gap on each side of the
+      // centre, so OK reads as part of the cross without touching it.
+      child: SizedBox(
+        width: 232,
+        height: 232,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Align(
+              alignment: Alignment.topCenter,
+              child: _PadButton(
+                icon: Icons.keyboard_arrow_up,
+                tooltip: 'Haut',
+                onPressed: () => onPress(RemoteNavigationDirection.up),
+              ),
+            ),
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: _PadButton(
+                icon: Icons.keyboard_arrow_down,
+                tooltip: 'Bas',
+                onPressed: () => onPress(RemoteNavigationDirection.down),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: _PadButton(
+                icon: Icons.keyboard_arrow_left,
+                tooltip: 'Gauche',
+                onPressed: () => onPress(RemoteNavigationDirection.left),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: _PadButton(
+                icon: Icons.keyboard_arrow_right,
+                tooltip: 'Droite',
+                onPressed: () => onPress(RemoteNavigationDirection.right),
+              ),
+            ),
+            // Sits in the free corner of the cross rather than under it:
+            // keeps the pad's footprint square, and puts "retour" where
+            // a physical remote puts it — off to the side of the ring.
+            Align(
+              alignment: Alignment.bottomLeft,
+              child: _PadButton(
+                icon: Icons.arrow_back,
+                tooltip: 'Retour',
+                onPressed: () => onPress(RemoteNavigationDirection.back),
+              ),
+            ),
+            Align(
+              alignment: Alignment.bottomRight,
+              child: _PadButton(
+                icon: Icons.search,
+                tooltip: 'Rechercher',
+                onPressed: () => onPress(RemoteNavigationDirection.search),
+              ),
+            ),
+            KidflixFocusZoom(
+              child: SizedBox(
+                // Same 64 dp as the arrows: OK is the most-used button,
+                // not a bigger one — the fill already says that.
+                width: 64,
+                height: 64,
+                child: FilledButton(
+                  onPressed: () => onPress(RemoteNavigationDirection.select),
+                  style: FilledButton.styleFrom(
+                    shape: const CircleBorder(),
+                    padding: EdgeInsets.zero,
+                  ),
+                  child: const Text(
+                    'OK',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PadButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  const _PadButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return KidflixFocusZoom(
+      child: Tooltip(
+        message: tooltip,
+        child: Material(
+          color: KidflixPalette.grey800,
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onPressed,
+            // Sized well past the 48 dp minimum: this is a thumb target
+            // used while looking at the TV, not at the phone.
+            child: SizedBox(
+              width: 64,
+              height: 64,
+              child: Icon(icon, size: 34, semanticLabel: tooltip),
+            ),
+          ),
+        ),
       ),
     );
   }

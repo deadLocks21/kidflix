@@ -14,8 +14,10 @@ import 'package:kidflix/infrastructure/providers/catalog.repository_provider.dar
 import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/remote_control.providers.dart';
 import 'package:kidflix/infrastructure/providers/remote_host_query_handler.dart';
+import 'package:kidflix/infrastructure/providers/search.controller_provider.dart';
 import 'package:kidflix/infrastructure/providers/session.controller_provider.dart';
 import 'package:kidflix/infrastructure/remote_control/remote_device_identity.dart';
+import 'package:kidflix/ui/focus/remote_focus_navigation.dart';
 import 'package:kidflix/ui/router/app_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -201,6 +203,7 @@ class RemotePlaybackHost extends _$RemotePlaybackHost {
         case RemotePreviousEpisodeCommand():
           await controls.previousEpisode();
         case RemotePlayMediaCommand():
+        case RemoteNavigateCommand():
         case RemoteSelectProfileCommand():
         case RemoteSubmitProfilePinCommand():
         case RemoteCancelProfilePinCommand():
@@ -230,6 +233,17 @@ class RemotePlaybackHost extends _$RemotePlaybackHost {
         await _selectProfile(profileId);
       case RemoteSubmitProfilePinCommand(:final pin):
         await _submitPin(pin);
+      case RemoteNavigateCommand(direction: RemoteNavigationDirection.search):
+        _openSearch();
+      case RemoteNavigateCommand(:final direction):
+        applyRemoteNavigation(
+          direction,
+          fallbackContext: ref
+              .read(appRouterProvider)
+              .routerDelegate
+              .navigatorKey
+              .currentContext,
+        );
       case RemoteCancelProfilePinCommand():
         // Same reasoning as [_selectProfile]: backing out is free, so
         // clearing the budget here would make the cooldown a formality.
@@ -238,6 +252,20 @@ class RemotePlaybackHost extends _$RemotePlaybackHost {
         return false;
     }
     return true;
+  }
+
+  /// Opens the host's search bar.
+  ///
+  /// Search lives on the home page, so a host parked in settings or on a
+  /// detail sheet is walked back there first — otherwise the command
+  /// would flip a flag nothing on screen reads, and the remote would look
+  /// broken.
+  void _openSearch() {
+    final router = ref.read(appRouterProvider);
+    if (router.routerDelegate.currentConfiguration.uri.path != AppRoutes.home) {
+      router.go(AppRoutes.home);
+    }
+    ref.read(searchUiControllerProvider.notifier).activate();
   }
 
   Future<void> _selectProfile(String profileId) async {

@@ -19,6 +19,7 @@ void main() {
       const RemoteSelectProfileCommand('profile-4'),
       const RemoteSubmitProfilePinCommand('1234'),
       const RemoteCancelProfilePinCommand(),
+      const RemoteNavigateCommand(RemoteNavigationDirection.left),
       const RemotePlayMediaCommand(mediaId: 'movie-1'),
       const RemotePlayMediaCommand(
         mediaId: 'ep-9',
@@ -102,6 +103,24 @@ void main() {
         RemoteCommand.fromJson({'type': 'seek', 'positionMs': 'soon'}),
         isNull,
       );
+    });
+
+    test('every navigation direction survives the wire', () {
+      for (final direction in RemoteNavigationDirection.values) {
+        final decoded =
+            RemoteCommand.fromJson(RemoteNavigateCommand(direction).toJson())!
+                as RemoteNavigateCommand;
+
+        expect(decoded.direction, equals(direction));
+      }
+    });
+
+    test('an unknown navigation direction decodes to null', () {
+      expect(
+        RemoteCommand.fromJson({'type': 'navigate', 'direction': 'sideways'}),
+        isNull,
+      );
+      expect(RemoteCommand.fromJson({'type': 'navigate'}), isNull);
     });
 
     test('an integer volume is accepted and widened to double', () {

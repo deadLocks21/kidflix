@@ -79,6 +79,12 @@ sealed class RemoteCommand {
         _ => null,
       },
       'cancelProfilePin' => const RemoteCancelProfilePinCommand(),
+      'navigate' => switch (RemoteNavigationDirection.tryParse(
+        stringOf('direction'),
+      )) {
+        final RemoteNavigationDirection d => RemoteNavigateCommand(d),
+        _ => null,
+      },
       'retryDownload' => const RemoteRetryDownloadCommand(),
       'playMedia' => switch (stringOf('mediaId')) {
         final String id => RemotePlayMediaCommand(
@@ -92,6 +98,52 @@ sealed class RemoteCommand {
       _ => null,
     };
   }
+}
+
+/// The four arrows and the OK of a physical remote.
+enum RemoteNavigationDirection {
+  up,
+  down,
+  left,
+  right,
+
+  /// The centre button: activates whatever the host has focused.
+  select,
+
+  /// Steps back out of the current page — the remote's `Escape`.
+  back,
+
+  /// Opens the host's search. Not a direction, but it belongs to the same
+  /// pad: it is the one move the arrows cannot make, and reaching the
+  /// search icon by traversal takes a dozen presses from the catalogue.
+  search;
+
+  static RemoteNavigationDirection? tryParse(String? value) =>
+      RemoteNavigationDirection.values
+          .where((d) => d.name == value)
+          .firstOrNull;
+}
+
+/// Moves the host's keyboard focus, or activates what it holds.
+///
+/// The host has a full keyboard-navigation layer already (`ui/focus`) —
+/// this command does not duplicate it, it feeds it: the box under the TV
+/// behaves exactly as if someone pressed an arrow or Enter on a keyboard
+/// plugged into it, focus ring included.
+///
+/// Deliberately not a "focus this item" command: the remote's mirror of
+/// the host's screen is stale by a frame or two, and an absolute target
+/// would land on whatever moved there in the meantime.
+class RemoteNavigateCommand extends RemoteCommand {
+  final RemoteNavigationDirection direction;
+
+  const RemoteNavigateCommand(this.direction);
+
+  @override
+  String get type => 'navigate';
+
+  @override
+  Map<String, Object?> get payload => {'direction': direction.name};
 }
 
 class RemotePlayCommand extends RemoteCommand {

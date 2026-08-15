@@ -31,23 +31,26 @@ class EscapeToPop extends StatelessWidget {
   Widget build(BuildContext context) {
     return Shortcuts(
       shortcuts: const <ShortcutActivator, Intent>{
-        SingleActivator(LogicalKeyboardKey.escape): _PopRouteIntent(),
+        SingleActivator(LogicalKeyboardKey.escape): PopRouteIntent(),
       },
       child: Actions(
-        actions: <Type, Action<Intent>>{_PopRouteIntent: _PopRouteAction()},
+        actions: <Type, Action<Intent>>{PopRouteIntent: _PopRouteAction()},
         child: child,
       ),
     );
   }
 }
 
-class _PopRouteIntent extends Intent {
-  const _PopRouteIntent();
+/// Public so the remote-control D-pad's "Retour" can dispatch the very
+/// same intent instead of re-deriving what `Escape` means — see
+/// `applyRemoteNavigation`.
+class PopRouteIntent extends Intent {
+  const PopRouteIntent();
 }
 
-class _PopRouteAction extends ContextAction<_PopRouteIntent> {
+class _PopRouteAction extends ContextAction<PopRouteIntent> {
   @override
-  bool isEnabled(_PopRouteIntent intent, [BuildContext? context]) {
+  bool isEnabled(PopRouteIntent intent, [BuildContext? context]) {
     if (context == null) return false;
     final route = ModalRoute.of(context);
     // Popups own their dismissal; only real pages are ours to pop.
@@ -56,7 +59,7 @@ class _PopRouteAction extends ContextAction<_PopRouteIntent> {
   }
 
   @override
-  void invoke(_PopRouteIntent intent, [BuildContext? context]) {
+  void invoke(PopRouteIntent intent, [BuildContext? context]) {
     if (context == null) return;
     // `maybePop`, not `pop`: a page that guards its exit with a [PopScope]
     // keeps the last word.
