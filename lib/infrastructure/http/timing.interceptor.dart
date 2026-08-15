@@ -33,7 +33,10 @@ class TimingInterceptor extends Interceptor {
   }
 
   @override
-  void onResponse(Response<dynamic> response, ResponseInterceptorHandler handler) {
+  void onResponse(
+    Response<dynamic> response,
+    ResponseInterceptorHandler handler,
+  ) {
     _emit(
       options: response.requestOptions,
       status: response.statusCode,

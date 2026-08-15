@@ -46,7 +46,8 @@ class PerfTrace {
       return await body();
     } finally {
       sw.stop();
-      _phases['${name}_ms'] = (_phases['${name}_ms'] ?? 0) + sw.elapsedMilliseconds;
+      _phases['${name}_ms'] =
+          (_phases['${name}_ms'] ?? 0) + sw.elapsedMilliseconds;
     }
   }
 

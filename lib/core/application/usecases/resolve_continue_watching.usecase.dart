@@ -255,9 +255,7 @@ class ResolveContinueWatchingUseCase {
         }
       }),
     );
-    return {
-      for (var i = 0; i < ordered.length; i++) ordered[i]: ?loaded[i],
-    };
+    return {for (var i = 0; i < ordered.length; i++) ordered[i]: ?loaded[i]};
   }
 
   Episode? _findEpisodeIn(Series series, String episodeId) {

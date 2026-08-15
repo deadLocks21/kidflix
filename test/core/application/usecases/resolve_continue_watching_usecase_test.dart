@@ -748,31 +748,34 @@ void main() {
         expect(catalog.listCalls, 0);
       });
 
-      test('the fallback walk happens once per session, not per load', () async {
-        final big = bigCatalog(20);
-        final series = _FakeSeries(big.details);
-        final progress = epProgress(
-          episodeId: 'series-6-e1',
-          updatedAt: DateTime(2026, 5, 6),
-        );
-        final uc = ResolveContinueWatchingUseCase(
-          progressRepo: _FakeProgress([progress]),
-          catalogRepo: _FakeCatalog(big.catalog),
-          seriesRepo: series,
-          logger: _logger,
-        );
+      test(
+        'the fallback walk happens once per session, not per load',
+        () async {
+          final big = bigCatalog(20);
+          final series = _FakeSeries(big.details);
+          final progress = epProgress(
+            episodeId: 'series-6-e1',
+            updatedAt: DateTime(2026, 5, 6),
+          );
+          final uc = ResolveContinueWatchingUseCase(
+            progressRepo: _FakeProgress([progress]),
+            catalogRepo: _FakeCatalog(big.catalog),
+            seriesRepo: series,
+            logger: _logger,
+          );
 
-        await uc.execute('p1');
-        expect(series.findByIdCalls, hasLength(20));
+          await uc.execute('p1');
+          expect(series.findByIdCalls, hasLength(20));
 
-        // Second home load on the same instance: the parent learned by
-        // the first walk is reused, so only that series is re-fetched.
-        series.findByIdCalls.clear();
-        final result = await uc.execute('p1');
+          // Second home load on the same instance: the parent learned by
+          // the first walk is reused, so only that series is re-fetched.
+          series.findByIdCalls.clear();
+          final result = await uc.execute('p1');
 
-        expect(result, hasLength(1));
-        expect(series.findByIdCalls, ['series-6']);
-      });
+          expect(result, hasLength(1));
+          expect(series.findByIdCalls, ['series-6']);
+        },
+      );
 
       test('a stale seriesId drops the entry instead of walking', () async {
         final big = bigCatalog(20);

@@ -718,7 +718,9 @@ Future<void> bootstrap(Ref ref) async {
         .info(
           'app.backend',
           attrs: {
-            'api.base_url': resolvedBaseUrl.isEmpty ? '(vide)' : resolvedBaseUrl,
+            'api.base_url': resolvedBaseUrl.isEmpty
+                ? '(vide)'
+                : resolvedBaseUrl,
             'api.in_memory': isInMemoryBaseUrl(resolvedBaseUrl),
           },
         ),
@@ -745,11 +747,12 @@ Future<void> bootstrap(Ref ref) async {
   // actually missing — but without it Continue Watching re-walks the
   // whole catalog on every single home load. Fire-and-forget: the home
   // must not wait on an optimisation.
-  if (restoredState case Authenticated(:final session) ||
-      PinRequired(:final session) ||
-      ProfileSelected(:final session) ||
-      ManagementPinRequired(:final session) ||
-      ManagingProfiles(:final session)) {
+  if (restoredState
+      case Authenticated(:final session) ||
+          PinRequired(:final session) ||
+          ProfileSelected(:final session) ||
+          ManagementPinRequired(:final session) ||
+          ManagingProfiles(:final session)) {
     unawaited(
       progressSync
           .backfillSeriesIds(session.profiles.map((p) => p.id))

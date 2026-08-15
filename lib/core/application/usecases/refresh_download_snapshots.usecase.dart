@@ -74,19 +74,15 @@ class RefreshDownloadSnapshotsUseCase {
             !_isMovieSnapshotComplete(record.entry))
           record.mediaId,
     };
-    final (seriesIdsToRefresh, completedEpisodesBySeries) = _seriesNeedingRefresh(
-      records,
-    );
+    final (seriesIdsToRefresh, completedEpisodesBySeries) =
+        _seriesNeedingRefresh(records);
     if (movieIdsToRefresh.isEmpty && seriesIdsToRefresh.isEmpty) return;
 
     // Same work as the previous attempt in this session — either it
     // succeeded and something else is re-triggering us, or it failed and
     // will fail again. Retrying on every home rebuild only competes with
     // the screen the user is waiting for. A restart retries.
-    final signature = [
-      ...movieIdsToRefresh,
-      ...seriesIdsToRefresh,
-    ]..sort();
+    final signature = [...movieIdsToRefresh, ...seriesIdsToRefresh]..sort();
     final signatureKey = signature.join(',');
     if (signatureKey == _lastAttempt) return;
     _lastAttempt = signatureKey;

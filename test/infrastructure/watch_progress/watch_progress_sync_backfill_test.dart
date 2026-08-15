@@ -131,7 +131,8 @@ EpisodeProgress _ep({
   updatedAt: updatedAt ?? DateTime.utc(2026, 5, 4),
 );
 
-({WatchProgressSyncService service, _MemStore store, _FakeRemote remote}) build({
+({WatchProgressSyncService service, _MemStore store, _FakeRemote remote})
+build({
   required List<WatchProgress> local,
   required Map<String, List<WatchProgress>> remote,
   bool online = true,
@@ -243,7 +244,10 @@ void main() {
         updatedAt: DateTime.utc(2026, 5, 4),
       );
       final ctx = build(
-        local: [movie, _ep(episodeId: 'e1')],
+        local: [
+          movie,
+          _ep(episodeId: 'e1'),
+        ],
         remote: {
           'p1': [_ep(episodeId: 'e1', seriesId: 'pingu')],
         },
@@ -256,7 +260,10 @@ void main() {
 
     test('an episode the remote cannot resolve is left as-is', () async {
       final ctx = build(
-        local: [_ep(episodeId: 'e1'), _ep(episodeId: 'orphan')],
+        local: [
+          _ep(episodeId: 'e1'),
+          _ep(episodeId: 'orphan'),
+        ],
         remote: {
           'p1': [_ep(episodeId: 'e1', seriesId: 'pingu')],
         },

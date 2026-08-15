@@ -465,7 +465,8 @@ void main() {
       repo = DioWatchProgressRepository(dio: _makeDio(adapter));
     });
 
-    String? headerOf(int i) => adapter.requests[i].headers['X-Profile-Id'] as String?;
+    String? headerOf(int i) =>
+        adapter.requests[i].headers['X-Profile-Id'] as String?;
 
     test('listForProfile épingle le profil du chemin', () async {
       await repo.listForProfile('kid-2');

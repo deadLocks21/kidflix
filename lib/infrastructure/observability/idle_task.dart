@@ -48,7 +48,9 @@ Future<T> runWhenIdle<T>(
     }
   }
 
-  unawaited(binding.scheduleTask(runOnce, Priority.idle, debugLabel: debugLabel));
+  unawaited(
+    binding.scheduleTask(runOnce, Priority.idle, debugLabel: debugLabel),
+  );
   final timer = Timer(deadline, () => unawaited(runOnce()));
   try {
     return await completer.future;
