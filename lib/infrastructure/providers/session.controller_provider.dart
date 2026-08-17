@@ -30,6 +30,7 @@ import 'package:kidflix/infrastructure/providers/remote_control.providers.dart';
 import 'package:kidflix/infrastructure/providers/remote_playback_host.controller.dart';
 import 'package:kidflix/infrastructure/providers/session.repository_provider.dart';
 import 'package:kidflix/infrastructure/providers/watch_progress.repository_provider.dart';
+import 'package:kidflix/ui/router/app_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'session.controller_provider.g.dart';
@@ -725,6 +726,34 @@ Future<void> bootstrap(Ref ref) async {
         ),
   );
   await ref.read(sessionControllerProvider.notifier).restoreSession();
+  // Bench de lecture uniquement : choisit un profil sans intervention.
+  //
+  // Le profil sélectionné n'est jamais persisté — une session restaurée
+  // repart toujours de `Authenticated`, donc de l'écran de choix. C'est
+  // délibéré côté produit (chacun reprend la main sur son profil), mais
+  // ça laisse le harnais bloqué là, sans jamais atteindre le player.
+  // Vide par défaut, donc sans effet en production.
+  if (kProbeProfileId.isNotEmpty) {
+    final probeController = ref.read(sessionControllerProvider.notifier);
+    await probeController.selectProfile(kProbeProfileId);
+    // Un profil protégé s'arrête sur `PinRequired`. Le code passe par
+    // `--dart-define=PROBE_PROFILE_PIN=…`, jamais par une valeur en dur :
+    // il n'a rien à faire dans le dépôt (cf. `tools/.bench.env`, ignoré).
+    if (ref.read(sessionControllerProvider) is PinRequired &&
+        kProbeProfilePin.isNotEmpty) {
+      await probeController.verifyPin(kProbeProfilePin);
+    }
+    // Séjour sur la home avant de lancer le film. Reproduit le chemin
+    // réel : la bande-annonce de la home a le temps de démarrer son
+    // propre lecteur mpv, ce qu'un saut direct ne fait jamais.
+    if (kProbeHomeDwellS > 0 && kProbeMediaId.isNotEmpty) {
+      unawaited(
+        Future<void>.delayed(Duration(seconds: kProbeHomeDwellS), () {
+          ref.read(appRouterProvider).go('/player/$kProbeMediaId');
+        }),
+      );
+    }
+  }
   // Once the persisted session is back in memory, fire-and-forget a
   // profile refresh against the auth repo so the latest server-side
   // state (PIN updates, avatars, `includedLowerAgeCategories` opt-ins,

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:kidflix/core/domain/model/media_track.dart';
 import 'package:kidflix/shared/video_controller_config.dart';
+import 'package:kidflix/ui/pages/player/playback_diagnostics.dart';
 import 'package:kidflix/ui/pages/player/player_engine.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -43,10 +44,12 @@ class MediaKitPlayerEngine implements PlayerEngine {
     _logSub = _player.stream.log.listen(
       (l) => debugPrint('[kidflix.player] [${l.level}] ${l.prefix}: ${l.text}'),
     );
+    _diagnostics = PlaybackDiagnostics(_player)..start();
   }
 
   StreamSubscription<String>? _errorSub;
   StreamSubscription<PlayerLog>? _logSub;
+  late final PlaybackDiagnostics _diagnostics;
 
   @override
   Future<void> open(
@@ -64,6 +67,7 @@ class MediaKitPlayerEngine implements PlayerEngine {
       ),
       play: false,
     );
+    unawaited(_diagnostics.logMediaOpened());
   }
 
   @override
@@ -77,6 +81,7 @@ class MediaKitPlayerEngine implements PlayerEngine {
 
   @override
   Future<void> dispose() async {
+    await _diagnostics.dispose();
     await _errorSub?.cancel();
     await _logSub?.cancel();
     await _player.dispose();

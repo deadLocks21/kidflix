@@ -55,10 +55,58 @@ String _targetRouteFor(SessionState state) => switch (state) {
   OtpRequested() => AppRoutes.otp,
   Authenticated() => AppRoutes.profiles,
   PinRequired() => AppRoutes.profilePin,
-  ProfileSelected() => AppRoutes.home,
+  ProfileSelected() =>
+    kProbeMediaId.isEmpty || kProbeHomeDwellS > 0
+        ? AppRoutes.home
+        : '/player/$kProbeMediaId',
   ManagementPinRequired() => AppRoutes.managementPin,
   ManagingProfiles() => AppRoutes.manage,
 };
+
+/// Sends the app straight into the player for this id as soon as a
+/// profile is selected, instead of to the home page.
+///
+/// Exists for the automated playback bench (`tools/playback_bench.sh`):
+/// measuring frame drops means measuring the *same* film, from the same
+/// point, over and over, and a human clicking through the catalogue is
+/// both the slowest part of that loop and a source of variance — a
+/// different film or a different scene changes the numbers.
+///
+/// Empty by default, so this branch is dead weight in every real build:
+/// the constant folds away and the route resolves to home exactly as
+/// before. Set with `--dart-define=PROBE_MEDIA_ID=<id>`.
+const String kProbeMediaId = String.fromEnvironment('PROBE_MEDIA_ID');
+
+/// Secondes passées sur la home avant que le bench ne lance le film,
+/// via `--dart-define=PROBE_HOME_DWELL_S=<n>`. Zéro (défaut) : le banc
+/// va droit au player.
+///
+/// Exister est tout l'intérêt : aller droit au player mesure un chemin
+/// que personne n'emprunte. Un vrai spectateur traverse la home, où une
+/// bande-annonce démarre son propre lecteur mpv, puis ouvre une modale
+/// qui en démarre un second. Mesurer sans ce passage, c'est mesurer une
+/// app qui n'a jamais rien fait d'autre que lire un fichier.
+const int kProbeHomeDwellS = int.fromEnvironment('PROBE_HOME_DWELL_S');
+
+/// Seconde du film où le bench démarre la lecture, via
+/// `--dart-define=PROBE_START_S=<n>`.
+///
+/// Le générique d'ouverture est le passage le moins coûteux d'un film :
+/// peu de mouvement, donc peu de travail pour le décodeur comme pour la
+/// présentation. Mesurer là revient à mesurer le meilleur cas, alors que
+/// le spectateur, lui, regarde le milieu du film.
+const int kProbeStartS = int.fromEnvironment('PROBE_START_S');
+
+/// Profil choisi automatiquement au démarrage pour le bench, via
+/// `--dart-define=PROBE_PROFILE_ID=<id>`. Voir son usage dans
+/// `bootstrap` : sans lui, l'app s'arrête sur l'écran de choix de profil
+/// et [kProbeMediaId] ne sert à rien.
+const String kProbeProfileId = String.fromEnvironment('PROBE_PROFILE_ID');
+
+/// Code PIN du profil visé par [kProbeProfileId], quand il en a un.
+/// Fourni par l'environnement au moment du build du bench et jamais
+/// stocké dans le dépôt.
+const String kProbeProfilePin = String.fromEnvironment('PROBE_PROFILE_PIN');
 
 bool _isManageSubRoute(String path) =>
     path == AppRoutes.manage ||

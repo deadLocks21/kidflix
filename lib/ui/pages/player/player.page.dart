@@ -51,6 +51,7 @@ import 'package:kidflix/ui/pages/player/widgets/subtitle_track_button.widget.dar
 import 'package:kidflix/ui/pages/player/widgets/track_selector_sheet.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/unlock_button.widget.dart';
 import 'package:kidflix/ui/pages/player/widgets/unlock_pin_dialog.widget.dart';
+import 'package:kidflix/ui/router/app_router.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -1019,6 +1020,15 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
       return Duration.zero;
     }
     if (_disposed || !mounted) return Duration.zero;
+    // Bench de lecture : repart du début, sans poser la question.
+    //
+    // Deux raisons, et la seconde est la plus importante. Le dialogue
+    // attend une réponse humaine, donc il fige le harnais ; mais surtout,
+    // reprendre là où le film s'était arrêté ferait mesurer une scène
+    // différente à chaque run — or une scène chargée en mouvement ne
+    // coûte pas la même chose qu'un plan fixe. Comparer deux commits
+    // suppose de mesurer exactement le même passage.
+    if (kProbeMediaId.isNotEmpty) return Duration.zero;
     final choice = await showResumeDialog(
       context,
       Duration(seconds: progress.positionSeconds),

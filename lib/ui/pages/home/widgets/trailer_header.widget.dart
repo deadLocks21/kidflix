@@ -54,7 +54,11 @@ class _TrailerHeaderState extends State<TrailerHeader> {
   void initState() {
     super.initState();
     final id = extractYouTubeVideoId(widget.trailerUrl);
-    if (id == null) {
+    // EXPÉRIENCE bench : neutralise la bande-annonce pour isoler le coût
+    // de son lecteur mpv sur la lecture qui suit.
+    // `--dart-define=PROBE_NO_TRAILER=true`.
+    const noTrailer = bool.fromEnvironment('PROBE_NO_TRAILER');
+    if (id == null || noTrailer) {
       _showFallback = true;
       return;
     }
