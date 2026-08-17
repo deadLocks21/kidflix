@@ -20,7 +20,6 @@ import 'package:kidflix/core/domain/model/avatar_update.dart';
 import 'package:kidflix/core/domain/model/profile.dart';
 import 'package:kidflix/core/domain/model/session.dart';
 import 'package:kidflix/infrastructure/providers/api_base_url.provider.dart';
-import 'package:kidflix/infrastructure/observability/idle_task.dart';
 import 'package:kidflix/infrastructure/providers/logger.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/auth.service_provider.dart';
 import 'package:kidflix/infrastructure/providers/authenticate_with_biometrics.usecase_provider.dart';
@@ -767,26 +766,41 @@ Future<void> bootstrap(Ref ref) async {
   // record that `restore()` publishes. Starting the server before they
   // are loaded advertises an empty id — which every remote drops, since
   // the id is what a pairing token is keyed on.
-  // Scheduled at idle rather than merely unawaited. `unawaited` only
-  // means nobody waits for the result — the work still starts at once
-  // and competes with the frames the app is trying to render.
+  // Démarré immédiatement, et NON via `runWhenIdle` : ce report était la
+  // cause des ralentissements de lecture.
   //
-  // Every individual step of the server start was measured and none of
-  // them holds the isolate: tokens 0 ms, bind 3 ms, interfaces ~180 ms,
-  // seed 1 ms, and the mDNS wait blocks ~180 ms of its 1.6 s. Yet
-  // enabling the server adds ~1.2 s of stall, in the frames that follow
-  // it coming up. There is no step to optimise — the fix is to stop
-  // paying it while the first screens are rendering.
+  // Ce démarrage contient ~670 ms d'enregistrement mDNS natif purement
+  // bloquant. Le différer ne le supprime pas, il le déplace là où
+  // l'attente d'inactivité se termine — or elle ne se termine jamais
+  // d'elle-même ici, l'app enchaînant les frames, si bien que c'est
+  // toujours l'échéance de repli de 3 s qui tranche. Soit à peu près le
+  // moment où l'utilisateur lance un film : le blocage tombait dans le
+  // démarrage de la lecture.
   //
-  // Deferred, not dropped: the server still comes up by itself, and the
-  // delay is invisible. mDNS requires ~1.6 s of conflict probing before
-  // the device is discoverable at all, so "started at launch" never
-  // meant "discoverable at launch".
+  // Bisecté et mesuré automatiquement (3 runs par point, verdict à la
+  // médiane, HEVC 1080p local, départ à 25 min, images perdues cumulées
+  // sur 8 fenêtres de 5 s) :
+  //
+  //   e1d6de8, parent de c55614a  :  5   ← dernier commit sain
+  //   c55614a                     : 30   ← premier commit fautif
+  //   HEAD sans correction        : 40
+  //   HEAD avec cette correction  :  0   (0 fenêtre sale sur 9, ×3 runs)
+  //
+  // Le protocole compte autant que le résultat : mesurer le générique ne
+  // montre RIEN — 0 partout, sain comme régressé. Une scène chargée est
+  // la seule qui sépare les deux, parce qu'elle n'a plus de marge quand
+  // le thread se bloque.
+  //
+  // Le jank de démarrage évité par le report était réel (~700 ms), mais
+  // il se produit une fois, sur un écran de catalogue, où il ne se voit
+  // pas ; les images perdues, elles, se voient à chaque film. La vraie
+  // sortie serait un enregistrement mDNS non bloquant côté natif — tant
+  // que ce n'est pas fait, le payer tôt est le moindre mal.
   unawaited(
-    runWhenIdle(() async {
+    () async {
       await ref.read(remoteDeviceIdProvider.notifier).load();
       await ref.read(remoteDeviceNameProvider.notifier).load();
       await ref.read(remoteHostControllerProvider.notifier).restore();
-    }, debugLabel: 'remote-host-restore').catchError((Object _) {}),
+    }().catchError((Object _) {}),
   );
 }

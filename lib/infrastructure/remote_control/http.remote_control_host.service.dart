@@ -123,9 +123,12 @@ class HttpRemoteControlHostService implements RemoteControlHostService {
 
     // Kept as a regression guard, not as live diagnosis: bringing the
     // server up is the one costly thing this app does at boot (~700 ms,
-    // almost all of it the mDNS registration), and it is scheduled off
-    // the critical path on that basis — cf. `runWhenIdle` at the call
-    // site. If `advertise_ms` ever grows, that assumption needs revisiting.
+    // almost all of it the mDNS registration). That cost is now paid at
+    // boot deliberately — deferring it only moved the stall onto the
+    // start of playback, where it cost dropped frames; see the call site
+    // in `bootstrap`. If `advertise_ms` ever grows, the way out is a
+    // non-blocking registration on the native side, not another attempt
+    // at scheduling around it.
     final trace = PerfTrace();
     _issuedTokens = await trace.measure('tokens', _pairing.loadIssuedTokens);
     _failedPairingAttempts = 0;
