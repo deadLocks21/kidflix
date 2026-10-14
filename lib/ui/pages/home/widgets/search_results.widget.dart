@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:kidflix/core/application/dtos/catalog_item.dto.dart';
 import 'package:kidflix/core/application/dtos/movie.dto.dart';
+import 'package:kidflix/core/application/dtos/profile.dto.dart';
 import 'package:kidflix/core/application/dtos/series.dto.dart';
 import 'package:kidflix/core/application/session_state.dart';
 import 'package:kidflix/core/domain/model/media.dart';
@@ -13,6 +15,7 @@ import 'package:kidflix/infrastructure/providers/session.controller_provider.dar
 import 'package:kidflix/ui/pages/home/widgets/movie_detail_modal.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/search_result_tile.widget.dart';
 import 'package:kidflix/ui/pages/home/widgets/series_detail_modal.widget.dart';
+import 'package:kidflix/ui/router/app_router.dart';
 
 /// Renders the search results area of the home page while search mode is
 /// active. Switches between 5 states based on the controller and async
@@ -42,8 +45,9 @@ class SearchResults extends ConsumerWidget {
       ),
       data: (list) {
         if (list.isEmpty) {
-          return _MessageState(
-            text: 'Aucun résultat ne correspond à « $trimmed ».',
+          return _NoResultsState(
+            query: trimmed,
+            canUseWishlist: _isMainProfile(ref),
           );
         }
         return ListView.separated(
@@ -56,6 +60,14 @@ class SearchResults extends ConsumerWidget {
         );
       },
     );
+  }
+
+  /// The wishlist is gated on the main profile — same rule as the
+  /// "Liste d'envies" menu entry and the backend's `requireMainProfile`.
+  bool _isMainProfile(WidgetRef ref) {
+    final session = ref.watch(sessionControllerProvider);
+    return session is ProfileSelected &&
+        ProfileDto.fromDomain(session.profile).isMain;
   }
 
   Future<void> _openDetail(
@@ -108,6 +120,48 @@ class _MessageState extends StatelessWidget {
           text,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyLarge,
+        ),
+      ),
+    );
+  }
+}
+
+/// Nothing in the catalogue. For the main profile, offers to look the
+/// title up in Watcharr instead: the wishlist search opens with [query]
+/// already filled in.
+class _NoResultsState extends StatelessWidget {
+  final String query;
+  final bool canUseWishlist;
+
+  const _NoResultsState({required this.query, required this.canUseWishlist});
+
+  @override
+  Widget build(BuildContext context) {
+    final message = 'Aucun résultat ne correspond à « $query ».';
+    if (!canUseWishlist) return _MessageState(text: message);
+    return Padding(
+      padding: const EdgeInsets.all(32),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: () => context.push(
+                Uri(
+                  path: AppRoutes.settingsWishlistAdd,
+                  queryParameters: {'q': query},
+                ).toString(),
+              ),
+              icon: const Icon(Icons.bookmark_add_outlined),
+              label: const Text("Ajouter à la liste d'envies"),
+            ),
+          ],
         ),
       ),
     );

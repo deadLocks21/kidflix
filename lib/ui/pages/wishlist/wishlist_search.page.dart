@@ -15,8 +15,14 @@ import 'package:kidflix/ui/pages/wishlist/widgets/wishlist_search_result_tile.wi
 /// Queries shorter than 2 chars (post-trim) short-circuit to an
 /// empty result list (matches
 /// [SearchAddableWishlistContentUseCase.minQueryLength]).
+///
+/// Also reached from the home search when the catalogue has no match:
+/// [initialQuery] then pre-fills the field and the search runs on open,
+/// without stealing focus so the keyboard doesn't hide the results.
 class WishlistSearchPage extends ConsumerStatefulWidget {
-  const WishlistSearchPage({super.key});
+  final String? initialQuery;
+
+  const WishlistSearchPage({super.key, this.initialQuery});
 
   @override
   ConsumerState<WishlistSearchPage> createState() => _WishlistSearchPageState();
@@ -25,10 +31,18 @@ class WishlistSearchPage extends ConsumerStatefulWidget {
 class _WishlistSearchPageState extends ConsumerState<WishlistSearchPage> {
   static const Duration _debounce = Duration(milliseconds: 350);
 
-  final TextEditingController _controller = TextEditingController();
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initialQuery?.trim() ?? '',
+  );
   Timer? _debounceTimer;
   String _activeQuery = '';
   AsyncValue<List<WishlistSearchResultDto>> _results = const AsyncData([]);
+
+  @override
+  void initState() {
+    super.initState();
+    if (_controller.text.isNotEmpty) _runSearch(_controller.text);
+  }
 
   @override
   void dispose() {
@@ -76,7 +90,7 @@ class _WishlistSearchPageState extends ConsumerState<WishlistSearchPage> {
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                   child: TextField(
                     controller: _controller,
-                    autofocus: true,
+                    autofocus: widget.initialQuery?.trim().isEmpty ?? true,
                     textInputAction: TextInputAction.search,
                     onChanged: _onChanged,
                     onSubmitted: (v) {

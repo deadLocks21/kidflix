@@ -175,7 +175,8 @@ GoRouter appRouter(Ref ref) {
       ),
       GoRoute(
         path: AppRoutes.settingsWishlistAdd,
-        builder: (_, _) => const WishlistSearchPage(),
+        builder: (_, s) =>
+            WishlistSearchPage(initialQuery: s.uri.queryParameters['q']),
       ),
       GoRoute(
         path: AppRoutes.managementPin,
